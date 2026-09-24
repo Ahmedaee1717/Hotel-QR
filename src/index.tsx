@@ -39549,763 +39549,1365 @@ app.get('/admin/beach-management', (c) => {
   `)
 })
 
-// Beach Map Designer - Interactive drag-and-drop interface
-app.get('/admin/beach-map-designer', (c) => {
-  return c.html(`
-<!DOCTYPE html>
+// ADMIN: Beach setup — layout builder on the guest photo, zones & booking limits, time slots
+app.get('/admin/beach-setup', (c) => {
+  return c.html(`<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beach Map Designer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        #beachCanvas {
-            border: 2px solid #cbd5e0;
-            cursor: crosshair;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-        }
-        .spot-icon {
-            position: absolute;
-            cursor: move;
-            font-size: 24px;
-            user-select: none;
-            transition: transform 0.1s;
-        }
-        .spot-icon:hover {
-            transform: scale(1.2);
-        }
-        .spot-icon.selected {
-            transform: scale(1.3);
-            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.8));
-        }
-        .tool-btn {
-            transition: all 0.2s;
-        }
-        .tool-btn.active {
-            background: #3b82f6;
-            color: white;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beach setup</title>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#f3f4f6}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#111827;font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
+body.embed,html.embed{background:transparent}
+body.embed header.top{display:none}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;background:#fff;border-bottom:1px solid #e5e7eb}
+header.top h1{font-size:1.25rem;font-weight:800}
+header.top h1 i{color:#0891b2;margin-right:9px}
+header.top a{color:#2563eb;text-decoration:none;font-weight:600;font-size:.85rem}
+.wrap{max-width:1480px;margin:0 auto;padding:14px 20px 40px}
+body.embed .wrap{padding:0 0 24px;max-width:none}
+.hidden{display:none!important}
+.tabs{display:flex;gap:2px;border-bottom:1px solid #e5e7eb;margin-bottom:14px;overflow-x:auto}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:11px 16px;font-weight:700;color:#6b7280;cursor:pointer;font-size:.92rem;white-space:nowrap;font-family:inherit}
+.tab i{margin-right:6px}
+.tab.on{color:#2563eb;border-bottom-color:#2563eb}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.pane>.card+.card{margin-top:14px}
+.card h2{font-size:1.02rem;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 i{color:#0891b2}
+.card h3{font-size:.98rem;font-weight:800;margin-bottom:8px}
+.card h3 i{color:#2563eb;margin-right:6px}
+.muted{color:#6b7280}
+.sm{font-size:.84rem}
+.xs{font-size:.76rem;margin-top:10px}
+.lb{display:block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:4px}
+.field{margin-bottom:10px;min-width:0}
+input[type=text],input[type=number],input[type=time],select{width:100%;border:1px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:.92rem;background:#fff;color:#111827;min-height:38px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+input:disabled{background:#f3f4f6;color:#6b7280}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.chk{display:flex;align-items:center;gap:8px;font-size:.88rem;font-weight:600;color:#374151;margin:6px 0 8px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:#2563eb;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:8px;padding:7px 12px;font-weight:700;font-size:.84rem;cursor:pointer;min-height:38px;font-family:inherit;white-space:nowrap}
+.btn:hover{background:#f9fafb}
+.btn.pri{background:#2563eb;border-color:#2563eb;color:#fff}
+.btn.pri:hover{background:#1d4ed8}
+.btn.danger{color:#dc2626;border-color:#fecaca;background:#fef2f2}
+.btn.on{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
+.btn.icon{width:38px;padding:0}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.lnk{background:none;border:0;color:#2563eb;font-weight:700;cursor:pointer;font-size:inherit;font-family:inherit;text-decoration:underline}
+.err{color:#b91c1c;font-size:.84rem;font-weight:600;margin:6px 0}
+.err:empty{display:none}
+.warn{color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 11px;font-size:.84rem;margin:10px 0}
+.warn:empty{display:none}
+.pill{display:inline-block;font-size:.72rem;font-weight:800;padding:2px 9px;border-radius:999px;background:#f3f4f6;color:#4b5563}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.toolbar .sp{flex:1}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.zoom{display:flex;align-items:center;gap:6px}
+.zoom span{min-width:44px;text-align:center;font-weight:700;font-size:.82rem;color:#374151}
+.legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:.8rem;color:#374151;margin:4px 0 10px}
+.legend b{font-weight:800}
+.legend .dim{color:#d1d5db}
+.sw{display:inline-block;width:15px;height:15px;border-radius:4px;border:2px solid #94a3b8;vertical-align:-3px;margin-right:5px}
+.sw.dash{border-style:dashed;border-color:#64748b}
+.sw.mt{border-color:#64748b;background-image:repeating-linear-gradient(45deg,rgba(220,38,38,.55) 0 3px,transparent 3px 6px)}
+.unsaved{color:#b45309;font-weight:700}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#f59e0b;margin-right:5px}
+/* tier colours: shared by map cells, legend swatches, chips and badges */
+.t-first_line{border-color:#0ea5e9!important;background-color:rgba(14,165,233,.2)}
+.t-standard{border-color:#475569!important;background-color:rgba(71,85,105,.16)}
+.t-vip{border-color:#f59e0b!important;background-color:rgba(245,158,11,.26)}
+.t-cabana{border-color:#8b5cf6!important;background-color:rgba(139,92,246,.26)}
+.lgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"map side" "tray side";gap:14px;align-items:start}
+.gmap{grid-area:map;min-width:0}
+.side{grid-area:side;position:sticky;top:8px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.tray{grid-area:tray;min-width:0}
+.mapwrap{position:relative;overflow:auto;border-radius:10px;background:#0f172a;max-height:74vh;-webkit-overflow-scrolling:touch;border:1px solid #e5e7eb}
+#stage{position:relative;width:100%;aspect-ratio:1774/887;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#stage.nophoto{background:linear-gradient(180deg,#e0f2fe 0%,#fef3c7 60%,#bae6fd 100%)}
+#stage.adding{cursor:crosshair}
+#photo{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;-webkit-user-drag:none}
+#cells{position:absolute;inset:0}
+.mapmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:#fff;background:rgba(15,23,42,.62);font-weight:600;padding:20px;text-align:center;z-index:5}
+.cell{position:absolute;border:2px solid;border-radius:7px;cursor:grab;touch-action:none;display:flex;align-items:flex-end;justify-content:center;transition:box-shadow .15s}
+.cell:hover{box-shadow:0 0 0 2px rgba(255,255,255,.75)}
+.cell .n{transform:translateY(58%);background:#fff;color:#111827;font-size:10px;font-weight:800;line-height:1;padding:3px 5px;border-radius:999px;border:1.5px solid #94a3b8;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.35);pointer-events:none;display:flex;align-items:center;gap:3px}
+.cell.t-first_line .n{border-color:#0ea5e9;color:#075985}
+.cell.t-vip .n{border-color:#f59e0b;color:#92400e}
+.cell.t-cabana .n{border-color:#8b5cf6;color:#5b21b6}
+.cell .n s{color:#9ca3af;font-weight:600}
+.cell.nobook{border-style:dashed}
+.cell.maint{background-image:repeating-linear-gradient(45deg,rgba(220,38,38,.4) 0 5px,transparent 5px 10px)}
+.cell.maint .n i{color:#dc2626}
+.cell.sel{outline:3px solid #2563eb;outline-offset:1px;box-shadow:0 0 0 6px rgba(37,99,235,.35);z-index:2}
+.cell.moved::after{content:'';position:absolute;top:-5px;right:-5px;width:10px;height:10px;border-radius:50%;background:#f59e0b;border:1.5px solid #fff}
+.cell.dragging{cursor:grabbing;z-index:3;opacity:.92}
+.cell.pv .n{background:#fef3c7}
+.cell.ghost{border:2px dashed #fff!important;background:rgba(37,99,235,.45)!important;pointer-events:none;z-index:4}
+.hint{font-size:.8rem;color:#6b7280;margin:8px 2px 0}
+.banner{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:10px 12px;font-size:.86rem}
+.edhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:42px;padding:0 8px;border-radius:10px;border:2px solid;font-weight:800;font-size:.95rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1.5px solid #d1d5db;background:#fff;border-radius:999px;padding:5px 11px;font-weight:700;font-size:.8rem;cursor:pointer;min-width:42px;min-height:32px;font-family:inherit;color:#111827}
+.tray .chip{cursor:grab}
+.chip.on{background:#2563eb!important;border-color:#2563eb!important;color:#fff}
+.trayhead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;margin-bottom:4px}
+.grp{margin-top:12px}
+.grp h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#374151;margin-bottom:6px;font-weight:800}
+.flyer{position:fixed;z-index:60;pointer-events:none;background:#2563eb;color:#fff;border-radius:999px;padding:5px 11px;font-weight:800;font-size:.82rem;transform:translate(-50%,-50%);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.tips{margin:12px 0 0 18px;font-size:.82rem;color:#4b5563}
+.tips li{margin-bottom:5px}
+.seg2{display:flex;flex-wrap:wrap;gap:6px 14px}
+.seg2 label{display:flex;align-items:center;gap:6px;font-weight:600;font-size:.88rem;cursor:pointer}
+.seg2 input{accent-color:#2563eb;width:17px;height:17px}
+.numprev{margin:8px 0}
+.pvlist{display:flex;flex-wrap:wrap;gap:4px;max-height:170px;overflow:auto;padding:6px;background:#f9fafb;border:1px solid #f3f4f6;border-radius:8px;margin-bottom:6px}
+.pvlist span{font-size:.76rem;padding:2px 7px;border-radius:6px;background:#fff;border:1px solid #e5e7eb;color:#6b7280}
+.pvlist span.chg{color:#111827;border-color:#fcd34d;background:#fffbeb}
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:8px}
+.tbl th,.tbl td{text-align:left;padding:9px 8px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+.tbl th{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:800;white-space:nowrap}
+.tbl td.num{font-weight:700;text-align:center}
+.tbl input[type=text]{min-width:140px}
+.tbl input[type=number]{width:110px}
+.tbl select{min-width:110px}
+.tbl .chk{margin:0}
+.addzone{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #f3f4f6}
+.addzone .field{margin:0;flex:1;min-width:160px}
+.limits{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,300px));gap:0 14px;margin:10px 0 6px}
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:12px 0}
+.slot{border:1px solid #e5e7eb;border-radius:10px;padding:14px;background:#fcfcfd}
+.slot h3{display:flex;align-items:center;gap:8px}
+.slot h3 i{color:#f59e0b}
+.tag{display:inline-block;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:5px;background:#fef3c7;color:#92400e;margin-left:4px}
+.src{font-size:.74rem;font-weight:700;color:#4b5563}
+.src.calc{color:#92400e}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;background:#111827;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:.88rem;transition:opacity .2s,transform .2s;z-index:100;max-width:min(560px,92vw);pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:#b91c1c}
+.toast.ok{background:#15803d}
+@media (max-width:960px){
+  .lgrid{grid-template-columns:minmax(0,1fr);grid-template-areas:"map" "side" "tray"}
+  .side{position:static}
+  .mapwrap{max-height:62vh}
+}
+@media (max-width:560px){
+  .wrap{padding:10px 12px 30px}
+  .grid2{grid-template-columns:1fr}
+}
+</style>
 </head>
-<body class="bg-gray-100">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <div class="w-80 bg-white shadow-lg p-6 overflow-y-auto">
-            <h1 class="text-2xl font-bold mb-6">
-                <i class="fas fa-map-marked-alt mr-2 text-blue-600"></i>
-                Beach Map Designer
-            </h1>
-            
-            <!-- Tools -->
-            <div class="mb-6">
-                <h3 class="font-bold mb-3">Tools</h3>
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="setTool('select')" id="selectTool" class="tool-btn active px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        <i class="fas fa-mouse-pointer mr-1"></i>Select
-                    </button>
-                    <button onclick="setTool('umbrella')" id="umbrellaTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        🔵 Umbrella
-                    </button>
-                    <button onclick="setTool('cabana')" id="cabanaTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        🟢 Cabana
-                    </button>
-                    <button onclick="setTool('lounger')" id="loungerTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        🟡 Lounger
-                    </button>
-                    <button onclick="setTool('daybed')" id="daybedTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        🟣 Daybed
-                    </button>
-                    <button onclick="deleteSelected()" class="tool-btn px-4 py-2 border rounded-lg hover:bg-red-50 text-red-600">
-                        <i class="fas fa-trash mr-1"></i>Delete
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Zone Drawing Tools -->
-            <div class="mb-6 bg-purple-50 p-4 rounded-lg border-2 border-purple-200">
-                <h3 class="font-bold mb-3 text-purple-700">
-                    <i class="fas fa-draw-polygon mr-2"></i>Zone Overlays
-                </h3>
-                <p class="text-xs text-gray-600 mb-3">Draw colored zones to help guests identify areas</p>
-                <div class="grid grid-cols-1 gap-2">
-                    <button onclick="setTool('zone-rect')" id="zoneRectTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-purple-100">
-                        <i class="fas fa-square mr-1"></i>Draw Rectangle Zone
-                    </button>
-                    <button onclick="toggleZonesList()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                        <i class="fas fa-list mr-1"></i>Manage Zones (<span id="zonesCount">0</span>)
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Zones List (Hidden by default) -->
-            <div id="zonesList" class="mb-6 hidden">
-                <h3 class="font-bold mb-3">Zones</h3>
-                <div id="zonesListContainer" class="space-y-2 max-h-60 overflow-y-auto">
-                    <p class="text-sm text-gray-500">No zones created yet</p>
-                </div>
-            </div>
-            
-            <!-- Upload Beach Photo -->
-            <div class="mb-6">
-                <h3 class="font-bold mb-3">Beach Photo</h3>
-                <input type="file" id="beachPhotoUpload" accept="image/*" class="w-full px-4 py-2 border rounded-lg text-sm">
-                <p class="text-xs text-gray-500 mt-2">Upload an aerial view of your beach</p>
-            </div>
-            
-            <!-- Selected Spot Details -->
-            <div id="spotDetails" class="mb-6 hidden">
-                <h3 class="font-bold mb-3">Spot Details</h3>
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Spot Number</label>
-                        <input type="text" id="spotNumber" class="w-full px-3 py-2 border rounded-lg" placeholder="A1">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Capacity</label>
-                        <input type="number" id="spotCapacity" min="1" max="10" value="2" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">
-                            <i class="fas fa-map-marker-alt mr-1 text-purple-600"></i>Zone
-                        </label>
-                        <select id="spotZone" class="w-full px-3 py-2 border rounded-lg bg-white">
-                            <option value="General Area">General Area</option>
-                            <option value="Quiet Zone">Quiet Zone</option>
-                            <option value="Family Area">Family Area</option>
-                            <option value="VIP Section">VIP Section</option>
-                            <option value="Beach Front">Beach Front</option>
-                            <option value="Pool Side">Pool Side</option>
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">Organize spots by zone for analytics</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Price (Full Day)</label>
-                        <input type="number" id="spotPrice" min="0" step="5" value="0" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
-                    <div>
-                        <label class="flex items-center">
-                            <input type="checkbox" id="spotPremium" class="mr-2">
-                            <span class="text-sm">Premium Spot</span>
-                        </label>
-                    </div>
-                    <button onclick="updateSpotDetails()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        <i class="fas fa-save mr-2"></i>Update Spot
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Spots List -->
-            <div class="mb-6">
-                <h3 class="font-bold mb-3">Beach Spots (<span id="spotCount">0</span>)</h3>
-                <div id="spotsList" class="space-y-2 max-h-60 overflow-y-auto">
-                    <p class="text-sm text-gray-500">No spots placed yet</p>
-                </div>
-            </div>
-            
-            <!-- Actions -->
-            <div class="space-y-2">
-                <button onclick="saveLayout()" class="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg hover:from-green-700 hover:to-blue-700 font-semibold">
-                    <i class="fas fa-save mr-2"></i>Save Beach Layout
-                </button>
-                <button onclick="clearAll()" class="w-full px-4 py-2 border border-red-600 text-red-600 rounded-lg hover:bg-red-50">
-                    <i class="fas fa-trash mr-2"></i>Clear All Spots
-                </button>
-                <button onclick="window.close()" class="w-full px-4 py-2 border rounded-lg hover:bg-gray-50">
-                    <i class="fas fa-times mr-2"></i>Close Designer
-                </button>
-            </div>
-        </div>
-        
-        <!-- Canvas Area -->
-        <div class="flex-1 p-6 overflow-auto">
-            <div class="bg-white rounded-lg shadow-lg h-full p-4">
-                <div class="relative w-full h-full overflow-auto">
-                    <div id="beachCanvas" class="relative bg-gradient-to-b from-blue-100 to-yellow-100" style="min-width: 800px; min-height: 600px; width: max-content; height: max-content;">
-                        <!-- Spots will be placed here -->
-                    </div>
-                </div>
-            </div>
-        </div>
+<body>
+<header class="top">
+  <h1><i class="fas fa-umbrella-beach"></i>Beach setup</h1>
+  <a href="/admin/dashboard"><i class="fas fa-arrow-left"></i> Dashboard</a>
+</header>
+<div class="wrap">
+  <nav class="tabs" role="tablist">
+    <button class="tab" data-tab="layout" onclick="showTab('layout')"><i class="fas fa-map"></i>Layout</button>
+    <button class="tab" data-tab="zones" onclick="showTab('zones')"><i class="fas fa-layer-group"></i>Zones &amp; capacity</button>
+    <button class="tab" data-tab="slots" onclick="showTab('slots')"><i class="fas fa-clock"></i>Time slots</button>
+  </nav>
+
+  <section id="pane-layout" class="pane">
+    <div class="toolbar">
+      <div class="seg">
+        <button class="btn" id="mSelect" onclick="setMode('select')"><i class="fas fa-arrow-pointer"></i>Select &amp; move</button>
+        <button class="btn" id="mAdd" onclick="setMode('add')"><i class="fas fa-plus"></i>Add spot</button>
+        <button class="btn" id="mNumber" onclick="setMode('number')"><i class="fas fa-arrow-down-1-9"></i>Number a row</button>
+      </div>
+      <button class="btn" onclick="addCabanas()"><i class="fas fa-campground"></i>Add cabanas VC-1–VC-3</button>
+      <span class="sp"></span>
+      <div class="zoom">
+        <button class="btn icon" onclick="zoomBy(-1)" title="Zoom out" aria-label="Zoom out"><i class="fas fa-magnifying-glass-minus"></i></button>
+        <span id="zoomLbl">100%</span>
+        <button class="btn icon" onclick="zoomBy(1)" title="Zoom in" aria-label="Zoom in"><i class="fas fa-magnifying-glass-plus"></i></button>
+      </div>
+      <button class="btn" id="discardBtn" onclick="discardLayout()" disabled>Discard</button>
+      <button class="btn pri" id="saveBtn" onclick="saveLayout()" disabled><i class="fas fa-floppy-disk"></i>Save layout</button>
     </div>
-    
-    <script>
-        // Get authenticated property ID from localStorage
-        const propertyId = localStorage.getItem('property_id') || '1';
-        const userId = localStorage.getItem('user_id') || '1';
-        
-        // Authenticated fetch helper
-        async function fetchWithAuth(url, options = {}) {
-            const headers = {
-                ...options.headers,
-                'X-User-ID': userId,
-                'X-Property-ID': propertyId
-            };
-            return fetch(url, { ...options, headers });
-        }
-        
-        let currentTool = 'select';
-        let selectedSpot = null;
-        let spots = [];
-        let spotIdCounter = 1;
-        let isDragging = false;
-        let dragOffset = { x: 0, y: 0 };
-        
-        // Zone overlay variables
-        let zones = [];
-        let zoneIdCounter = 1;
-        let isDrawingZone = false;
-        let zoneStartPoint = null;
-        let currentZone = null;
-        
-        const canvas = document.getElementById('beachCanvas');
-        const spotDetails = document.getElementById('spotDetails');
-        
-        // Load existing spots
-        async function loadExistingSpots() {
-            try {
-                const response = await fetch('/api/admin/beach/spots/' + propertyId);
-                const data = await response.json();
-                
-                if (data.success && data.spots) {
-                    spots = data.spots.map(spot => ({
-                        id: spot.spot_id,
-                        type: spot.spot_type,
-                        x: spot.position_x,
-                        y: spot.position_y,
-                        number: spot.spot_number,
-                        capacity: spot.max_capacity,
-                        price: spot.price_full_day,
-                        premium: spot.is_premium === 1,
-                        zone: spot.zone_name || 'General Area'
-                    }));
-                    renderSpots();
-                }
-            } catch (error) {
-                console.error('Load spots error:', error);
-            }
-        }
-        
-        // Load existing zone overlays
-        async function loadExistingZones() {
-            try {
-                const response = await fetch('/api/admin/beach/zone-overlays/' + propertyId);
-                const data = await response.json();
-                
-                if (data.overlays && data.overlays.length > 0) {
-                    zones = data.overlays.map(overlay => {
-                        const coords = JSON.parse(overlay.coordinates);
-                        return {
-                            id: overlay.overlay_id,
-                            name: overlay.zone_name,
-                            x: coords.x,
-                            y: coords.y,
-                            width: coords.width,
-                            height: coords.height,
-                            color: overlay.color,
-                            opacity: overlay.opacity
-                        };
-                    });
-                    renderZones();
-                }
-            } catch (error) {
-                console.error('Load zones error:', error);
-            }
-        }
-        
-        async function loadBeachPhoto() {
-            try {
-                const response = await fetchWithAuth('/api/admin/beach/settings/' + propertyId);
-                const data = await response.json();
-                
-                if (data.success && data.settings && data.settings.beach_map_image_url) {
-                    canvas.style.backgroundImage = 'url(' + data.settings.beach_map_image_url + ')';
-                    canvas.style.backgroundSize = '100% auto';
-                    canvas.style.backgroundPosition = 'top left';
-                    canvas.style.backgroundRepeat = 'no-repeat';
-                    console.log('🏖️ Loaded beach photo from database');
-                }
-            } catch (error) {
-                console.error('Load beach photo error:', error);
-            }
-        }
-        
-        function setTool(tool) {
-            currentTool = tool;
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-            const toolBtn = document.getElementById(tool + 'Tool');
-            if (toolBtn) toolBtn.classList.add('active');
-            canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
-        }
-        
-        function getSpotIcon(type) {
-            const icons = {
-                umbrella: '🔵',
-                cabana: '🟢',
-                lounger: '🟡',
-                daybed: '🟣'
-            };
-            return icons[type] || '🔵';
-        }
-        
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            if (currentTool === 'select') return;
-            
-            // Handle zone drawing
-            if (currentTool === 'zone-rect') {
-                isDrawingZone = true;
-                zoneStartPoint = { x, y };
-                return;
-            }
-            
-            // Handle spot placement
-            const spot = {
-                id: spotIdCounter++,
-                type: currentTool,
-                x: x,
-                y: y,
-                number: 'S' + spotIdCounter,
-                capacity: 2,
-                zone: 'General Area',
-                price: 0,
-                premium: false
-            };
-            
-            spots.push(spot);
-            renderSpots();
-        });
-        
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDrawingZone || !zoneStartPoint) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            // Draw temporary zone rectangle
-            renderZones();
-            renderTempZone(zoneStartPoint.x, zoneStartPoint.y, x, y);
-        });
-        
-        canvas.addEventListener('mouseup', (e) => {
-            if (!isDrawingZone || !zoneStartPoint) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            // Calculate zone coordinates
-            const minX = Math.min(zoneStartPoint.x, x);
-            const minY = Math.min(zoneStartPoint.y, y);
-            const width = Math.abs(x - zoneStartPoint.x);
-            const height = Math.abs(y - zoneStartPoint.y);
-            
-            if (width > 20 && height > 20) {
-                const zoneName = prompt('Enter zone name:', 'Quiet Zone');
-                if (zoneName) {
-                    const zone = {
-                        id: zoneIdCounter++,
-                        name: zoneName,
-                        type: 'rectangle',
-                        x: minX,
-                        y: minY,
-                        width: width,
-                        height: height,
-                        color: getZoneColor(zoneName),
-                        opacity: 0.3
-                    };
-                    zones.push(zone);
-                    renderZones();
-                    updateZonesList();
-                }
-            }
-            
-            isDrawingZone = false;
-            zoneStartPoint = null;
-        });
-        
-        function renderSpots() {
-            // Calculate canvas dimensions based on spot positions
-            let maxX = 0;
-            let maxY = 0;
-            spots.forEach(spot => {
-                maxX = Math.max(maxX, spot.x + 40);
-                maxY = Math.max(maxY, spot.y + 40);
-            });
-            
-            // Get container width and ensure canvas is at least full width
-            const container = canvas.parentElement;
-            const containerWidth = container ? container.offsetWidth : 0;
-            const canvasWidth = Math.max(maxX, containerWidth);
-            const canvasHeight = Math.max(maxY, 500);
-            
-            canvas.style.width = canvasWidth + 'px';
-            canvas.style.height = canvasHeight + 'px';
-            
-            // Remove existing spot elements
-            document.querySelectorAll('.spot-icon').forEach(el => el.remove());
-            
-            spots.forEach(spot => {
-                const spotEl = document.createElement('div');
-                spotEl.className = 'spot-icon';
-                spotEl.innerHTML = getSpotIcon(spot.type);
-                spotEl.style.left = spot.x + 'px';
-                spotEl.style.top = spot.y + 'px';
-                spotEl.dataset.spotId = spot.id;
-                
-                spotEl.addEventListener('mousedown', (e) => {
-                    if (currentTool === 'select') {
-                        e.stopPropagation();
-                        selectSpot(spot.id);
-                        isDragging = true;
-                        const rect = canvas.getBoundingClientRect();
-                        dragOffset.x = e.clientX - rect.left - spot.x;
-                        dragOffset.y = e.clientY - rect.top - spot.y;
-                    }
-                });
-                
-                canvas.appendChild(spotEl);
-            });
-            
-            updateSpotsList();
-            document.getElementById('spotCount').textContent = spots.length;
-        }
-        
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging && selectedSpot) {
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left - dragOffset.x;
-                const y = e.clientY - rect.top - dragOffset.y;
-                
-                const spot = spots.find(s => s.id === selectedSpot);
-                if (spot) {
-                    spot.x = Math.max(0, Math.min(x, rect.width - 30));
-                    spot.y = Math.max(0, Math.min(y, rect.height - 30));
-                    renderSpots();
-                }
-            }
-        });
-        
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
-        
-        function selectSpot(id) {
-            selectedSpot = id;
-            document.querySelectorAll('.spot-icon').forEach(el => el.classList.remove('selected'));
-            const spotEl = document.querySelector('[data-spot-id="' + id + '"]');
-            if (spotEl) spotEl.classList.add('selected');
-            
-            const spot = spots.find(s => s.id === id);
-            if (spot) {
-                document.getElementById('spotNumber').value = spot.number;
-                document.getElementById('spotCapacity').value = spot.capacity;
-                document.getElementById('spotZone').value = spot.zone || 'General Area';
-                document.getElementById('spotPrice').value = spot.price;
-                document.getElementById('spotPremium').checked = spot.premium;
-                spotDetails.classList.remove('hidden');
-            }
-        }
-        
-        function updateSpotDetails() {
-            const spot = spots.find(s => s.id === selectedSpot);
-            if (spot) {
-                spot.number = document.getElementById('spotNumber').value;
-                spot.capacity = parseInt(document.getElementById('spotCapacity').value);
-                spot.zone = document.getElementById('spotZone').value;
-                spot.price = parseFloat(document.getElementById('spotPrice').value);
-                spot.premium = document.getElementById('spotPremium').checked;
-                updateSpotsList();
-                renderSpots();
-                alert('✅ Spot details updated!');
-            }
-        }
-        
-        function deleteSelected() {
-            if (selectedSpot) {
-                spots = spots.filter(s => s.id !== selectedSpot);
-                selectedSpot = null;
-                spotDetails.classList.add('hidden');
-                renderSpots();
-            } else {
-                alert('Please select a spot first');
-            }
-        }
-        
-        function updateSpotsList() {
-            const list = document.getElementById('spotsList');
-            if (spots.length === 0) {
-                list.innerHTML = '<p class="text-sm text-gray-500">No spots placed yet</p>';
-                return;
-            }
-            
-            list.innerHTML = spots.map(spot =>
-                '<div class="p-2 border rounded hover:bg-gray-50 cursor-pointer text-sm" onclick="selectSpot(' + spot.id + ')">' +
-                    '<div class="flex items-center justify-between">' +
-                        '<span>' + getSpotIcon(spot.type) + ' ' + spot.number + '</span>' +
-                        '<span class="text-xs text-gray-500">' + spot.capacity + ' guests</span>' +
-                    '</div>' +
-                    '<div class="text-xs text-purple-600 mt-1">' +
-                        '<i class="fas fa-map-marker-alt mr-1"></i>' + (spot.zone || 'General Area') +
-                    '</div>' +
-                '</div>'
-            ).join('');
-        }
-        
-        async function saveLayout() {
-            // Allow saving empty layout (for clearing the beach)
-            
-            try {
-                // Delete all existing spots
-                const existingSpots = await fetch('/api/admin/beach/spots/' + propertyId);
-                const existingData = await existingSpots.json();
-                
-                if (existingData.success && existingData.spots) {
-                    for (const spot of existingData.spots) {
-                        await fetchWithAuth('/api/admin/beach/spots/' + spot.spot_id, { method: 'DELETE' });
-                    }
-                }
-                
-                // Delete all existing zone overlays
-                await fetchWithAuth('/api/admin/beach/zone-overlays/' + propertyId, { method: 'DELETE' });
-                
-                // Create all new spots
-                for (const spot of spots) {
-                    await fetchWithAuth('/api/admin/beach/spots', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            property_id: parseInt(propertyId),
-                            zone_id: 1,
-                            spot_number: spot.number,
-                            spot_type: spot.type,
-                            position_x: Math.round(spot.x),
-                            position_y: Math.round(spot.y),
-                            max_capacity: spot.capacity,
-                            price_full_day: spot.price,
-                            is_premium: spot.premium ? 1 : 0,
-                            zone_name: spot.zone || 'General Area'
-                        })
-                    });
-                }
-                
-                // Save all zone overlays
-                for (let i = 0; i < zones.length; i++) {
-                    const zone = zones[i];
-                    await fetchWithAuth('/api/admin/beach/zone-overlays', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            property_id: parseInt(propertyId),
-                            zone_name: zone.name,
-                            shape_type: 'rectangle',
-                            coordinates: JSON.stringify({
-                                x: Math.round(zone.x),
-                                y: Math.round(zone.y),
-                                width: Math.round(zone.width),
-                                height: Math.round(zone.height)
-                            }),
-                            color: zone.color,
-                            opacity: zone.opacity,
-                            display_order: i
-                        })
-                    });
-                }
-                
-                alert('✅ Beach layout saved successfully!\\n' + spots.length + ' spots and ' + zones.length + ' zones saved.');
-            } catch (error) {
-                console.error('Save error:', error);
-                alert('❌ Failed to save beach layout');
-            }
-        }
-        
-        function clearAll() {
-            if (confirm('Clear all spots and zones? This cannot be undone.')) {
-                spots = [];
-                zones = [];
-                selectedSpot = null;
-                spotDetails.classList.add('hidden');
-                renderSpots();
-                renderZones();
-            }
-        }
-        
-        // Zone overlay functions
-        function renderZones() {
-            document.querySelectorAll('.zone-overlay').forEach(el => el.remove());
-            
-            zones.forEach(zone => {
-                const zoneEl = document.createElement('div');
-                zoneEl.className = 'zone-overlay';
-                zoneEl.style.position = 'absolute';
-                zoneEl.style.left = zone.x + 'px';
-                zoneEl.style.top = zone.y + 'px';
-                zoneEl.style.width = zone.width + 'px';
-                zoneEl.style.height = zone.height + 'px';
-                zoneEl.style.backgroundColor = zone.color;
-                zoneEl.style.opacity = zone.opacity;
-                zoneEl.style.border = '2px dashed ' + zone.color;
-                zoneEl.style.pointerEvents = 'none';
-                zoneEl.style.borderRadius = '8px';
-                
-                const label = document.createElement('div');
-                label.style.position = 'absolute';
-                label.style.top = '5px';
-                label.style.left = '5px';
-                label.style.backgroundColor = zone.color;
-                label.style.color = 'white';
-                label.style.padding = '4px 8px';
-                label.style.borderRadius = '4px';
-                label.style.fontSize = '12px';
-                label.style.fontWeight = 'bold';
-                label.style.opacity = '0.9';
-                label.textContent = zone.name;
-                zoneEl.appendChild(label);
-                
-                canvas.appendChild(zoneEl);
-            });
-        }
-        
-        function renderTempZone(x1, y1, x2, y2) {
-            document.querySelectorAll('.temp-zone').forEach(el => el.remove());
-            
-            const minX = Math.min(x1, x2);
-            const minY = Math.min(y1, y2);
-            const width = Math.abs(x2 - x1);
-            const height = Math.abs(y2 - y1);
-            
-            const tempZone = document.createElement('div');
-            tempZone.className = 'zone-overlay temp-zone';
-            tempZone.style.position = 'absolute';
-            tempZone.style.left = minX + 'px';
-            tempZone.style.top = minY + 'px';
-            tempZone.style.width = width + 'px';
-            tempZone.style.height = height + 'px';
-            tempZone.style.backgroundColor = '#8b5cf6';
-            tempZone.style.opacity = '0.3';
-            tempZone.style.border = '2px dashed #8b5cf6';
-            tempZone.style.pointerEvents = 'none';
-            tempZone.style.borderRadius = '8px';
-            canvas.appendChild(tempZone);
-        }
-        
-        function getZoneColor(zoneName) {
-            const colors = {
-                'Quiet Zone': '#10b981',
-                'Family Area': '#f59e0b',
-                'VIP Section': '#8b5cf6',
-                'Beach Front': '#3b82f6',
-                'Pool Side': '#06b6d4',
-                'General Area': '#6b7280'
-            };
-            return colors[zoneName] || '#8b5cf6';
-        }
-        
-        function updateZonesList() {
-            const container = document.getElementById('zonesListContainer');
-            const count = document.getElementById('zonesCount');
-            count.textContent = zones.length;
-            
-            if (zones.length === 0) {
-                container.innerHTML = '<p class="text-sm text-gray-500">No zones created yet</p>';
-                return;
-            }
-            
-            container.innerHTML = zones.map(zone =>
-                '<div class="p-3 border rounded-lg bg-white">' +
-                    '<div class="flex items-center justify-between mb-2">' +
-                        '<div class="flex items-center gap-2">' +
-                            '<div class="w-4 h-4 rounded" style="background-color: ' + zone.color + ';"></div>' +
-                            '<span class="font-medium">' + zone.name + '</span>' +
-                        '</div>' +
-                        '<button onclick="deleteZone(' + zone.id + ')" class="text-red-600 hover:text-red-800">' +
-                            '<i class="fas fa-trash"></i>' +
-                        '</button>' +
-                    '</div>' +
-                    '<div class="text-xs text-gray-500">' + zone.width + 'x' + zone.height + ' px</div>' +
-                '</div>'
-            ).join('');
-        }
-        
-        window.toggleZonesList = function() {
-            const list = document.getElementById('zonesList');
-            list.classList.toggle('hidden');
-        };
-        
-        window.deleteZone = function(id) {
-            if (confirm('Delete this zone overlay?')) {
-                zones = zones.filter(z => z.id !== id);
-                renderZones();
-                updateZonesList();
-            }
-        };
-        
-        // Beach photo upload
-        document.getElementById('beachPhotoUpload').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                // Show loading indicator
-                const canvas = document.getElementById('beachCanvas');
-                canvas.style.opacity = '0.5';
-                
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    const base64Data = event.target.result;
-                    
-                    // Apply immediately as preview
-                    canvas.style.backgroundImage = 'url(' + base64Data + ')';
-                    canvas.style.opacity = '1';
-                    
-                    // Save to database
-                    try {
-                        console.log('🔧 DEBUG: Uploading beach photo...');
-                        console.log('📍 Property ID:', propertyId);
-                        console.log('📏 Base64 data length:', base64Data.length);
-                        
-                        const response = await fetchWithAuth('/api/admin/beach/settings', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                beach_map_image_url: base64Data,
-                                beach_booking_enabled: 1 // Ensure it's enabled
-                            })
-                        });
-                        
-                        console.log('📨 Response status:', response.status);
-                        const data = await response.json();
-                        console.log('📦 Response data:', data);
-                        
-                        if (data.success) {
-                            alert('✅ Beach photo uploaded and saved successfully!');
-                            console.log('🏖️ Beach photo saved to database');
-                        } else {
-                            alert('❌ Failed to save beach photo: ' + (data.error || 'Unknown error'));
-                            console.error('❌ Save error:', data);
-                        }
-                    } catch (error) {
-                        console.error('❌ Upload error:', error);
-                        alert('❌ Error uploading beach photo: ' + error.message);
-                    }
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-        
-        // Initialize
-        loadExistingSpots();
-        loadExistingZones();
-        loadBeachPhoto();
-    </script>
+    <div class="legend" id="legend"></div>
+    <div class="lgrid">
+      <div class="gmap">
+        <div class="mapwrap" id="mapwrap">
+          <div id="stage">
+            <img id="photo" alt="Beach photo" draggable="false">
+            <div id="cells"></div>
+          </div>
+          <div id="mapMsg" class="mapmsg"><i class="fas fa-spinner fa-spin"></i> Loading the beach layout…</div>
+        </div>
+        <p class="hint" id="modeHint"></p>
+      </div>
+      <aside class="side" id="side"></aside>
+      <div class="card tray" id="tray"></div>
+    </div>
+  </section>
+
+  <section id="pane-zones" class="pane hidden">
+    <div class="card">
+      <h2><i class="fas fa-scale-balanced"></i>Booking limits</h2>
+      <p class="muted sm">A standard booking is <b>1 umbrella + up to <span id="lngTxt">3</span> sun loungers</b>. The most specific limit wins: spot → zone → global.</p>
+      <div class="limits">
+        <div class="field"><label class="lb" for="gUmb">Umbrellas per room (same date &amp; slot)</label><input type="number" id="gUmb" min="1" max="20" step="1"></div>
+        <div class="field"><label class="lb" for="gLng">Sun loungers per booking</label><input type="number" id="gLng" min="1" max="20" step="1"></div>
+      </div>
+      <button class="btn pri" id="limSave" onclick="saveLimits()"><i class="fas fa-floppy-disk"></i>Save limits</button>
+    </div>
+    <div class="card">
+      <h2><i class="fas fa-layer-group"></i>Zones</h2>
+      <p class="muted sm">Leave a limit blank to use the global one.</p>
+      <div class="tscroll"><table class="tbl"><thead><tr><th>Zone</th><th>Type</th><th>Spots</th><th>Umbrellas / room</th><th>Loungers / booking</th><th>Active</th><th></th></tr></thead><tbody id="zoneRows"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody></table></div>
+      <div class="addzone">
+        <div class="field"><label class="lb" for="nzName">New zone name</label><input type="text" id="nzName" maxlength="60" placeholder="e.g. VIP deck"></div>
+        <div class="field"><label class="lb" for="nzType">Type</label><select id="nzType"><option>standard</option><option>premium</option><option>vip</option><option>family</option><option>quiet</option></select></div>
+        <button class="btn" onclick="createZone()"><i class="fas fa-plus"></i>Add zone</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2><i class="fas fa-couch"></i>Spots with their own lounger limit</h2>
+      <div id="spotOverrides" class="muted sm"></div>
+    </div>
+  </section>
+
+  <section id="pane-slots" class="pane hidden">
+    <div class="card">
+      <h2><i class="fas fa-sun"></i>Time slots</h2>
+      <p class="muted sm">Guests choose Morning or Afternoon. Sunrise and sunset are looked up every day for the resort's location. Untick "auto" to use a fixed time instead.</p>
+      <div class="slots">
+        <div class="slot">
+          <h3><i class="fas fa-sun"></i>Morning</h3>
+          <div class="field"><span class="lb">Starts</span>
+            <label class="chk"><input type="checkbox" id="amAuto" onchange="slotAutoChanged('am')"> Sunrise (auto)</label>
+            <input type="time" id="amStart" oninput="slotsChanged()" aria-label="Morning start"></div>
+          <div class="field"><label class="lb" for="amEnd">Ends</label><input type="time" id="amEnd" oninput="slotsChanged()"></div>
+        </div>
+        <div class="slot">
+          <h3><i class="fas fa-cloud-sun"></i>Afternoon</h3>
+          <div class="field"><label class="lb" for="pmStart">Starts</label><input type="time" id="pmStart" oninput="slotsChanged()"></div>
+          <div class="field"><span class="lb">Ends</span>
+            <label class="chk"><input type="checkbox" id="pmAuto" onchange="slotAutoChanged('pm')"> Sunset (auto)</label>
+            <input type="time" id="pmEnd" oninput="slotsChanged()" aria-label="Afternoon end"></div>
+        </div>
+        <div class="slot">
+          <h3><i class="fas fa-calendar-day"></i>Full day</h3>
+          <label class="chk"><input type="checkbox" id="fullDay" onchange="slotsChanged()"> Offer a Full day slot</label>
+          <p class="muted sm">Runs from the Morning start to the Afternoon end. A Full day booking blocks both halves of its spot.</p>
+        </div>
+      </div>
+      <div class="warn" id="slotWarn"></div>
+      <div class="btns"><button class="btn pri" id="slotSave" onclick="saveSlots()"><i class="fas fa-floppy-disk"></i>Save time slots</button><span class="muted sm" id="slotState" style="align-self:center"></span></div>
+    </div>
+    <div class="card">
+      <h2><i class="fas fa-calendar-week"></i>Next 7 days</h2>
+      <p class="muted sm" id="pvNote"></p>
+      <div class="tscroll"><table class="tbl"><thead id="pvHead"></thead><tbody id="pvRows"><tr><td class="muted">Loading…</td></tr></tbody></table></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+var QS = new URLSearchParams(location.search);
+var EMBED = QS.has('embed');
+if (EMBED) { document.body.classList.add('embed'); document.documentElement.classList.add('embed'); }
+if (!EMBED && !localStorage.getItem('admin_token')) window.location.href = '/admin/login';
+var ADMIN = {};
+try { ADMIN = JSON.parse(localStorage.getItem('admin_user') || '{}') || {}; } catch (e) { ADMIN = {}; }
+var PID = String(QS.get('property') || ADMIN.property_id || localStorage.getItem('property_id') || '1');
+var UID = String(ADMIN.user_id || localStorage.getItem('user_id') || '');
+
+var TIER_KEYS = ['first_line', 'standard', 'vip', 'cabana'];
+var TIERS = { first_line: { label: 'First line' }, standard: { label: 'Standard' }, vip: { label: 'VIP ★' }, cabana: { label: 'Cabana' } };
+var SIZE = { sunbed: { w: 4.0, h: 11.8 }, cabana: { w: 6.5, h: 9 } };
+var ZOOMS = [1, 1.5, 2, 3];
+var BULK = '/api/admin/beach/layout/bulk';
+var ZONE_TYPES = ['standard', 'premium', 'vip', 'family', 'quiet'];
+
+var S = {
+  image: { url: '/static/beach-map.jpg', width: 1774, height: 887 },
+  zones: [], limits: { max_loungers_per_booking: 3, max_umbrellas_per_booking: 1 },
+  spots: [], byId: {}, dirty: {}, sel: [],
+  mode: 'select', placeId: null, pending: null, addTier: 'first_line',
+  num: { src: '', start: '1', prefix: '', dir: 'ltr', incl: false }, numPlan: null,
+  zoomIx: 0, loaded: false, busy: false
+};
+var SL = { loaded: false, saved: null, days: [], dirty: false, sunrise: '', sunset: '' };
+var curTab = 'layout';
+
+function el(id) { return document.getElementById(id); }
+function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function r2(n) { return Math.round(n * 100) / 100; }
+function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function numOrNull(v) { if (v === null || v === undefined || v === '') return null; var n = Number(v); return isFinite(n) ? n : null; }
+function natCmp(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }); }
+function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+function cairoToday() {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
+  catch (e) { return new Date().toISOString().slice(0, 10); }
+}
+function toast(msg, kind) {
+  var t = el('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(toast.tm);
+  toast.tm = setTimeout(function () { t.className = 'toast'; }, kind === 'err' ? 7000 : 3200);
+}
+async function api(method, url, body) {
+  var opt = { method: method, cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-User-ID': UID, 'X-Property-ID': PID } };
+  if (body !== undefined) opt.body = JSON.stringify(body);
+  var r, d = {};
+  try { r = await fetch(url, opt); } catch (e) { return { ok: false, status: 0, data: { error: 'Network error. Check the connection and try again.' } }; }
+  try { d = (await r.json()) || {}; } catch (e) { d = {}; }
+  return { ok: r.ok && d.success !== false, status: r.status, data: d };
+}
+function errText(res, fallback) {
+  var d = res.data || {};
+  if (res.status === 401) return 'You are signed out. Sign in to the dashboard again.';
+  if (res.status === 403) return d.error || 'Your account does not have permission for this.';
+  var m = d.message || d.error;
+  if (m && typeof m === 'string') return m;
+  return (fallback || 'Something went wrong') + (res.status ? ' (HTTP ' + res.status + ')' : '');
+}
+
+// ---------- layout data ----------
+function normSpot(s) {
+  return {
+    spot_id: Number(s.spot_id), spot_number: String(s.spot_number == null ? '' : s.spot_number).trim(),
+    spot_type: s.spot_type || 'umbrella', tier: TIERS[s.tier] ? s.tier : 'standard',
+    zone_id: s.zone_id == null ? null : Number(s.zone_id), zone_name: s.zone_name || '',
+    row_no: numOrNull(s.row_no), map_x: numOrNull(s.map_x), map_y: numOrNull(s.map_y), map_w: numOrNull(s.map_w), map_h: numOrNull(s.map_h),
+    guest_bookable: Number(s.guest_bookable) ? 1 : 0, max_loungers: numOrNull(s.max_loungers),
+    effective_max_loungers: numOrNull(s.effective_max_loungers), is_premium: Number(s.is_premium) ? 1 : 0,
+    maintenance_mode: Number(s.maintenance_mode) ? 1 : 0, position_x: numOrNull(s.position_x), position_y: numOrNull(s.position_y)
+  };
+}
+function eff(s) {
+  var d = S.dirty[s.spot_id];
+  if (!d) return s;
+  var o = {}, k;
+  for (k in s) o[k] = s[k];
+  for (k in d) o[k] = d[k];
+  return o;
+}
+function isPlaced(s) { return eff(s).map_x != null; }
+function defSize(tier) { return tier === 'cabana' ? SIZE.cabana : SIZE.sunbed; }
+function geo(s) {
+  var e = eff(s), sz = defSize(s.tier);
+  return { x: e.map_x, y: e.map_y, w: e.map_w || sz.w, h: e.map_h || sz.h };
+}
+var GEO_KEYS = ['map_x', 'map_y', 'map_w', 'map_h'];
+function setDirty(id, patch) {
+  var s = S.byId[id];
+  if (!s) return;
+  var d = S.dirty[id] || {};
+  for (var k in patch) d[k] = patch[k] == null ? null : r2(patch[k]);
+  var same = GEO_KEYS.every(function (key) {
+    if (!(key in d)) return true;
+    return d[key] == null ? s[key] == null : (s[key] != null && r2(s[key]) === d[key]);
+  });
+  if (same) delete S.dirty[id]; else S.dirty[id] = d;
+}
+function dirtyCount() { return Object.keys(S.dirty).length; }
+function zoneById(id) { for (var i = 0; i < S.zones.length; i++) if (S.zones[i].zone_id === id) return S.zones[i]; return null; }
+function defaultZoneId() {
+  var z = S.zones.filter(function (x) { return x.is_active; })[0] || S.zones[0];
+  return z ? z.zone_id : null;
+}
+function inheritedLoungers(s) {
+  var z = zoneById(s.zone_id);
+  if (z && z.max_loungers != null) return { n: z.max_loungers, from: 'zone' };
+  return { n: S.limits.max_loungers_per_booking, from: 'global' };
+}
+function rowList() {
+  var m = {};
+  S.spots.forEach(function (s) {
+    if (s.row_no == null) return;
+    var r = m[s.row_no] = m[s.row_no] || { row: s.row_no, placed: 0, total: 0 };
+    r.total++;
+    if (isPlaced(s)) r.placed++;
+  });
+  return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return a.row - b.row; });
+}
+function nextNumber(tier) {
+  var max = 0;
+  if (tier === 'cabana') {
+    S.spots.forEach(function (s) { var m = s.spot_number.toUpperCase().split('VC-'); if (m.length === 2 && m[0] === '') { var n = parseInt(m[1], 10); if (n > max) max = n; } });
+    return 'VC-' + (max + 1);
+  }
+  S.spots.forEach(function (s) { var n = Number(s.spot_number); if (Number.isInteger(n) && n > max) max = n; });
+  return String(max + 1);
+}
+function guessRow(y) {
+  var best = null, bd = 7;
+  S.spots.forEach(function (s) {
+    if (s.row_no == null || !isPlaced(s)) return;
+    var g = geo(s), d = Math.abs(g.y + g.h / 2 - y);
+    if (d < bd) { bd = d; best = s.row_no; }
+  });
+  return best;
+}
+
+async function loadLayout() {
+  var r = await api('GET', '/api/beach/layout/' + encodeURIComponent(PID));
+  if (!r.ok || !Array.isArray(r.data.spots)) {
+    el('mapMsg').innerHTML = '<span><i class="fas fa-triangle-exclamation"></i> Could not load the beach layout: ' + esc(errText(r, 'layout not available')) + '</span> <button class="btn" onclick="loadLayout()">Retry</button>';
+    el('mapMsg').classList.remove('hidden');
+    return false;
+  }
+  var d = r.data;
+  if (d.image) S.image = { url: d.image.url || '', width: Number(d.image.width) || 1774, height: Number(d.image.height) || 887 };
+  S.zones = (d.zones || []).map(function (z) {
+    return { zone_id: Number(z.zone_id), zone_name: z.zone_name || ('Zone ' + z.zone_id), zone_type: z.zone_type || 'standard',
+      max_loungers: numOrNull(z.max_loungers), max_umbrellas: numOrNull(z.max_umbrellas), is_active: z.is_active == null ? 1 : (Number(z.is_active) ? 1 : 0) };
+  });
+  if (d.limits) S.limits = { max_loungers_per_booking: numOrNull(d.limits.max_loungers_per_booking) || 3, max_umbrellas_per_booking: numOrNull(d.limits.max_umbrellas_per_booking) || 1 };
+  S.spots = d.spots.map(normSpot);
+  S.byId = {};
+  S.spots.forEach(function (s) { S.byId[s.spot_id] = s; });
+  Object.keys(S.dirty).forEach(function (id) { if (!S.byId[id]) delete S.dirty[id]; else setDirty(Number(id), {}); });
+  S.sel = S.sel.filter(function (id) { return S.byId[id]; });
+  if (S.placeId && !S.byId[S.placeId]) { S.placeId = null; S.mode = 'select'; }
+  S.loaded = true;
+  el('mapMsg').classList.add('hidden');
+  renderPhoto();
+  renderLayout();
+  renderZones();
+  return true;
+}
+
+// ---------- layout rendering ----------
+function renderPhoto() {
+  var st = el('stage'), ph = el('photo');
+  st.style.aspectRatio = S.image.width + ' / ' + S.image.height;
+  if (S.image.url) {
+    if (ph.getAttribute('src') !== S.image.url) ph.setAttribute('src', S.image.url);
+    ph.classList.remove('hidden');
+    st.classList.remove('nophoto');
+  } else {
+    ph.classList.add('hidden');
+    st.classList.add('nophoto');
+  }
+}
+function cellHtml(s) {
+  var e = eff(s);
+  if (e.map_x == null) return '';
+  var g = geo(s);
+  var cls = 'cell t-' + s.tier;
+  if (S.sel.indexOf(s.spot_id) >= 0) cls += ' sel';
+  if (!s.guest_bookable) cls += ' nobook';
+  if (s.maintenance_mode) cls += ' maint';
+  if (S.dirty[s.spot_id]) cls += ' moved';
+  var label = esc(s.spot_number) + (s.tier === 'vip' ? '★' : '');
+  var pv = (S.mode === 'number' && S.numPlan) ? S.numPlan.to[s.spot_id] : null;
+  if (pv != null) { cls += ' pv'; if (pv !== s.spot_number) label = '<s>' + label + '</s>' + esc(pv); }
+  if (s.maintenance_mode) label = '<i class="fas fa-wrench"></i>' + label;
+  var title = TIERS[s.tier].label + ' ' + s.spot_number + (s.guest_bookable ? '' : ' · staff only') + (s.maintenance_mode ? ' · maintenance' : '');
+  return '<div class="' + cls + '" data-id="' + s.spot_id + '" title="' + esc(title) + '" style="left:' + r2(g.x - g.w / 2) + '%;top:' + r2(g.y) + '%;width:' + g.w + '%;height:' + g.h + '%"><span class="n">' + label + '</span></div>';
+}
+function pendingGeo() {
+  var P = S.pending, sz = defSize(P.tier);
+  return { x: clamp(P.x, sz.w / 2, 100 - sz.w / 2), y: clamp(P.y - sz.h / 2, 0, 100 - sz.h), w: sz.w, h: sz.h };
+}
+function renderMap() {
+  var h = '';
+  S.spots.forEach(function (s) { h += cellHtml(s); });
+  if (S.mode === 'add' && S.pending) {
+    var g = pendingGeo();
+    h += '<div class="cell ghost" style="left:' + r2(g.x - g.w / 2) + '%;top:' + r2(g.y) + '%;width:' + g.w + '%;height:' + g.h + '%"><span class="n">' + esc(S.pending.num || 'new') + '</span></div>';
+  }
+  el('cells').innerHTML = h;
+  el('stage').classList.toggle('adding', S.mode === 'add' || S.mode === 'place');
+}
+function renderLegend() {
+  var c = { first_line: 0, standard: 0, vip: 0, cabana: 0 }, placed = 0, book = 0, n = dirtyCount();
+  S.spots.forEach(function (s) {
+    c[s.tier]++;
+    if (isPlaced(s)) { placed++; if (s.guest_bookable && !s.maintenance_mode) book++; }
+  });
+  el('legend').innerHTML = TIER_KEYS.map(function (k) { return '<span><i class="sw t-' + k + '"></i>' + TIERS[k].label + ' <b>' + c[k] + '</b></span>'; }).join('') +
+    '<span class="dim">|</span><span>On the photo <b>' + placed + '</b> of ' + S.spots.length + '</span>' +
+    '<span>Guests can book <b>' + book + '</b></span>' +
+    '<span><i class="sw dash"></i>Staff only</span><span><i class="sw mt"></i>Maintenance</span>' +
+    (n ? '<span class="unsaved"><i class="dot"></i>' + n + ' unsaved</span>' : '');
+  el('saveBtn').disabled = !n || S.busy;
+  el('discardBtn').disabled = !n || S.busy;
+  el('saveBtn').innerHTML = '<i class="fas fa-floppy-disk"></i>Save layout' + (n ? ' (' + n + ')' : '');
+}
+function renderTray() {
+  var groups = {}, total = 0;
+  S.spots.forEach(function (s) {
+    if (isPlaced(s)) return;
+    var k = s.row_no == null ? 'none' : String(s.row_no);
+    (groups[k] = groups[k] || []).push(s);
+    total++;
+  });
+  var keys = Object.keys(groups).sort(function (a, b) { if (a === 'none') return 1; if (b === 'none') return -1; return Number(a) - Number(b); });
+  var h = '<div class="trayhead"><h2><i class="fas fa-inbox"></i>Not on the photo <span class="pill">' + total + '</span></h2>' +
+    '<span class="muted sm">Staff can still book these. Click one, then click the photo, or drag it onto the photo.</span></div>';
+  if (!total) h += '<p class="muted sm" style="margin-top:8px">Every active spot is on the photo.</p>';
+  keys.forEach(function (k) {
+    var list = groups[k].sort(function (a, b) { return natCmp(a.spot_number, b.spot_number); });
+    h += '<div class="grp"><h4>' + (k === 'none' ? 'No row' : 'Row ' + k + (k === '1' ? ' · first line' : '')) + ' <span class="muted">(' + list.length + ')</span></h4><div class="chips">' +
+      list.map(function (s) {
+        return '<button type="button" class="chip t-' + s.tier + (S.placeId === s.spot_id ? ' on' : '') + '" data-id="' + s.spot_id + '" title="' + esc(TIERS[s.tier].label) + '">' + esc(s.spot_number) + (s.tier === 'vip' ? '★' : '') + '</button>';
+      }).join('') + '</div></div>';
+  });
+  el('tray').innerHTML = h;
+}
+var MODE_HINTS = {
+  select: 'Click a spot to edit it. Drag to move. Shift/Ctrl-click selects several. Arrow keys nudge the selection (hold Shift for bigger steps).',
+  add: 'Click the photo where the new spot goes. Esc to stop adding.',
+  place: 'Click the photo where this spot goes. Esc to cancel.',
+  number: 'Pick a row, or click spots on the photo to choose them. Then set the first number and the direction.'
+};
+function renderLayout() {
+  renderMap();
+  renderLegend();
+  renderTray();
+  renderSide();
+  ['Select', 'Add', 'Number'].forEach(function (m) { el('m' + m).classList.toggle('on', S.mode === m.toLowerCase()); });
+  el('modeHint').textContent = MODE_HINTS[S.mode] || '';
+}
+function fld(label, input) { return '<div class="field"><label class="lb">' + label + '</label>' + input + '</div>'; }
+function tierOptions(cur) { return TIER_KEYS.map(function (k) { return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + TIERS[k].label + '</option>'; }).join(''); }
+function zoneOptions(cur, withBlank) {
+  var h = S.zones.map(function (z) { return '<option value="' + z.zone_id + '"' + (z.zone_id === cur ? ' selected' : '') + '>' + esc(z.zone_name) + (z.is_active ? '' : ' (inactive)') + '</option>'; }).join('');
+  if (withBlank || cur == null || !zoneById(cur)) h = '<option value="">—</option>' + h;
+  return h;
+}
+function renderSide() {
+  var h;
+  if (S.mode === 'add') h = addPanel();
+  else if (S.mode === 'number') h = numberPanel();
+  else if (S.sel.length === 1 && S.byId[S.sel[0]]) {
+    h = (S.mode === 'place' ? '<div class="banner"><i class="fas fa-location-crosshairs"></i> Click the photo where spot <b>' + esc(S.byId[S.sel[0]].spot_number) + '</b> goes. <button class="lnk" onclick="cancelMode()">Cancel</button></div>' : '') + editorPanel(S.byId[S.sel[0]]);
+  }
+  else if (S.sel.length > 1) h = multiPanel();
+  else h = idlePanel();
+  el('side').innerHTML = h;
+  if (S.mode === 'number') refreshNumbering();
+}
+function idlePanel() {
+  var rows = rowList();
+  return '<div class="card"><h3>Beach layout</h3><p class="muted sm">This is the photo guests see. Each box is a spot; guests can book the solid ones, dashed ones are staff only.</p>' +
+    (rows.length ? '<span class="lb" style="margin-top:14px">Select a whole row</span><div class="chips">' +
+      rows.map(function (r) { return '<button class="chip" onclick="selectRow(' + r.row + ')">Row ' + r.row + ' <span class="muted">· ' + r.placed + '</span></button>'; }).join('') + '</div>' : '') +
+    '<ul class="tips"><li><b>Move:</b> drag a box, or select it and use the arrow keys.</li>' +
+    '<li><b>Add:</b> press <i>Add spot</i>, then click the photo.</li>' +
+    '<li><b>Renumber:</b> <i>Number a row</i> numbers a row left to right or right to left.</li>' +
+    '<li>Moves wait until you press <b>Save layout</b>. Spot details save straight away.</li></ul></div>';
+}
+function editorPanel(s) {
+  var e = eff(s), placed = e.map_x != null, g = geo(s), inh = inheritedLoungers(s);
+  var status = placed ? (S.dirty[s.spot_id] ? 'on the photo · unsaved move' : 'on the photo') : (S.dirty[s.spot_id] ? 'taken off the photo · unsaved' : 'not on the photo');
+  return '<div class="card">' +
+    '<div class="edhead"><span class="badge t-' + s.tier + '">' + esc(s.spot_number) + (s.tier === 'vip' ? '★' : '') + '</span><div><b>Spot ' + esc(s.spot_number) + '</b><div class="muted sm">' + TIERS[s.tier].label + ' · ' + status + '</div></div></div>' +
+    '<div class="grid2">' +
+      fld('Number', '<input type="text" id="edNum" maxlength="12" autocomplete="off" value="' + esc(s.spot_number) + '">') +
+      fld('Tier', '<select id="edTier">' + tierOptions(s.tier) + '</select>') +
+      fld('Zone', '<select id="edZone">' + zoneOptions(s.zone_id, false) + '</select>') +
+      fld('Row (1 = first line)', '<input type="number" id="edRow" min="1" max="50" step="1" placeholder="—" value="' + (s.row_no == null ? '' : s.row_no) + '">') +
+    '</div>' +
+    fld('Sun loungers per booking', '<input type="number" id="edLng" min="1" max="20" step="1" placeholder="Inherit: ' + inh.n + ' (' + inh.from + ')" value="' + (s.max_loungers == null ? '' : s.max_loungers) + '">') +
+    '<label class="chk"><input type="checkbox" id="edBook"' + (s.guest_bookable ? ' checked' : '') + '> Guests can book it in the app</label>' +
+    (s.guest_bookable && !placed ? '<p class="muted xs" style="margin-top:0">Guests only see spots that are on the photo.</p>' : '') +
+    '<label class="chk"><input type="checkbox" id="edMaint"' + (s.maintenance_mode ? ' checked' : '') + '> Under maintenance (nobody can book it)</label>' +
+    '<div class="err" id="edErr"></div>' +
+    '<div class="btns"><button class="btn pri" id="edSave" onclick="saveSpot()"><i class="fas fa-floppy-disk"></i>Save spot</button>' +
+      '<button class="btn danger" onclick="deleteSpot()"><i class="fas fa-trash"></i>Delete</button></div>' +
+    '<div style="border-top:1px solid #f3f4f6;margin-top:14px;padding-top:12px">' +
+    (placed
+      ? '<div class="grid2">' + fld('Box width %', '<input type="number" id="edW" min="0.5" max="40" step="0.1" value="' + r2(g.w) + '" onchange="resizeSel()">') +
+          fld('Box height %', '<input type="number" id="edH" min="0.5" max="60" step="0.1" value="' + r2(g.h) + '" onchange="resizeSel()">') + '</div>' +
+        '<div class="btns"><button class="btn" onclick="unplaceSel()"><i class="fas fa-eye-slash"></i>Take off the photo</button></div>' +
+        '<p class="muted xs">Position and size are published with <b>Save layout</b>.</p>'
+      : '<div class="btns"><button class="btn" onclick="startPlace(' + s.spot_id + ')"><i class="fas fa-location-crosshairs"></i>Place on the photo</button></div>') +
+    '</div></div>';
+}
+function multiPanel() {
+  var list = S.sel.map(function (id) { return S.byId[id]; }).filter(Boolean).sort(function (a, b) { return natCmp(a.spot_number, b.spot_number); });
+  return '<div class="card"><h3>' + list.length + ' spots selected</h3>' +
+    '<p class="muted sm" style="max-height:66px;overflow:auto">' + list.map(function (s) { return esc(s.spot_number); }).join(', ') + '</p>' +
+    '<p class="muted xs" style="margin:6px 0 10px">Drag any of them to move them together, or use the arrow keys.</p>' +
+    '<div class="btns" style="margin-bottom:12px"><button class="btn" onclick="numberSelection()"><i class="fas fa-arrow-down-1-9"></i>Number these</button><button class="btn" onclick="clearSel()">Clear selection</button></div>' +
+    '<div class="grid2">' + fld('Tier', '<select id="mTier"><option value="">—</option>' + tierOptions('') + '</select>') + '<div class="field"><span class="lb">&nbsp;</span><button class="btn" onclick="bulkTier()">Set tier</button></div>' +
+    fld('Zone', '<select id="mZone">' + zoneOptions(null, true) + '</select>') + '<div class="field"><span class="lb">&nbsp;</span><button class="btn" onclick="bulkZone()">Set zone</button></div>' +
+    fld('Row', '<input type="number" id="mRow" min="1" max="50" step="1" placeholder="—">') + '<div class="field"><span class="lb">&nbsp;</span><button class="btn" onclick="bulkRow()">Set row</button></div></div>' +
+    '<span class="lb">Guest booking</span><div class="btns"><button class="btn" onclick="bulkSet(\\'guest_bookable\\', 1)">Guests can book</button><button class="btn" onclick="bulkSet(\\'guest_bookable\\', 0)">Staff only</button></div>' +
+    '<span class="lb" style="margin-top:10px">Maintenance</span><div class="btns"><button class="btn" onclick="bulkSet(\\'maintenance_mode\\', 1)">On</button><button class="btn" onclick="bulkSet(\\'maintenance_mode\\', 0)">Off</button><button class="btn" onclick="unplaceSel()"><i class="fas fa-eye-slash"></i>Take off the photo</button></div>' +
+    '</div>';
+}
+function addPanel() {
+  var P = S.pending;
+  if (!P) return '<div class="card"><h3><i class="fas fa-plus"></i>Add a spot</h3><p class="muted sm">Click the photo where the new spot goes. You can drag it into its exact place afterwards.</p><div class="btns"><button class="btn" onclick="cancelMode()">Done</button></div></div>';
+  return '<div class="card"><h3><i class="fas fa-plus"></i>New spot</h3>' +
+    '<div class="grid2">' +
+      fld('Number', '<input type="text" id="addNum" maxlength="12" autocomplete="off" value="' + esc(P.num) + '" oninput="addInput()">') +
+      fld('Tier', '<select id="addTier" onchange="addInput(true)">' + tierOptions(P.tier) + '</select>') +
+      fld('Row (1 = first line)', '<input type="number" id="addRow" min="1" max="50" step="1" placeholder="—" value="' + (P.row == null ? '' : P.row) + '" oninput="addInput()">') +
+      fld('Zone', '<select id="addZone" onchange="addInput()">' + zoneOptions(P.zone, false) + '</select>') +
+    '</div>' +
+    '<label class="chk"><input type="checkbox" id="addBook"' + (P.book ? ' checked' : '') + ' onchange="addInput()"> Guests can book it in the app</label>' +
+    '<div class="err" id="addErr"></div>' +
+    '<div class="btns"><button class="btn pri" id="addGo" onclick="createSpot()"><i class="fas fa-check"></i>Create spot</button><button class="btn" onclick="cancelMode()">Cancel</button></div>' +
+    '<p class="muted xs">Click somewhere else on the photo to move the marker.</p></div>';
+}
+function numberPanel() {
+  var N = S.num, rows = rowList();
+  var opts = (S.sel.length ? '<option value="sel"' + (N.src === 'sel' ? ' selected' : '') + '>Selected spots (' + S.sel.length + ')</option>' : '') +
+    rows.map(function (r) {
+      return '<option value="row:' + r.row + '"' + (N.src === 'row:' + r.row ? ' selected' : '') + '>Row ' + r.row + (r.row === 1 ? ' · first line' : '') + ' (' + r.placed + ' on photo' + (r.total > r.placed ? ', ' + (r.total - r.placed) + ' off' : '') + ')</option>';
+    }).join('');
+  return '<div class="card"><h3><i class="fas fa-arrow-down-1-9"></i>Number a row</h3>' +
+    fld('Spots', '<select id="nSrc" onchange="numInput()">' + (opts || '<option value="">No rows yet</option>') + '</select>') +
+    '<div class="grid2">' + fld('First number', '<input type="number" id="nStart" min="0" step="1" value="' + esc(N.start) + '" oninput="numInput()">') +
+      fld('Prefix (optional)', '<input type="text" id="nPrefix" maxlength="6" placeholder="e.g. V" autocomplete="off" value="' + esc(N.prefix) + '" oninput="numInput()">') + '</div>' +
+    fld('Direction, as seen on the photo', '<div class="seg2"><label><input type="radio" name="nDir" value="ltr"' + (N.dir === 'ltr' ? ' checked' : '') + ' onchange="numInput()"> Left → right</label><label><input type="radio" name="nDir" value="rtl"' + (N.dir === 'rtl' ? ' checked' : '') + ' onchange="numInput()"> Right → left</label></div>') +
+    '<label class="chk" id="nInclWrap"><input type="checkbox" id="nIncl"' + (N.incl ? ' checked' : '') + ' onchange="numInput()"> <span id="nInclTxt"></span></label>' +
+    '<div id="numPrev" class="numprev"></div>' +
+    '<div class="btns"><button class="btn pri" id="nApply" onclick="applyNumbering()"><i class="fas fa-check"></i>Apply numbers</button><button class="btn" onclick="cancelMode()">Cancel</button></div></div>';
+}
+
+// ---------- modes & selection ----------
+function setMode(m) {
+  if (m !== 'select' && S.mode === m) m = 'select';
+  if (m === 'number') {
+    var rl = rowList(), valid = rl.some(function (r) { return 'row:' + r.row === S.num.src; });
+    if (S.sel.length > 1) S.num.src = 'sel';
+    else if (S.sel.length === 1 && S.byId[S.sel[0]] && S.byId[S.sel[0]].row_no != null) S.num.src = 'row:' + S.byId[S.sel[0]].row_no;
+    else if (!valid) S.num.src = rl.length ? 'row:' + rl[0].row : (S.sel.length ? 'sel' : '');
+  }
+  S.mode = m;
+  S.placeId = null;
+  S.pending = null;
+  S.numPlan = null;
+  renderLayout();
+}
+function cancelMode() { setMode('select'); }
+function clearSel() { S.sel = []; renderLayout(); }
+function selectRow(n) {
+  S.sel = S.spots.filter(function (s) { return s.row_no === n && isPlaced(s); }).map(function (s) { return s.spot_id; });
+  if (!S.sel.length) toast('No spots of row ' + n + ' are on the photo yet');
+  renderLayout();
+}
+function numberSelection() { S.num.src = 'sel'; S.mode = 'number'; S.pending = null; S.placeId = null; renderLayout(); }
+function selectSpot(id, multi) {
+  var before = S.sel.join(',');
+  if (multi) { var i = S.sel.indexOf(id); if (i >= 0) S.sel.splice(i, 1); else S.sel.push(id); }
+  else S.sel = [id];
+  if (S.mode === 'number') S.num.src = S.sel.length ? 'sel' : (rowList()[0] ? 'row:' + rowList()[0].row : '');
+  if (S.sel.join(',') !== before || S.mode === 'number') renderLayout();
+}
+function startPlace(id) { S.mode = 'place'; S.placeId = id; S.sel = [id]; S.pending = null; renderLayout(); }
+function jumpToSpot(id) {
+  showTab('layout');
+  S.mode = 'select'; S.sel = [id]; S.pending = null; S.placeId = null;
+  renderLayout();
+  var c = el('cells').querySelector('.cell[data-id="' + id + '"]');
+  if (c) c.scrollIntoView({ block: 'nearest', inline: 'center' });
+}
+function pctAt(ev) {
+  var r = el('stage').getBoundingClientRect();
+  return { x: clamp((ev.clientX - r.left) / r.width * 100, 0, 100), y: clamp((ev.clientY - r.top) / r.height * 100, 0, 100) };
+}
+function placeAt(id, p) {
+  var s = S.byId[id];
+  if (!s) return;
+  var sz = defSize(s.tier), w = s.map_w || sz.w, h = s.map_h || sz.h;
+  setDirty(id, { map_x: clamp(p.x, w / 2, 100 - w / 2), map_y: clamp(p.y - h / 2, 0, 100 - h), map_w: w, map_h: h });
+  S.mode = 'select'; S.placeId = null; S.sel = [id];
+  renderLayout();
+  toast('Spot ' + s.spot_number + ' placed. Press Save layout to publish it.');
+}
+
+// ---------- map interaction: select, drag, add, place ----------
+var drag = null, lastDragEnd = 0;
+el('cells').addEventListener('pointerdown', function (ev) {
+  if (ev.button !== 0) return;
+  var cell = ev.target.closest('.cell');
+  if (!cell || cell.classList.contains('ghost')) return;
+  if (S.mode !== 'select' && S.mode !== 'number') return;
+  var id = Number(cell.dataset.id);
+  if (!S.byId[id]) return;
+  var multi = ev.shiftKey || ev.ctrlKey || ev.metaKey || S.mode === 'number';
+  var ids = (!multi && S.sel.length > 1 && S.sel.indexOf(id) >= 0)
+    ? S.sel.filter(function (i) { return S.byId[i] && isPlaced(S.byId[i]); }) : [id];
+  var orig = {};
+  ids.forEach(function (i) { orig[i] = geo(S.byId[i]); });
+  drag = { id: id, multi: multi, sx: ev.clientX, sy: ev.clientY, rect: el('stage').getBoundingClientRect(), moved: false, ids: ids, orig: orig, dx: 0, dy: 0, canMove: S.mode === 'select' };
+  try { cell.setPointerCapture(ev.pointerId); } catch (e) {}
+  ev.preventDefault();
+});
+el('cells').addEventListener('pointermove', function (ev) {
+  if (!drag || !drag.canMove) return;
+  var mx = ev.clientX - drag.sx, my = ev.clientY - drag.sy;
+  if (!drag.moved && Math.abs(mx) + Math.abs(my) < 4) return;
+  drag.moved = true;
+  var dx = mx / drag.rect.width * 100, dy = my / drag.rect.height * 100;
+  drag.ids.forEach(function (i) { var o = drag.orig[i]; dx = clamp(dx, -o.x, 100 - o.x); dy = clamp(dy, -o.y - o.h / 2, 100 - o.y - o.h / 2); });
+  drag.dx = dx; drag.dy = dy;
+  drag.ids.forEach(function (i) {
+    var o = drag.orig[i], c = el('cells').querySelector('.cell[data-id="' + i + '"]');
+    if (c) { c.style.left = r2(o.x + dx - o.w / 2) + '%'; c.style.top = r2(o.y + dy) + '%'; c.classList.add('dragging'); }
+  });
+});
+function endCellDrag(ev) {
+  if (!drag) return;
+  var d = drag;
+  drag = null;
+  lastDragEnd = Date.now();
+  if (!d.moved) { if (ev.type === 'pointerup') selectSpot(d.id, d.multi); return; }
+  d.ids.forEach(function (i) { var o = d.orig[i]; setDirty(i, { map_x: o.x + d.dx, map_y: o.y + d.dy }); });
+  var selChanged = S.sel.indexOf(d.id) < 0;
+  if (selChanged) S.sel = [d.id];
+  renderMap();
+  renderLegend();
+  if (selChanged || d.ids.length === 1) renderSide();
+}
+el('cells').addEventListener('pointerup', endCellDrag);
+el('cells').addEventListener('pointercancel', endCellDrag);
+el('stage').addEventListener('click', function (ev) {
+  var onCell = ev.target.closest('.cell');
+  if (onCell && Date.now() - lastDragEnd < 300) return;
+  if (S.mode === 'add') {
+    var p = pctAt(ev);
+    if (S.pending) { S.pending.x = p.x; S.pending.y = p.y; renderMap(); return; }
+    var tier = S.addTier, zid = defaultZoneId();
+    S.pending = { x: p.x, y: p.y, tier: tier, row: guessRow(p.y), num: nextNumber(tier), auto: true, zone: zid, book: false };
+    renderMap();
+    renderSide();
+    return;
+  }
+  if (S.mode === 'place' && S.placeId) { placeAt(S.placeId, pctAt(ev)); return; }
+  if (S.mode === 'select' && !onCell && S.sel.length) { S.sel = []; renderLayout(); }
+});
+el('photo').addEventListener('load', function () {
+  var ph = el('photo');
+  if (ph.naturalWidth && ph.naturalHeight && Math.abs(ph.naturalWidth / ph.naturalHeight - S.image.width / S.image.height) > 0.005) {
+    S.image.width = ph.naturalWidth;
+    S.image.height = ph.naturalHeight;
+    el('stage').style.aspectRatio = S.image.width + ' / ' + S.image.height;
+  }
+});
+el('photo').addEventListener('error', function () { el('photo').classList.add('hidden'); el('stage').classList.add('nophoto'); });
+
+// Unplaced tray: mouse/pen can drag a chip onto the photo; touch uses tap-then-tap so the tray still scrolls
+var tdrag = null, lastTrayDrag = 0;
+el('tray').addEventListener('pointerdown', function (ev) {
+  var chip = ev.target.closest('.chip');
+  if (!chip || ev.pointerType === 'touch' || ev.button !== 0) return;
+  tdrag = { id: Number(chip.dataset.id), sx: ev.clientX, sy: ev.clientY, moved: false, fly: null };
+  try { chip.setPointerCapture(ev.pointerId); } catch (e) {}
+});
+el('tray').addEventListener('pointermove', function (ev) {
+  if (!tdrag) return;
+  if (!tdrag.moved && Math.abs(ev.clientX - tdrag.sx) + Math.abs(ev.clientY - tdrag.sy) < 6) return;
+  if (!tdrag.moved) {
+    tdrag.moved = true;
+    tdrag.fly = document.createElement('div');
+    tdrag.fly.className = 'flyer';
+    tdrag.fly.textContent = S.byId[tdrag.id] ? S.byId[tdrag.id].spot_number : '';
+    document.body.appendChild(tdrag.fly);
+  }
+  tdrag.fly.style.left = ev.clientX + 'px';
+  tdrag.fly.style.top = ev.clientY + 'px';
+});
+function endTrayDrag(ev) {
+  if (!tdrag) return;
+  var t = tdrag;
+  tdrag = null;
+  if (t.fly) t.fly.remove();
+  if (!t.moved) return;
+  lastTrayDrag = Date.now();
+  var r = el('stage').getBoundingClientRect(), w = el('mapwrap').getBoundingClientRect();
+  var inside = ev.clientX >= Math.max(r.left, w.left) && ev.clientX <= Math.min(r.right, w.right) && ev.clientY >= Math.max(r.top, w.top) && ev.clientY <= Math.min(r.bottom, w.bottom);
+  if (ev.type === 'pointerup' && inside) placeAt(t.id, pctAt(ev));
+}
+el('tray').addEventListener('pointerup', endTrayDrag);
+el('tray').addEventListener('pointercancel', endTrayDrag);
+el('tray').addEventListener('click', function (ev) {
+  var chip = ev.target.closest('.chip');
+  if (!chip || Date.now() - lastTrayDrag < 350) return;
+  var id = Number(chip.dataset.id);
+  if (!S.byId[id]) return;
+  if (S.mode === 'place' && S.placeId === id) { cancelMode(); return; }
+  startPlace(id);
+  toast('Now click the photo where spot ' + S.byId[id].spot_number + ' goes');
+});
+
+function applyZoom() {
+  var wrap = el('mapwrap'), st = el('stage');
+  var cx = (wrap.scrollLeft + wrap.clientWidth / 2) / (st.offsetWidth || 1);
+  var cy = (wrap.scrollTop + wrap.clientHeight / 2) / (st.offsetHeight || 1);
+  st.style.width = (ZOOMS[S.zoomIx] * 100) + '%';
+  el('zoomLbl').textContent = Math.round(ZOOMS[S.zoomIx] * 100) + '%';
+  wrap.scrollLeft = cx * st.offsetWidth - wrap.clientWidth / 2;
+  wrap.scrollTop = cy * st.offsetHeight - wrap.clientHeight / 2;
+}
+function zoomBy(d) { S.zoomIx = clamp(S.zoomIx + d, 0, ZOOMS.length - 1); applyZoom(); }
+
+document.addEventListener('keydown', function (e) {
+  if (curTab !== 'layout') return;
+  var t = e.target, tag = t && t.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (t && t.isContentEditable)) return;
+  if (e.key === 'Escape') { if (S.mode !== 'select') cancelMode(); else if (S.sel.length) clearSel(); return; }
+  var st = e.shiftKey ? 1 : 0.1, dx = 0, dy = 0;
+  if (e.key === 'ArrowLeft') dx = -st; else if (e.key === 'ArrowRight') dx = st;
+  else if (e.key === 'ArrowUp') dy = -st; else if (e.key === 'ArrowDown') dy = st;
+  else return;
+  if (S.mode !== 'select') return;
+  var ids = S.sel.filter(function (id) { return S.byId[id] && isPlaced(S.byId[id]); });
+  if (!ids.length) return;
+  e.preventDefault();
+  ids.forEach(function (id) {
+    var g = geo(S.byId[id]);
+    setDirty(id, { map_x: clamp(g.x + dx, 0, 100), map_y: clamp(g.y + dy, -g.h / 2, 100 - g.h / 2) });
+  });
+  renderMap();
+  renderLegend();
+});
+window.addEventListener('beforeunload', function (e) {
+  if (dirtyCount() || SL.dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ---------- layout writes ----------
+async function saveLayout() {
+  var ids = Object.keys(S.dirty);
+  if (!ids.length || S.busy) return;
+  var updates = ids.map(function (id) { var u = { spot_id: Number(id) }, d = S.dirty[id]; for (var k in d) u[k] = d[k]; return u; });
+  S.busy = true;
+  renderLegend();
+  var r = await api('POST', BULK, { updates: updates });
+  S.busy = false;
+  if (!r.ok) { renderLegend(); toast(errText(r, 'Could not save the layout'), 'err'); return; }
+  S.dirty = {};
+  await loadLayout();
+  toast('Layout saved: ' + plural(updates.length, 'spot') + ' updated', 'ok');
+}
+function discardLayout() {
+  var n = dirtyCount();
+  if (!n || !confirm('Discard ' + plural(n, 'unsaved change') + ' to the layout?')) return;
+  S.dirty = {};
+  renderLayout();
+}
+function resizeSel() {
+  var s = S.byId[S.sel[0]];
+  if (!s) return;
+  var w = parseFloat(el('edW').value), h = parseFloat(el('edH').value);
+  if (!(w >= 0.5 && w <= 40) || !(h >= 0.5 && h <= 60)) { toast('Width must be 0.5–40% and height 0.5–60%', 'err'); return; }
+  var g = geo(s);
+  setDirty(s.spot_id, { map_x: g.x, map_y: g.y, map_w: w, map_h: h });
+  renderMap();
+  renderLegend();
+}
+function unplaceSel() {
+  var ids = S.sel.filter(function (id) { return S.byId[id] && isPlaced(S.byId[id]); });
+  if (!ids.length) return;
+  var names = ids.map(function (id) { return S.byId[id].spot_number; }).join(', ');
+  if (!confirm('Take ' + (ids.length === 1 ? 'spot ' : 'spots ') + names + ' off the photo? Guests will no longer see ' + (ids.length === 1 ? 'it' : 'them') + '; staff can still book ' + (ids.length === 1 ? 'it' : 'them') + '.')) return;
+  ids.forEach(function (id) { setDirty(id, { map_x: null, map_y: null, map_w: null, map_h: null }); });
+  renderLayout();
+  toast('Press Save layout to publish the change');
+}
+async function saveSpot() {
+  var s = S.byId[S.sel[0]];
+  if (!s || S.busy) return;
+  var err = el('edErr'), body = {};
+  err.textContent = '';
+  var num = el('edNum').value.trim();
+  if (!num) { err.textContent = 'Enter a spot number.'; return; }
+  if (num !== s.spot_number) {
+    var clash = S.spots.filter(function (o) { return o.spot_id !== s.spot_id && o.spot_number === num; })[0];
+    if (clash) { err.textContent = 'Number ' + num + ' is already used by another spot (' + TIERS[clash.tier].label + (clash.row_no ? ', row ' + clash.row_no : '') + (isPlaced(clash) ? '' : ', not on the photo') + ').'; return; }
+    body.spot_number = num;
+  }
+  var tier = el('edTier').value;
+  if (tier !== s.tier) {
+    body.tier = tier;
+    body.is_premium = tier === 'vip' ? 1 : 0;
+    if (tier === 'cabana') body.spot_type = 'cabana'; else if (s.spot_type === 'cabana') body.spot_type = 'umbrella';
+  }
+  var z = el('edZone').value;
+  if (z !== '' && Number(z) !== s.zone_id) body.zone_id = Number(z);
+  var row = el('edRow').value.trim(), rowN = row === '' ? null : Number(row);
+  if (row !== '' && !(Number.isInteger(rowN) && rowN >= 1 && rowN <= 50)) { err.textContent = 'Row must be a whole number (1 = first line nearest the sea).'; return; }
+  if (rowN !== s.row_no) body.row_no = rowN;
+  var lng = el('edLng').value.trim(), lngN = lng === '' ? null : Number(lng);
+  if (lng !== '' && !(Number.isInteger(lngN) && lngN >= 1 && lngN <= 20)) { err.textContent = 'Loungers must be a whole number from 1 to 20, or blank to inherit.'; return; }
+  if (lngN !== s.max_loungers) body.max_loungers = lngN;
+  var book = el('edBook').checked ? 1 : 0;
+  if (book !== s.guest_bookable) body.guest_bookable = book;
+  var mt = el('edMaint').checked ? 1 : 0;
+  if (mt !== s.maintenance_mode) body.maintenance_mode = mt;
+  if (!Object.keys(body).length) { toast('Nothing to save'); return; }
+  S.busy = true;
+  el('edSave').disabled = true;
+  var r = await api('PUT', '/api/admin/beach/spots/' + s.spot_id, body);
+  S.busy = false;
+  if (!r.ok) {
+    if (el('edSave')) el('edSave').disabled = false;
+    var msg = r.status === 409 ? 'Number ' + num + ' is already used by another active spot.' : errText(r, 'Could not save the spot');
+    if (el('edErr')) el('edErr').textContent = msg; else toast(msg, 'err');
+    return;
+  }
+  toast('Spot ' + num + ' saved', 'ok');
+  await loadLayout();
+}
+async function deleteSpot() {
+  var s = S.byId[S.sel[0]];
+  if (!s || S.busy) return;
+  if (!confirm('Delete spot ' + s.spot_number + '? It disappears from every map and list. Past bookings are kept.')) return;
+  S.busy = true;
+  var r = await api('DELETE', '/api/admin/beach/spots/' + s.spot_id);
+  if (r.status === 409 && r.data && r.data.error === 'has_bookings') {
+    var n = Number(r.data.count) || 0;
+    if (!confirm('Spot ' + s.spot_number + ' has ' + plural(n, 'upcoming booking') + '. Delete it anyway? Those bookings are kept, but the spot will no longer show on the maps.')) { S.busy = false; return; }
+    r = await api('DELETE', '/api/admin/beach/spots/' + s.spot_id + '?force=1');
+  }
+  S.busy = false;
+  if (!r.ok) { toast(errText(r, 'Could not delete the spot'), 'err'); return; }
+  delete S.dirty[s.spot_id];
+  S.sel = [];
+  await loadLayout();
+  toast('Spot ' + s.spot_number + ' deleted', 'ok');
+}
+async function bulkUpdate(fn, what) {
+  var list = S.sel.map(function (id) { return S.byId[id]; }).filter(Boolean);
+  if (!list.length || S.busy) return;
+  S.busy = true;
+  var r = await api('POST', BULK, { updates: list.map(function (s) { var u = fn(s); u.spot_id = s.spot_id; return u; }) });
+  S.busy = false;
+  if (!r.ok) { toast(errText(r, 'Could not update the spots'), 'err'); return; }
+  toast(plural(list.length, 'spot') + ' updated' + (what ? ': ' + what : ''), 'ok');
+  await loadLayout();
+}
+function bulkSet(key, val) {
+  var what = key === 'guest_bookable' ? (val ? 'guests can book' : 'staff only') : ('maintenance ' + (val ? 'on' : 'off'));
+  bulkUpdate(function () { var u = {}; u[key] = val; return u; }, what);
+}
+function bulkTier() {
+  var t = el('mTier').value;
+  if (!TIERS[t]) { toast('Choose a tier first', 'err'); return; }
+  bulkUpdate(function (s) {
+    var u = { tier: t, is_premium: t === 'vip' ? 1 : 0 };
+    if (t === 'cabana') u.spot_type = 'cabana'; else if (s.spot_type === 'cabana') u.spot_type = 'umbrella';
+    return u;
+  }, TIERS[t].label);
+}
+function bulkZone() {
+  var z = el('mZone').value;
+  if (z === '') { toast('Choose a zone first', 'err'); return; }
+  bulkUpdate(function () { return { zone_id: Number(z) }; }, (zoneById(Number(z)) || {}).zone_name);
+}
+function bulkRow() {
+  var v = el('mRow').value.trim(), n = Number(v);
+  if (v === '' || !(Number.isInteger(n) && n >= 1 && n <= 50)) { toast('Enter a row number (1 = first line)', 'err'); return; }
+  bulkUpdate(function () { return { row_no: n }; }, 'row ' + n);
+}
+
+// ---------- add spot / cabanas ----------
+function addInput(tierChanged) {
+  var P = S.pending;
+  if (!P) return;
+  var tier = el('addTier').value;
+  if (tierChanged && P.auto) { P.num = nextNumber(tier); el('addNum').value = P.num; }
+  var num = el('addNum').value;
+  if (num !== P.num) P.auto = false;
+  P.num = num;
+  P.tier = tier;
+  S.addTier = tier;
+  var rv = el('addRow').value.trim();
+  P.row = rv === '' ? null : Number(rv);
+  P.zone = el('addZone').value === '' ? null : Number(el('addZone').value);
+  P.book = el('addBook').checked;
+  renderMap();
+}
+function newSpotBody(num, tier, row, zone, book, g) {
+  var body = {
+    property_id: Number(PID) || PID, spot_number: num, spot_type: tier === 'cabana' ? 'cabana' : 'umbrella', tier: tier,
+    row_no: row == null ? null : row, is_premium: tier === 'vip' ? 1 : 0, guest_bookable: book ? 1 : 0,
+    max_capacity: 2, price_full_day: 0,
+    map_x: r2(g.x), map_y: r2(g.y), map_w: g.w, map_h: g.h,
+    // The Ops app map and the dashboard live canvas still draw legacy pixel positions
+    position_x: Math.round(25 + g.x * 6.85), position_y: Math.round(240 + (58.8 - g.y) * 6)
+  };
+  var z = zone || defaultZoneId();
+  if (z) body.zone_id = z;
+  return body;
+}
+function spotIdFrom(d) { var v = d && (d.spot_id || (d.spot && d.spot.spot_id) || d.id); return v ? Number(v) : null; }
+async function createSpot() {
+  var P = S.pending;
+  if (!P || S.busy) return;
+  addInput();
+  var err = el('addErr');
+  err.textContent = '';
+  var num = (P.num || '').trim();
+  if (!num) { err.textContent = 'Enter a spot number.'; return; }
+  if (S.spots.some(function (s) { return s.spot_number === num; })) { err.textContent = 'Number ' + num + ' is already used by another spot.'; return; }
+  if (P.row != null && !(Number.isInteger(P.row) && P.row >= 1 && P.row <= 50)) { err.textContent = 'Row must be a whole number (1 = first line).'; return; }
+  S.busy = true;
+  el('addGo').disabled = true;
+  var r = await api('POST', '/api/admin/beach/spots', newSpotBody(num, P.tier, P.row, P.zone, P.book, pendingGeo()));
+  S.busy = false;
+  if (!r.ok) {
+    if (el('addGo')) el('addGo').disabled = false;
+    var msg = r.status === 409 ? 'Number ' + num + ' is already used by another spot.' : errText(r, 'Could not create the spot');
+    if (el('addErr')) el('addErr').textContent = msg; else toast(msg, 'err');
+    return;
+  }
+  var newId = spotIdFrom(r.data), book = P.book;
+  S.pending = null;
+  await loadLayout();
+  var ns = (newId && S.byId[newId]) || S.spots.filter(function (s) { return s.spot_number === num; })[0];
+  if (ns) { S.sel = [ns.spot_id]; renderLayout(); }
+  toast('Spot ' + num + ' created' + (book ? '' : ' as staff only'), 'ok');
+}
+async function addCabanas() {
+  if (!S.loaded || S.busy) return;
+  var have = {};
+  S.spots.forEach(function (s) { have[s.spot_number.toUpperCase()] = s; });
+  // Centres of the three white gazebos at the top right of the stock photo; the admin drags them exact
+  var X = [75.9, 84.0, 93.2];
+  var todo = [1, 2, 3].filter(function (i) { return !have['VC-' + i]; });
+  if (!todo.length) {
+    S.mode = 'select';
+    S.sel = [1, 2, 3].map(function (i) { return have['VC-' + i].spot_id; });
+    renderLayout();
+    toast('VC-1, VC-2 and VC-3 already exist. They are now selected.');
+    return;
+  }
+  var names = todo.map(function (i) { return 'VC-' + i; });
+  if (!confirm('Create cabana' + (todo.length > 1 ? 's ' : ' ') + names.join(', ') + ' by the white gazebos (top right of the photo)? They start as staff only: drag each box onto its gazebo, then tick "Guests can book it".')) return;
+  S.busy = true;
+  var results = await Promise.all(todo.map(function (i) {
+    return api('POST', '/api/admin/beach/spots', newSpotBody('VC-' + i, 'cabana', null, null, false, { x: X[i - 1], y: 35.5, w: SIZE.cabana.w, h: SIZE.cabana.h }));
+  }));
+  S.busy = false;
+  var made = [], failed = [];
+  results.forEach(function (r, k) { if (r.ok) made.push(names[k]); else failed.push(names[k] + ' (' + errText(r, 'failed') + ')'); });
+  await loadLayout();
+  S.mode = 'select';
+  S.sel = S.spots.filter(function (s) { return made.indexOf(s.spot_number) >= 0; }).map(function (s) { return s.spot_id; });
+  renderLayout();
+  if (failed.length) toast('Could not create ' + failed.join('; '), 'err');
+  else toast(made.join(', ') + ' added. Drag them onto the gazebos.', 'ok');
+}
+
+// ---------- numbering ----------
+function numInput() {
+  var N = S.num;
+  N.src = el('nSrc').value;
+  N.start = el('nStart').value;
+  N.prefix = el('nPrefix').value;
+  var d = document.querySelector('input[name="nDir"]:checked');
+  N.dir = d ? d.value : 'ltr';
+  N.incl = el('nIncl').checked;
+  refreshNumbering();
+}
+function planNumbering() {
+  var N = S.num, ids = [];
+  if (N.src === 'sel') ids = S.sel.slice();
+  else if (N.src) { var rn = Number(N.src.split(':')[1]); ids = S.spots.filter(function (s) { return s.row_no === rn; }).map(function (s) { return s.spot_id; }); }
+  var on = [], off = [];
+  ids.forEach(function (id) { var s = S.byId[id]; if (s) (isPlaced(s) ? on : off).push(s); });
+  var sg = N.dir === 'rtl' ? -1 : 1;
+  on.sort(function (a, b) { return sg * (geo(a).x - geo(b).x) || natCmp(a.spot_number, b.spot_number); });
+  off.sort(function (a, b) { return sg * ((a.position_x || 0) - (b.position_x || 0)) || natCmp(a.spot_number, b.spot_number); });
+  var seq = (N.src === 'sel' || N.incl) ? on.concat(off) : on;
+  var start = parseInt(N.start, 10);
+  if (!(start >= 0)) start = 1;
+  var prefix = String(N.prefix || '').trim();
+  var inSet = {}, taken = {};
+  seq.forEach(function (s) { inSet[s.spot_id] = 1; });
+  S.spots.forEach(function (s) { if (!inSet[s.spot_id]) taken[s.spot_number] = s; });
+  var list = [], to = {}, clashes = [];
+  seq.forEach(function (s, i) {
+    var n = prefix + (start + i);
+    list.push({ id: s.spot_id, from: s.spot_number, to: n });
+    to[s.spot_id] = n;
+    if (taken[n]) clashes.push({ number: n, spot: taken[n] });
+  });
+  return { list: list, to: to, clashes: clashes, offCount: N.src === 'sel' ? 0 : off.length };
+}
+function refreshNumbering() {
+  if (!el('numPrev')) return;
+  var plan = planNumbering();
+  S.numPlan = plan;
+  el('nInclWrap').classList.toggle('hidden', !plan.offCount);
+  el('nInclTxt').textContent = 'Also number the ' + plan.offCount + ' spot' + (plan.offCount === 1 ? '' : 's') + ' of this row that ' + (plan.offCount === 1 ? 'is' : 'are') + ' not on the photo (after the others)';
+  var h = '', changes = plan.list.filter(function (x) { return x.from !== x.to; }).length;
+  if (!plan.list.length) h = '<p class="muted sm">Nothing to number yet. Pick a row, or click spots on the photo.</p>';
+  else {
+    h += '<div class="pvlist">' + plan.list.map(function (x) { return '<span' + (x.from !== x.to ? ' class="chg"' : '') + '>' + esc(x.from) + ' → <b>' + esc(x.to) + '</b></span>'; }).join('') + '</div>';
+    h += '<p class="muted sm">' + changes + ' of ' + plan.list.length + ' numbers change.</p>';
+    if (plan.clashes.length) {
+      h += '<div class="err">Already used by other spots: ' + plan.clashes.map(function (c) {
+        return '<b>' + esc(c.number) + '</b> (' + (c.spot.row_no ? 'row ' + c.spot.row_no : 'no row') + (isPlaced(c.spot) ? '' : ', not on the photo') + ')';
+      }).join(', ') + '. Change the first number or prefix' + (plan.offCount && !S.num.incl ? ', or include the spots that are not on the photo' : '') + ', or renumber those spots first.</div>';
+    }
+  }
+  el('numPrev').innerHTML = h;
+  el('nApply').disabled = !changes || plan.clashes.length > 0 || S.busy;
+  renderMap();
+}
+async function applyNumbering() {
+  var plan = S.numPlan || planNumbering();
+  var ch = plan.list.filter(function (x) { return x.from !== x.to; });
+  if (!ch.length || plan.clashes.length || S.busy) return;
+  if (!confirm('Renumber ' + plural(ch.length, 'spot') + '? Guests and staff see the new numbers straight away. Existing bookings stay on the same spots.')) return;
+  S.busy = true;
+  el('nApply').disabled = true;
+  var fin = ch.map(function (x) { return { spot_id: x.id, spot_number: x.to }; });
+  var r = await api('POST', BULK, { updates: fin }), stuck = false;
+  if (!r.ok && r.status === 409) {
+    // A reversed row (27..1 becoming 1..27) can be rejected if each new number is checked against the
+    // numbers stored right now, so step through unique temporary numbers first
+    var r1 = await api('POST', BULK, { updates: ch.map(function (x) { return { spot_id: x.id, spot_number: 'TMP' + x.id }; }) });
+    if (r1.ok) {
+      r = await api('POST', BULK, { updates: fin });
+      if (!r.ok) {
+        var back = await api('POST', BULK, { updates: ch.map(function (x) { return { spot_id: x.id, spot_number: x.from }; }) });
+        stuck = !back.ok;
+      }
+    }
+  }
+  S.busy = false;
+  if (!r.ok) {
+    await loadLayout();
+    if (stuck) { toast('Renumbering stopped half-way: some spots show a temporary number (TMP…). Press Apply again.', 'err'); return; }
+    var d = r.data || {}, list = d.conflicts || d.duplicates || d.clashes || d.numbers;
+    var detail = Array.isArray(list) && list.length
+      ? list.map(function (v) { return typeof v === 'object' && v ? (v.spot_number || v.number || '?') : v; }).join(', ')
+      : (d.spot_number || '');
+    var human = d.message || d.error;
+    if (typeof human !== 'string' || human.indexOf(' ') < 0) human = 'These numbers are already taken';
+    toast(r.status === 409 ? human + (detail ? ': ' + detail : '') : errText(r, 'Could not renumber'), 'err');
+    return;
+  }
+  S.mode = 'select';
+  S.numPlan = null;
+  await loadLayout();
+  toast(plural(ch.length, 'spot') + ' renumbered', 'ok');
+}
+
+// ---------- zones & capacity ----------
+function renderZones() {
+  var gl = S.limits;
+  if (document.activeElement !== el('gUmb')) el('gUmb').value = gl.max_umbrellas_per_booking;
+  if (document.activeElement !== el('gLng')) el('gLng').value = gl.max_loungers_per_booking;
+  el('lngTxt').textContent = gl.max_loungers_per_booking;
+  var counts = {};
+  S.spots.forEach(function (s) { counts[s.zone_id] = (counts[s.zone_id] || 0) + 1; });
+  el('zoneRows').innerHTML = S.zones.length ? S.zones.map(function (z) {
+    var types = ZONE_TYPES.indexOf(z.zone_type) < 0 ? ZONE_TYPES.concat([z.zone_type]) : ZONE_TYPES;
+    return '<tr>' +
+      '<td><input type="text" id="zn' + z.zone_id + '" maxlength="60" value="' + esc(z.zone_name) + '" aria-label="Zone name"></td>' +
+      '<td><select id="zt' + z.zone_id + '" aria-label="Zone type">' + types.map(function (t) { return '<option' + (t === z.zone_type ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select></td>' +
+      '<td class="num">' + (counts[z.zone_id] || 0) + '</td>' +
+      '<td><input type="number" id="zu' + z.zone_id + '" min="1" max="20" step="1" placeholder="' + gl.max_umbrellas_per_booking + ' (global)" value="' + (z.max_umbrellas == null ? '' : z.max_umbrellas) + '" aria-label="Umbrellas per room"></td>' +
+      '<td><input type="number" id="zl' + z.zone_id + '" min="1" max="20" step="1" placeholder="' + gl.max_loungers_per_booking + ' (global)" value="' + (z.max_loungers == null ? '' : z.max_loungers) + '" aria-label="Loungers per booking"></td>' +
+      '<td><label class="chk"><input type="checkbox" id="za' + z.zone_id + '"' + (z.is_active ? ' checked' : '') + ' aria-label="Active"></label></td>' +
+      '<td><button class="btn" onclick="saveZone(' + z.zone_id + ')">Save</button></td></tr>';
+  }).join('') : '<tr><td colspan="7" class="muted">No zones yet. Add one below.</td></tr>';
+  var ov = S.spots.filter(function (s) { return s.max_loungers != null; }).sort(function (a, b) { return natCmp(a.spot_number, b.spot_number); });
+  el('spotOverrides').innerHTML = ov.length
+    ? '<div class="chips">' + ov.map(function (s) { return '<button class="chip t-' + s.tier + '" onclick="jumpToSpot(' + s.spot_id + ')">' + esc(s.spot_number) + ' · ' + plural(s.max_loungers, 'lounger') + '</button>'; }).join('') + '</div>'
+    : 'None. Every spot uses its zone limit or the global one. To give one spot its own limit (for example a cabana with 4 loungers), select it in the Layout tab.';
+}
+function limitVal(v) {
+  v = String(v).trim();
+  if (v === '') return null;
+  var n = Number(v);
+  return (Number.isInteger(n) && n >= 1 && n <= 20) ? n : false;
+}
+async function saveLimits() {
+  var u = limitVal(el('gUmb').value), l = limitVal(el('gLng').value);
+  if (!u || !l) { toast('Both limits must be whole numbers from 1 to 20', 'err'); return; }
+  el('limSave').disabled = true;
+  var r = await api('POST', '/api/admin/beach/settings', { max_umbrellas_per_booking: u, max_loungers_per_booking: l });
+  el('limSave').disabled = false;
+  if (!r.ok) { toast(errText(r, 'Could not save the limits'), 'err'); return; }
+  S.limits = { max_umbrellas_per_booking: u, max_loungers_per_booking: l };
+  toast('Booking limits saved', 'ok');
+  await loadLayout();
+}
+async function saveZone(id) {
+  var name = el('zn' + id).value.trim();
+  if (!name) { toast('Zone name is required', 'err'); return; }
+  var u = limitVal(el('zu' + id).value), l = limitVal(el('zl' + id).value);
+  if (u === false || l === false) { toast('Zone limits must be whole numbers from 1 to 20, or blank to inherit', 'err'); return; }
+  var active = el('za' + id).checked ? 1 : 0, z = zoneById(id);
+  if (z && z.is_active && !active) {
+    var n = S.spots.filter(function (s) { return s.zone_id === id; }).length;
+    if (n && !confirm(plural(n, 'spot') + ' ' + (n === 1 ? 'is' : 'are') + ' in this zone. Deactivate it anyway?')) return;
+  }
+  var r = await api('PUT', '/api/admin/beach/zones/' + id, { zone_name: name, name: name, zone_type: el('zt' + id).value, max_umbrellas: u, max_loungers: l, is_active: active });
+  if (!r.ok) { toast(errText(r, 'Could not save the zone'), 'err'); return; }
+  toast('Zone ' + name + ' saved', 'ok');
+  await loadLayout();
+}
+async function createZone() {
+  var name = el('nzName').value.trim();
+  if (!name) { toast('Enter a zone name', 'err'); return; }
+  if (S.zones.some(function (z) { return z.zone_name.toLowerCase() === name.toLowerCase(); })) { toast('There is already a zone called ' + name, 'err'); return; }
+  var r = await api('POST', '/api/admin/beach/zones', { zone_name: name, name: name, zone_type: el('nzType').value, is_active: 1, display_order: S.zones.length + 1 });
+  if (!r.ok) { toast(errText(r, 'Could not create the zone'), 'err'); return; }
+  el('nzName').value = '';
+  toast('Zone ' + name + ' created', 'ok');
+  await loadLayout();
+}
+
+// ---------- time slots ----------
+function slotForm() {
+  return {
+    amStart: el('amAuto').checked ? '' : el('amStart').value.slice(0, 5), amEnd: el('amEnd').value.slice(0, 5),
+    pmStart: el('pmStart').value.slice(0, 5), pmEnd: el('pmAuto').checked ? '' : el('pmEnd').value.slice(0, 5),
+    full: el('fullDay').checked ? 1 : 0
+  };
+}
+function fillSlotForm(v) {
+  el('amAuto').checked = !v.amStart;
+  el('amStart').value = v.amStart || SL.sunrise || '';
+  el('amStart').disabled = !v.amStart;
+  el('amEnd').value = v.amEnd;
+  el('pmStart').value = v.pmStart;
+  el('pmAuto').checked = !v.pmEnd;
+  el('pmEnd').value = v.pmEnd || SL.sunset || '';
+  el('pmEnd').disabled = !v.pmEnd;
+  el('fullDay').checked = !!v.full;
+  slotsChanged();
+}
+function slotProblems(v) {
+  var errs = [], warns = [];
+  if (!el('amAuto').checked && !v.amStart) errs.push('Enter the Morning start time, or tick Sunrise (auto).');
+  if (!v.amEnd) errs.push('Enter the Morning end time.');
+  if (!v.pmStart) errs.push('Enter the Afternoon start time.');
+  if (!el('pmAuto').checked && !v.pmEnd) errs.push('Enter the Afternoon end time, or tick Sunset (auto).');
+  var amS = v.amStart || SL.sunrise, pmE = v.pmEnd || SL.sunset;
+  if (amS && v.amEnd && amS >= v.amEnd) errs.push('Morning must end after it starts (' + amS + ' → ' + v.amEnd + ').');
+  if (pmE && v.pmStart && v.pmStart >= pmE) errs.push('Afternoon must end after it starts (' + v.pmStart + ' → ' + pmE + ').');
+  if (v.amEnd && v.pmStart && v.amEnd > v.pmStart) warns.push('Morning ends after Afternoon starts, so the two slots overlap on the beach.');
+  return { errs: errs, warns: warns };
+}
+function slotsChanged() {
+  var v = slotForm(), s = SL.saved;
+  SL.dirty = !!s && (v.amStart !== s.amStart || v.amEnd !== s.amEnd || v.pmStart !== s.pmStart || v.pmEnd !== s.pmEnd || v.full !== s.full);
+  var p = slotProblems(v);
+  el('slotWarn').innerHTML = p.errs.concat(p.warns).map(esc).join('<br>');
+  el('slotState').textContent = SL.dirty ? 'Unsaved changes' : '';
+  renderPreview();
+}
+function slotAutoChanged(which) {
+  var auto = el(which + 'Auto').checked, inp = el(which === 'am' ? 'amStart' : 'pmEnd');
+  inp.disabled = auto;
+  if (auto) inp.value = (which === 'am' ? SL.sunrise : SL.sunset) || inp.value;
+  else if (!inp.value) inp.value = which === 'am' ? (SL.sunrise || '07:00') : (SL.sunset || '18:00');
+  slotsChanged();
+}
+async function loadSlots() {
+  SL.loaded = true;
+  var r = await api('GET', '/api/admin/beach/settings/' + encodeURIComponent(PID));
+  var s = r.ok && r.data.settings;
+  if (!s) { SL.loaded = false; el('slotState').textContent = errText(r, 'Could not load the time slots'); }
+  else {
+    SL.saved = { amStart: (s.slot_am_start || '').slice(0, 5), amEnd: (s.slot_am_end || '13:00').slice(0, 5), pmStart: (s.slot_pm_start || '13:30').slice(0, 5), pmEnd: (s.slot_pm_end || '').slice(0, 5), full: Number(s.full_day_enabled) ? 1 : 0 };
+    fillSlotForm(SL.saved);
+  }
+  loadPreview();
+}
+async function saveSlots() {
+  var v = slotForm(), p = slotProblems(v);
+  if (p.errs.length) { toast(p.errs[0], 'err'); return; }
+  el('slotSave').disabled = true;
+  var r = await api('POST', '/api/admin/beach/settings', { slot_am_start: v.amStart, slot_am_end: v.amEnd, slot_pm_start: v.pmStart, slot_pm_end: v.pmEnd, full_day_enabled: v.full });
+  el('slotSave').disabled = false;
+  if (!r.ok) { toast(errText(r, 'Could not save the time slots'), 'err'); return; }
+  SL.saved = v;
+  slotsChanged();
+  toast('Time slots saved', 'ok');
+  loadPreview();
+}
+async function loadPreview() {
+  var r = await api('GET', '/api/beach/slots/' + encodeURIComponent(PID) + '?from=' + cairoToday() + '&days=7');
+  if (!r.ok || !Array.isArray(r.data.days)) {
+    SL.days = [];
+    el('pvHead').innerHTML = '';
+    el('pvRows').innerHTML = '<tr><td class="muted">' + esc(errText(r, 'The sunrise/sunset preview is not available')) + '</td></tr>';
+    return;
+  }
+  SL.days = r.data.days;
+  var t = SL.days[0];
+  if (t) {
+    SL.sunrise = (t.sunrise || '').slice(0, 5);
+    SL.sunset = (t.sunset || '').slice(0, 5);
+    if (el('amAuto').checked && SL.sunrise) el('amStart').value = SL.sunrise;
+    if (el('pmAuto').checked && SL.sunset) el('pmEnd').value = SL.sunset;
+  }
+  slotsChanged();
+}
+function slotById(list, id) { for (var i = 0; i < (list || []).length; i++) if (list[i] && list[i].id === id) return list[i]; return null; }
+function dayLabel(ymd) {
+  var p = String(ymd || '').split('-');
+  if (p.length !== 3) return esc(ymd);
+  var d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])));
+  var s = d.toLocaleDateString('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
+  return (ymd === cairoToday() ? 'Today · ' : '') + s;
+}
+var SRC_LABEL = { api: 'sunrise-sunset.org', calc: 'calculated', cache: 'saved' };
+function renderPreview() {
+  if (!SL.days.length) return;
+  var v = slotForm(), full = !!v.full;
+  el('pvHead').innerHTML = '<tr><th>Date</th><th>Sunrise</th><th>Sunset</th><th>Morning</th><th>Afternoon</th>' + (full ? '<th>Full day</th>' : '') + '<th>Sun times</th></tr>';
+  el('pvNote').textContent = SL.dirty ? 'Showing your unsaved times. Press Save time slots to apply them.' : 'The times guests will see.';
+  function rng(a, b) { return esc(a || '—') + ' – ' + esc(b || '—'); }
+  el('pvRows').innerHTML = SL.days.map(function (d) {
+    var am, pm, rise = (d.sunrise || '').slice(0, 5), set = (d.sunset || '').slice(0, 5);
+    var sAm = slotById(d.slots, 'half_day_am'), sPm = slotById(d.slots, 'half_day_pm');
+    if (SL.dirty || !sAm || !sPm) { am = { start: v.amStart || rise, end: v.amEnd }; pm = { start: v.pmStart, end: v.pmEnd || set }; }
+    else { am = { start: sAm.start, end: sAm.end }; pm = { start: sPm.start, end: sPm.end }; }
+    var src = d.source || '';
+    return '<tr><td><b>' + dayLabel(d.date) + '</b></td><td>' + esc(rise || '—') + '</td><td>' + esc(set || '—') + '</td>' +
+      '<td>' + rng(am.start, am.end) + (v.amStart ? '' : '<span class="tag">sunrise</span>') + '</td>' +
+      '<td>' + rng(pm.start, pm.end) + (v.pmEnd ? '' : '<span class="tag">sunset</span>') + '</td>' +
+      (full ? '<td>' + rng(am.start, pm.end) + '</td>' : '') +
+      '<td><span class="src ' + esc(src) + '">' + esc(SRC_LABEL[src] || src || '—') + '</span></td></tr>';
+  }).join('');
+}
+
+// ---------- tabs & start-up ----------
+function showTab(t, fromHash) {
+  if (['layout', 'zones', 'slots'].indexOf(t) < 0) t = 'layout';
+  curTab = t;
+  document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === t); });
+  document.querySelectorAll('.pane').forEach(function (p) { p.classList.toggle('hidden', p.id !== 'pane-' + t); });
+  if (!fromHash) { try { history.replaceState(null, '', location.pathname + location.search + '#' + t); } catch (e) {} }
+  if (t === 'slots' && !SL.loaded) loadSlots();
+}
+window.addEventListener('hashchange', function () { showTab(location.hash.slice(1), true); });
+showTab(location.hash.slice(1), true);
+renderPhoto();
+applyZoom();
+renderLayout();
+loadLayout();
+if (!SL.loaded) loadSlots();
+</script>
 </body>
-</html>
-  `)
+</html>`)
+})
+
+// The old free-form designer re-created every spot on save (orphaning bookings); Beach setup replaces it
+app.get('/admin/beach-map-designer', (c) => {
+  const qs = new URL(c.req.url).search
+  return c.redirect('/admin/beach-setup' + qs, 302)
 })
 
 // Beach Analytics Dashboard - Comprehensive analytics with AI insights
@@ -54988,11 +55590,17 @@ app.get('/admin/dashboard', (c) => {
                     <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>
                     Beach Booking Management
                 </h2>
+                <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openBeachSetup()" class="px-5 py-3 bg-white border-2 border-cyan-500 text-cyan-700 hover:bg-cyan-50 rounded-xl font-semibold transition flex items-center gap-2">
+                    <i class="fas fa-map-marked-alt"></i>
+                    Beach setup
+                </button>
                 <button onclick="window.open('/admin/beach-management', '_blank')" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg transition transform hover:scale-105 flex items-center gap-2">
                     <i class="fas fa-external-link-alt"></i>
                     Open Beach Management Portal
                     <span class="text-xs bg-white/20 px-2 py-1 rounded">STAFF</span>
                 </button>
+                </div>
             </div>
             <p class="text-gray-600 mb-4">
                 Configure your beach spots, create interactive beach maps, and manage guest bookings for umbrellas, cabanas, and loungers.
@@ -55187,25 +55795,17 @@ app.get('/admin/dashboard', (c) => {
                 }
             </script>
 
-            <!-- Time Slots Management -->
-            <div class="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-6 mb-6 border-2 border-green-200">
-                <h3 class="text-xl font-bold mb-4">
-                    <i class="fas fa-clock mr-2 text-green-600"></i>Time Slots Management
-                </h3>
-                <p class="text-sm text-gray-600 mb-4">Configure booking time slots that guests can choose from</p>
-                
-                <div id="timeSlotsContainer" class="space-y-4 mb-4">
-                    <!-- Time slots will be dynamically loaded here -->
+            <!-- Time Slots: edited in Beach setup below -->
+            <div class="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-6 mb-6 border-2 border-green-200 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-xl font-bold mb-1">
+                        <i class="fas fa-clock mr-2 text-green-600"></i>Time Slots
+                    </h3>
+                    <p class="text-sm text-gray-600">Guests book a Morning or an Afternoon slot. By default Morning starts at sunrise and Afternoon ends at sunset, looked up every day. Set fixed times or add a Full day slot in Beach setup.</p>
                 </div>
-                
-                <div class="flex gap-2">
-                    <button onclick="addTimeSlot()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-                        <i class="fas fa-plus mr-2"></i>Add Time Slot
-                    </button>
-                    <button onclick="saveTimeSlots()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                        <i class="fas fa-save mr-2"></i>Save Time Slots
-                    </button>
-                </div>
+                <button onclick="openBeachSetup('slots')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition whitespace-nowrap">
+                    <i class="fas fa-clock mr-2"></i>Edit time slots
+                </button>
             </div>
 
             <!-- Beach Card Customization -->
@@ -55445,27 +56045,21 @@ app.get('/admin/dashboard', (c) => {
                 </button>
             </div>
 
-            <!-- Beach Map Designer -->
-            <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xl font-bold">
-                        <i class="fas fa-map-marked-alt mr-2 text-cyan-600"></i>Beach Map Designer
-                    </h3>
-                    <div class="flex gap-2">
-                        <button onclick="openBeachMapDesigner()" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition">
-                            <i class="fas fa-paint-brush mr-2"></i>Design Beach Map
-                        </button>
+            <!-- Beach setup: layout builder, zones & capacity, time slots (embedded page) -->
+            <div id="beachSetupCard" class="bg-white border-2 border-cyan-200 rounded-lg p-4 mb-6">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h3 class="text-xl font-bold">
+                            <i class="fas fa-map-marked-alt mr-2 text-cyan-600"></i>Beach setup
+                        </h3>
+                        <p class="text-sm text-gray-600">Place and number spots on the beach photo guests see, set booking limits per zone, and set the time slots.</p>
                     </div>
+                    <a href="/admin/beach-setup" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:underline whitespace-nowrap">
+                        <i class="fas fa-up-right-from-square mr-1"></i>Open full screen
+                    </a>
                 </div>
-                <p class="text-gray-600 mb-4">
-                    Upload your beach photo, draw zones, and place spots (umbrellas, cabanas, loungers) with drag-and-drop.
-                </p>
-                
-                <div id="beachMapPreview" class="bg-gray-100 rounded-lg p-8 text-center">
-                    <i class="fas fa-map text-6xl text-gray-400 mb-4"></i>
-                    <p class="text-gray-600">No beach map configured yet</p>
-                    <p class="text-sm text-gray-500 mt-2">Click "Design Beach Map" to get started</p>
-                </div>
+                <iframe id="beachSetupFrame" data-src="/admin/beach-setup?embed=1" title="Beach setup"
+                        style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
             </div>
 
             <!-- Beach Spots List -->
@@ -63116,8 +63710,32 @@ app.get('/admin/dashboard', (c) => {
       };
       
       // ===== BEACH MANAGEMENT FUNCTIONS =====
-      
+
+      // Beach setup (layout builder, zones & capacity, time slots) is an embedded page, loaded on first open
+      function loadBeachSetupFrame() {
+        const f = document.getElementById('beachSetupFrame');
+        if (!f || f.src) return f;
+        f.dataset.src = '/admin/beach-setup?embed=1&property=' + encodeURIComponent(propertyId);
+        lazyFrame('beachSetupFrame');
+        return f;
+      }
+
+      window.openBeachSetup = function(tab) {
+        const f = document.getElementById('beachSetupFrame');
+        if (!f) return;
+        if (!f.src) {
+          f.dataset.src = '/admin/beach-setup?embed=1&property=' + encodeURIComponent(propertyId) + (tab ? '#' + tab : '');
+          lazyFrame('beachSetupFrame');
+        } else if (tab) {
+          // Only the hash changes, so the page switches tab without reloading (unsaved edits survive)
+          f.src = f.src.split('#')[0] + '#' + tab;
+        }
+        const card = document.getElementById('beachSetupCard') || f;
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+
       async function loadBeachSettings() {
+        loadBeachSetupFrame();
         try {
           const response = await fetchWithAuth('/api/admin/beach/settings/' + propertyId);
           const data = await response.json();
@@ -63207,10 +63825,7 @@ app.get('/admin/dashboard', (c) => {
               beachBookingDateEl.value = today;
             }
             await loadBeachBookings();
-            
-            // Load time slots
-            loadTimeSlots(s.time_slots);
-            
+
             // Initialize live beach map
             await initializeLiveMap();
           }
@@ -63218,104 +63833,6 @@ app.get('/admin/dashboard', (c) => {
           console.error('Load beach settings error:', error);
         }
       }
-
-      function loadTimeSlots(timeSlotsJson) {
-        try {
-          const timeSlots = timeSlotsJson ? JSON.parse(timeSlotsJson) : [
-            {id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00'},
-            {id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00'},
-            {id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00'}
-          ];
-          
-          window.beachTimeSlots = timeSlots;
-          renderTimeSlots();
-        } catch (error) {
-          console.error('Load time slots error:', error);
-          window.beachTimeSlots = [
-            {id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00'},
-            {id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00'},
-            {id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00'}
-          ];
-          renderTimeSlots();
-        }
-      }
-
-      function renderTimeSlots() {
-        const container = document.getElementById('timeSlotsContainer');
-        if (!container) return;
-        
-        const html = window.beachTimeSlots.map((slot, index) => 
-          '<div class="bg-white p-4 rounded-lg border-2 border-green-200">' +
-            '<div class="grid grid-cols-1 md:grid-cols-4 gap-3">' +
-              '<div>' +
-                '<label class="block text-sm font-medium mb-1">Slot Name</label>' +
-                '<input type="text" value="' + slot.name + '" onchange="updateTimeSlot(' + index + ', &quot;name&quot;, this.value)" class="w-full px-3 py-2 border rounded-lg">' +
-              '</div>' +
-              '<div>' +
-                '<label class="block text-sm font-medium mb-1">Start Time</label>' +
-                '<input type="time" value="' + slot.start + '" onchange="updateTimeSlot(' + index + ', &quot;start&quot;, this.value)" class="w-full px-3 py-2 border rounded-lg">' +
-              '</div>' +
-              '<div>' +
-                '<label class="block text-sm font-medium mb-1">End Time</label>' +
-                '<input type="time" value="' + slot.end + '" onchange="updateTimeSlot(' + index + ', &quot;end&quot;, this.value)" class="w-full px-3 py-2 border rounded-lg">' +
-              '</div>' +
-              '<div class="flex items-end">' +
-                '<button onclick="removeTimeSlot(' + index + ')" class="w-full px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">' +
-                  '<i class="fas fa-trash mr-1"></i>Remove' +
-                '</button>' +
-              '</div>' +
-            '</div>' +
-          '</div>'
-        ).join('');
-        
-        container.innerHTML = html;
-      }
-
-      window.addTimeSlot = function() {
-        const newId = 'slot_' + Date.now();
-        window.beachTimeSlots.push({
-          id: newId,
-          name: 'New Slot',
-          start: '09:00',
-          end: '12:00'
-        });
-        renderTimeSlots();
-      };
-
-      window.updateTimeSlot = function(index, field, value) {
-        if (window.beachTimeSlots[index]) {
-          window.beachTimeSlots[index][field] = value;
-        }
-      };
-
-      window.removeTimeSlot = function(index) {
-        if (confirm('Remove this time slot?')) {
-          window.beachTimeSlots.splice(index, 1);
-          renderTimeSlots();
-        }
-      };
-
-      window.saveTimeSlots = async function() {
-        try {
-          const response = await fetchWithAuth('/api/admin/beach/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              time_slots: JSON.stringify(window.beachTimeSlots)
-            })
-          });
-          
-          const data = await response.json();
-          if (data.success) {
-            alert('✅ Time slots saved successfully!');
-          } else {
-            alert('❌ Failed to save time slots: ' + data.error);
-          }
-        } catch (error) {
-          console.error('Save time slots error:', error);
-          alert('❌ Error saving time slots');
-        }
-      };
 
       window.saveBeachCardCustomization = async function() {
         try {
@@ -63630,7 +64147,7 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.openBeachMapDesigner = function() {
-        window.open('/admin/beach-map-designer', '_blank', 'width=1400,height=900');
+        window.openBeachSetup('layout');
       };
       
       window.openInteractiveMapBuilder = function() {
