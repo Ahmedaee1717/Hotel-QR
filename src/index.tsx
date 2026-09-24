@@ -47699,6 +47699,223 @@ app.get('/.well-known/assetlinks.json', (c) => {
   }] : [])
 })
 
+// Printable beach arrivals list for the attendants. Lives under /staff/ so the
+// Ops TWA opens it in-app; ?print=1 opens the print dialog on load.
+app.get('/staff/beach/arrivals', async (c) => {
+  const pid = String(c.req.query('property_id') || '1')
+  const qd = String(c.req.query('date') || '')
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(qd) ? qd : attCairoDate()
+  let slot = attSlotId(c.req.query('slot') || 'all')
+  if (slot !== 'half_day_am' && slot !== 'half_day_pm') slot = 'all'
+  const autoPrint = c.req.query('print') === '1'
+  const h = attEsc
+
+  let day: any = null
+  let propName = 'Old Palace Resort'
+  let failed = false
+  try {
+    const [d, prop]: any = await Promise.all([
+      attBeachDay(c.env, pid, date),
+      c.env.DB.prepare('SELECT name FROM properties WHERE property_id = ?').bind(pid).first().catch(() => null)
+    ])
+    day = d
+    if (prop && prop.name) propName = String(prop.name)
+  } catch (e) {
+    console.error('beach arrivals error', e)
+    failed = true
+  }
+
+  const times: any = (day && day.slot_times) || {}
+  const tm = (id: string) => (times[id] && times[id].start && times[id].end) ? times[id].start + '–' + times[id].end : ''
+  const slotNames: any = { all: 'All day', half_day_am: 'Morning', half_day_pm: 'Afternoon', full_day: 'Full day' }
+  const rows: any[] = ((day && day.bookings) || []).filter((b: any) => attInSlot(b.slot_type, slot))
+  const zoneCount = new Set(rows.map((b: any) => b.zone_name).filter(Boolean)).size
+  const hasFullDay = rows.some((b: any) => b.slot_type === 'full_day')
+  const tot = { guests: 0, umbrellas: 0, loungers: 0, arrived: 0, waiting: 0, noShow: 0 }
+  for (const b of rows) {
+    tot.guests += Number(b.num_guests) || 0
+    tot.umbrellas += Number(b.umbrellas) || 0
+    tot.loungers += Number(b.loungers) || 0
+    if (b.booking_status === 'checked_in' || b.booking_status === 'completed') tot.arrived++
+    else if (b.booking_status === 'no_show') tot.noShow++
+    else tot.waiting++
+  }
+
+  const dateLabel = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'))
+  const printedAt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Africa/Cairo' }).format(new Date())
+  const slotLine = slot === 'all'
+    ? ['half_day_am', 'half_day_pm'].map((id) => slotNames[id] + (tm(id) ? ' ' + tm(id) : '')).join(' · ')
+    : slotNames[slot] + (tm(slot) ? ' ' + tm(slot) : '') + (hasFullDay ? ' · includes full-day bookings' : '')
+  const statusOf = (s: string) => s === 'checked_in' ? 'Arrived' : s === 'completed' ? 'Left' : s === 'no_show' ? 'No-show' : 'Expected'
+  const cols = slot === 'all' ? 10 : 9
+  const opt = (v: string, label: string) => `<option value="${v}"${slot === v ? ' selected' : ''}>${h(label)}</option>`
+
+  let lastRow: any = '-'
+  const body = rows.map((b: any) => {
+    let out = ''
+    const rn = b.row_no == null ? null : Number(b.row_no)
+    if (rn !== lastRow) {
+      lastRow = rn
+      const label = rn == null ? 'Other spots' : rn < 1 ? 'Front' : 'Row ' + rn + (rn === 1 ? ' · first line' : '')
+      out += `<tr class="grp"><td colspan="${cols}">${label}</td></tr>`
+    }
+    const st = String(b.booking_status || '')
+    const inn = st === 'checked_in' || st === 'completed'
+    const tag = (b.tier === 'cabana' || b.spot_type === 'cabana') ? 'Cabana' : b.tier === 'vip' ? 'VIP' : ''
+    const umb = Number(b.umbrellas) || 1
+    const slotTag = b.slot_type === 'half_day_am' ? 'AM' : b.slot_type === 'half_day_pm' ? 'PM' : 'Day'
+    out += `<tr class="${inn ? 'in' : st === 'no_show' ? 'ns' : ''}">`
+      + `<td class="spot"><b>${h(b.spot_number == null ? '?' : b.spot_number)}</b>${tag ? `<span class="tag">${tag}</span>` : ''}${zoneCount > 1 && b.zone_name ? `<small>${h(b.zone_name)}</small>` : ''}</td>`
+      + `<td class="guest">${h(b.guest_name || 'Guest')}${b.special_requests ? `<small>${h(String(b.special_requests).slice(0, 90))}</small>` : ''}</td>`
+      + `<td class="c">${h(b.guest_room_number || '—')}</td>`
+      + `<td class="c">${Number(b.num_guests) || '—'}</td>`
+      + `<td class="c">${Number(b.loungers) || 0}${umb > 1 ? `<small>+ ${umb} ☂</small>` : ''}</td>`
+      + (slot === 'all' ? `<td class="c">${slotTag}</td>` : '')
+      + `<td class="code">${h(b.booking_code || '')}</td>`
+      + `<td class="st">${statusOf(st)}${st === 'no_show' && b.checked_in_by ? `<small>${h(b.checked_in_by)}</small>` : ''}</td>`
+      + `<td>${inn ? h(b.checked_in_time || '') + (b.checked_in_by ? `<small>${h(b.checked_in_by)}</small>` : '') : ''}</td>`
+      + `<td class="sig"></td>`
+      + `</tr>`
+    return out
+  }).join('')
+
+  const empty = failed
+    ? 'Could not load the bookings. Check the connection and reload.'
+    : `No ${slot === 'all' ? '' : slotNames[slot].toLowerCase() + ' '}bookings for ${dateLabel}.`
+
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#120a0e">
+<meta name="color-scheme" content="light">
+<title>Beach arrivals ${h(date)} ${h(slotNames[slot])}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#1c1917;--dim:#57534e;--line:#d6d3d1;--soft:#f5f5f4;--gold:#a16207;--ok:#047857;--bad:#b91c1c}
+html{-webkit-text-size-adjust:100%}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#e7e5e4;color:var(--ink);-webkit-font-smoothing:antialiased}
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:#120a0e;color:#f6f0e3}
+.bar .back{order:1;color:#f0d98c;text-decoration:none;font-weight:700;font-size:.9rem;padding:8px 4px;margin-right:auto}
+.bar form{order:3;flex:1 1 100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bar label{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(246,240,227,.7);display:flex;flex-direction:column;gap:4px;min-width:0}
+.bar input,.bar select{width:100%;min-width:0;font:inherit;font-size:.9rem;letter-spacing:0;text-transform:none;background:#241318;color:#f6f0e3;border:1px solid rgba(212,175,55,.45);border-radius:10px;padding:8px 10px;min-height:42px;color-scheme:dark}
+.bar button{order:2;font:inherit;font-weight:800;font-size:.85rem;border:none;border-radius:999px;padding:10px 20px;min-height:42px;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;cursor:pointer}
+@media (min-width:720px){
+  .bar form{order:2;flex:0 1 auto;display:flex;align-items:center}
+  .bar label{flex-direction:row;align-items:center;gap:6px}
+  .bar input,.bar select{width:auto}
+  .bar button{order:3}
+}
+.ring{display:none;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#b3122f;color:#fff;font-weight:700;font-size:.9rem}
+.ring a{background:#fff;color:#7d0a20;border-radius:999px;padding:9px 16px;text-decoration:none;font-weight:800;white-space:nowrap}
+.sheet{background:#fff;max-width:210mm;margin:16px auto;padding:12mm 11mm;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:8px}
+.hd .rn{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800}
+.hd h1{font-size:1.4rem;line-height:1.2;margin-top:2px}
+.hd .dt{font-size:.95rem;font-weight:700;margin-top:2px}
+.hd .sl{font-size:.8rem;color:var(--dim);margin-top:2px}
+.hd .pr{text-align:right;font-size:.72rem;color:var(--dim);white-space:nowrap}
+.tot{font-size:.8rem;margin-bottom:10px;font-variant-numeric:tabular-nums}
+.tot b{font-weight:800}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.8rem;min-width:660px;font-variant-numeric:tabular-nums}
+th{font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;text-align:left;color:var(--dim);border-bottom:1.5px solid var(--ink);padding:5px}
+td{border-bottom:1px solid var(--line);padding:6px 5px;vertical-align:top}
+td small{display:block;font-size:.68rem;color:var(--dim);margin-top:1px;font-weight:400}
+td.c,th.c{text-align:center}
+td.spot{white-space:nowrap}
+td.spot b{font-size:.95rem}
+td.guest{font-weight:600}
+.tag{display:inline-block;margin-left:4px;font-size:.56rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--gold);color:var(--gold);border-radius:4px;padding:0 3px;vertical-align:middle}
+td.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.74rem}
+td.sig,th.sig{width:30mm;min-width:30mm}
+td.sig{border:1px solid #a8a29e}
+tr.grp td{background:var(--soft);font-weight:800;font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:4px 5px}
+tr.in td.st{color:var(--ok);font-weight:700}
+tr.ns td.st{color:var(--bad);font-weight:700}
+.empty{padding:28px 8px;text-align:center;color:var(--dim);font-size:.95rem}
+.foot{margin-top:10px;font-size:.66rem;color:var(--dim);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+@media (max-width:640px){
+  .sheet{margin:0;padding:16px;box-shadow:none}
+  .hd{flex-direction:column;gap:4px}
+  .hd .pr{text-align:left}
+}
+@page{size:A4 portrait;margin:10mm}
+@media print{
+  body{background:#fff}
+  .bar,.ring{display:none!important}
+  .sheet{margin:0;padding:0;max-width:none;box-shadow:none}
+  .scroll{overflow:visible}
+  table{min-width:0;font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  td{padding:5px 4px}
+  td.sig{height:9mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <a class="back" id="arrBack" href="/staff/app">&lsaquo; Ops</a>
+  <form id="arrForm" method="get" action="/staff/beach/arrivals">
+    <input type="hidden" name="property_id" value="${h(pid)}">
+    <label>Date <input type="date" name="date" value="${h(date)}" required></label>
+    <label>Slot <select name="slot">${opt('all', 'All day')}${opt('half_day_am', 'Morning' + (tm('half_day_am') ? ' ' + tm('half_day_am') : ''))}${opt('half_day_pm', 'Afternoon' + (tm('half_day_pm') ? ' ' + tm('half_day_pm') : ''))}</select></label>
+    <noscript><button type="submit">Show</button></noscript>
+  </form>
+  <button type="button" id="arrPrint">Print</button>
+</div>
+<div class="ring" id="arrRing"><span>A guest is waiting on the Ops console</span><a href="/staff/app">Open Ops</a></div>
+<main class="sheet">
+  <div class="hd">
+    <div>
+      <div class="rn">${h(propName)}</div>
+      <h1>Beach arrivals</h1>
+      <div class="dt">${h(dateLabel)}</div>
+      <div class="sl">${h(slotLine)}</div>
+    </div>
+    <div class="pr">Printed ${h(printedAt)}<br>Cairo time</div>
+  </div>
+  ${rows.length ? `<div class="tot"><b>${rows.length}</b> booking${rows.length === 1 ? '' : 's'} · <b>${tot.guests}</b> guests · <b>${tot.umbrellas}</b> ☂ · <b>${tot.loungers}</b> loungers · <b>${tot.arrived}</b> arrived · <b>${tot.waiting}</b> expected${tot.noShow ? ` · <b>${tot.noShow}</b> no-show` : ''}</div>
+  <div class="scroll"><table>
+    <thead><tr><th>Spot</th><th>Guest</th><th class="c">Room</th><th class="c">Guests</th><th class="c">Loungers</th>${slot === 'all' ? '<th class="c">Slot</th>' : ''}<th>Code</th><th>Status</th><th>Arrived</th><th class="sig">Signature</th></tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>` : `<div class="empty">${h(empty)}</div>`}
+  <div class="foot"><span>${h(propName)} · Beach arrivals · ${h(date)} · ${h(slotNames[slot])}</span><span>Times are Cairo time</span></div>
+</main>
+<script>
+(function(){
+  var AUTO = ${autoPrint ? 'true' : 'false'};
+  var f = document.getElementById('arrForm');
+  if (f) f.addEventListener('change', function(){ f.submit(); });
+  var p = document.getElementById('arrPrint');
+  if (p) p.addEventListener('click', function(){ window.print(); });
+  var bk = document.getElementById('arrBack');
+  if (bk) bk.addEventListener('click', function(e){
+    try { if (document.referrer && document.referrer.indexOf('/staff/app') >= 0 && history.length > 1) { e.preventDefault(); history.back(); } } catch (err) {}
+  });
+  // The front-desk ring only plays on the Ops console: point staff back to it
+  try {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function(ev){
+      var r = document.getElementById('arrRing');
+      if (ev.data && ev.data.type === 'ring') {
+        if (r) r.style.display = 'flex';
+        try { if (navigator.vibrate) navigator.vibrate([600, 200, 600, 200, 600]); } catch (e) {}
+      } else if (ev.data && ev.data.type === 'stopring' && r) {
+        r.style.display = 'none';
+      }
+    });
+  } catch (e) {}
+  if (AUTO) window.addEventListener('load', function(){ setTimeout(function(){ try { window.print(); } catch (e) {} }, 400); });
+})();
+</script>
+</body>
+</html>`)
+})
+
 // STAFF OPS APP — front desk console (installable PWA / wrapped as APK)
 app.get('/staff/app', (c) => {
   return c.html(`
@@ -47782,18 +47999,30 @@ app.get('/staff/app', (c) => {
         /* ── Beach ── */
         .bch-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
         .bch-nav{width:42px;height:42px;border-radius:12px;border:1px solid rgba(212,175,55,.35);background:rgba(250,246,236,.05);color:var(--gold2);cursor:pointer;flex-shrink:0}
-        .bch-date{flex:1;text-align:center;line-height:1.15}
+        .bch-date{flex:1;text-align:center;line-height:1.15;min-width:0}
         .bch-date span{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:700;display:block}
         .bch-date small{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
         .bch-scan{flex-shrink:0;border:none;border-radius:999px;padding:11px 18px;font-weight:800;font-size:.78rem;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;cursor:pointer}
-        .bch-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-        .bch-stats .st{background:rgba(250,246,236,.05);border:1px solid rgba(212,175,55,.22);border-radius:12px;padding:10px 6px;text-align:center}
-        .bch-stats .st b{display:block;font-size:1.35rem;font-weight:800;color:var(--txt)}
-        .bch-stats .st span{font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+        .bch-slots{display:flex;gap:8px;margin-bottom:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+        .bch-slots::-webkit-scrollbar{display:none}
+        .bch-slot{flex:1 0 auto;min-height:44px;padding:7px 14px;border-radius:14px;border:1px solid rgba(212,175,55,.3);background:rgba(250,246,236,.05);color:var(--dim);font-weight:700;font-size:.78rem;cursor:pointer;line-height:1.15;font-family:inherit}
+        .bch-slot small{display:block;font-size:.62rem;font-weight:600;letter-spacing:.02em;opacity:.85;margin-top:2px;font-variant-numeric:tabular-nums}
+        .bch-slot.on{background:rgba(212,175,55,.18);border-color:var(--gold);color:var(--gold2)}
+        .bch-meta{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+        .bch-who{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:1px dashed rgba(212,175,55,.4);background:none;color:var(--txt);border-radius:999px;padding:9px 14px;font-size:.74rem;font-weight:600;cursor:pointer;text-align:left;font-family:inherit}
+        .bch-who i{color:var(--gold2)}
+        .bch-who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .bch-who em{font-style:normal;color:var(--dim);font-weight:500;margin-left:auto;flex-shrink:0}
+        .bch-print{flex-shrink:0;border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.1);color:var(--gold2);border-radius:999px;padding:9px 14px;font-size:.74rem;font-weight:800;cursor:pointer;font-family:inherit}
+        .bch-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px}
+        .bch-stats .st{background:rgba(250,246,236,.05);border:1px solid rgba(212,175,55,.22);border-radius:12px;padding:9px 2px;text-align:center;min-width:0}
+        .bch-stats .st b{display:block;font-size:1.25rem;font-weight:800;color:var(--txt);font-variant-numeric:tabular-nums}
+        .bch-stats .st span{font-size:.52rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
         .bch-stats .st.ok b{color:#6ee7b7}
         .bch-stats .st.warn b{color:#fcd34d}
+        .bch-stats .st.bad b{color:#fda4af}
         .bch-split{display:grid;grid-template-columns:1fr;gap:14px}
-        .bch-mapwrap{background:rgba(250,246,236,.04);border:1px solid rgba(212,175,55,.25);border-radius:16px;padding:12px}
+        .bch-mapwrap{background:rgba(250,246,236,.04);border:1px solid rgba(212,175,55,.25);border-radius:16px;padding:12px;min-width:0}
         .bch-map{width:100%;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#123a4d 0%,#1a5f70 22%,#e8d9a8 46%,#efe0b4 100%)}
         .bch-map svg{display:block;width:100%;height:auto;touch-action:manipulation}
         /* On phones the umbrellas would be too small to tap, so the map keeps a
@@ -47802,29 +48031,45 @@ app.get('/staff/app', (c) => {
           .bch-map{overflow-x:auto;-webkit-overflow-scrolling:touch}
           .bch-map svg{width:780px;max-width:none}
         }
-        .bch-legend{display:flex;gap:14px;margin-bottom:8px;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+        .bch-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
         .bch-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
         .bch-legend .dot.free{background:rgba(246,240,227,.45)}
         .bch-legend .dot.booked{background:#D4AF37}
         .bch-legend .dot.inn{background:#34d399}
+        .bch-legend .dot.ns{background:#fb7185}
         .bch-hint{font-size:.66rem;color:var(--dim);text-align:center;margin-top:8px}
         .only-phone{display:inline}
         @media(min-width:820px){.only-phone{display:none}}
-        .bch-search{width:100%;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:12px 16px;color:var(--txt);font-size:.9rem;margin-bottom:10px}
+        .bch-find{display:grid;grid-template-columns:1fr 104px;gap:8px;margin-bottom:8px}
+        .bch-search{width:100%;min-width:0;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:12px 16px;color:var(--txt);font-size:.9rem;font-family:inherit}
         .bch-search:focus{outline:none;border-color:var(--gold)}
-        .bch-row{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid rgba(212,175,55,.2);border-radius:14px;margin-bottom:8px;background:rgba(250,246,236,.03);cursor:pointer}
-        .bch-row .num{width:46px;height:46px;flex-shrink:0;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.45);color:var(--gold2)}
+        .bch-count{font-size:.66rem;color:var(--dim);margin:0 4px 8px;min-height:1px}
+        .bch-row{display:grid;grid-template-columns:52px 1fr;gap:6px 12px;padding:12px;border:1px solid rgba(212,175,55,.2);border-radius:14px;margin-bottom:8px;background:rgba(250,246,236,.03);cursor:pointer}
+        .bch-row .num{width:52px;min-height:46px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.45);color:var(--gold2);text-align:center;line-height:1.1;padding:4px 2px;word-break:break-all}
+        .bch-row .num em{font-style:normal;font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;color:var(--txt);opacity:.8}
         .bch-row.inn .num{background:rgba(52,211,153,.16);border-color:rgba(52,211,153,.5);color:#6ee7b7}
-        .bch-row .who{flex:1;min-width:0}
-        .bch-row .who b{display:block;font-size:.95rem;font-weight:700}
-        .bch-row .who span{font-size:.7rem;color:var(--dim)}
-        .bch-row .go{border:none;border-radius:999px;padding:10px 15px;font-size:.72rem;font-weight:800;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;cursor:pointer;flex-shrink:0}
-        .bch-row.inn .go{background:rgba(52,211,153,.16);color:#6ee7b7;border:1px solid rgba(52,211,153,.45)}
+        .bch-row.ns .num{background:rgba(251,113,133,.14);border-color:rgba(251,113,133,.5);color:#fda4af}
+        .bch-row.hit{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,.35) inset;background:rgba(212,175,55,.08)}
+        .bch-row .who{min-width:0}
+        .bch-row .who b{display:block;font-size:.95rem;font-weight:700;overflow-wrap:anywhere}
+        .bch-row .who span{display:block;font-size:.7rem;color:var(--dim);margin-top:2px}
+        .bch-hitchip{display:inline-block!important;font-size:.52rem!important;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#231307!important;background:var(--gold);border-radius:999px;padding:2px 7px;margin:0 0 0 6px!important;vertical-align:middle}
+        .stt{font-weight:700}
+        .stt.ok{color:#6ee7b7!important}
+        .stt.bad{color:#fda4af!important}
+        .stt.wait{color:#fcd34d!important}
+        .bch-row .acts{grid-column:1 / -1;display:flex;gap:8px;justify-content:flex-end}
+        .bb{border:none;border-radius:999px;min-height:40px;padding:9px 16px;font-size:.74rem;font-weight:800;cursor:pointer;font-family:inherit}
+        .bb.in{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;flex:1;max-width:180px}
+        .bb.ns{background:none;color:#fda4af;border:1px solid rgba(251,113,133,.45)}
+        .bb.undo{background:none;color:var(--txt);border:1px solid rgba(212,175,55,.35)}
+        .bb:disabled{opacity:.5;cursor:default}
+        .bch-upd{font-size:.6rem;color:var(--dim);text-align:center;margin-top:10px;letter-spacing:.04em}
         @media(min-width:820px){
           .bch-split{grid-template-columns:1.35fr 1fr;align-items:start}
           .bch-listwrap{max-height:calc(100vh - 300px);overflow:auto}
-          .bch-stats{grid-template-columns:repeat(4,1fr)}
           .wrap{max-width:1200px;margin:0 auto}
+          .bch-slot{flex:0 0 auto;min-width:130px}
         }
         /* scanner */
         #scanWrap{position:fixed;inset:0;z-index:900;background:#000;display:none}
@@ -47843,13 +48088,32 @@ app.get('/staff/app', (c) => {
         @media(min-width:820px){#bkSheet{align-items:center;justify-content:center}.bk-panel{max-width:460px;border-radius:20px}}
         .bk-panel h3{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:700;margin-bottom:2px}
         .bk-panel .sub{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gold2);margin-bottom:16px}
-        .bk-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
-        .bk-facts div{background:rgba(250,246,236,.05);border:1px solid rgba(212,175,55,.2);border-radius:12px;padding:10px 12px}
+        .bk-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+        .bk-facts div{background:rgba(250,246,236,.05);border:1px solid rgba(212,175,55,.2);border-radius:12px;padding:10px 12px;min-width:0}
         .bk-facts small{display:block;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
-        .bk-facts b{font-size:.95rem;font-weight:700}
-        .bk-cta{width:100%;border:none;border-radius:999px;padding:16px;font-size:.9rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;cursor:pointer}
+        .bk-facts b{font-size:.95rem;font-weight:700;overflow-wrap:anywhere}
+        .bk-cta{width:100%;border:none;border-radius:999px;padding:16px;font-size:.9rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;cursor:pointer;font-family:inherit}
         .bk-cta.done{background:rgba(52,211,153,.16);color:#6ee7b7;border:1px solid rgba(52,211,153,.45)}
-        .bk-sec{width:100%;border:1px solid rgba(212,175,55,.35);background:none;color:var(--txt);border-radius:999px;padding:13px;font-weight:700;font-size:.8rem;cursor:pointer;margin-top:10px}
+        .bk-sec{width:100%;border:1px solid rgba(212,175,55,.35);background:none;color:var(--txt);border-radius:999px;padding:13px;font-weight:700;font-size:.8rem;cursor:pointer;margin-top:10px;font-family:inherit}
+        .bk-sec.bad{color:#fda4af;border-color:rgba(251,113,133,.45)}
+        .bk-book{border-top:1px solid rgba(212,175,55,.2);padding-top:14px;margin-bottom:16px}
+        .bk-panel .sub + .bk-book{border-top:none;padding-top:0}
+        .bk-book.dim{opacity:.6}
+        .bk-bh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+        .bk-bh b{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:700;overflow-wrap:anywhere}
+        .bk-bh span{font-size:.72rem;flex-shrink:0}
+        .bk-note{margin:0 0 14px;font-size:.8rem;color:var(--dim)}
+        .bk-free{font-size:.85rem;color:var(--dim);margin-bottom:6px}
+        /* attendant name dialog: below the ring bar (z 900) so Acknowledge stays tappable */
+        #bchWho{position:fixed;inset:0;z-index:895;background:rgba(8,4,6,.72);display:none;align-items:center;justify-content:center;padding:20px}
+        #bchWho.open{display:flex}
+        .bch-dlg{width:100%;max-width:380px;background:linear-gradient(180deg,#241318,#140a0e);border:1px solid rgba(212,175,55,.45);border-radius:20px;padding:22px 20px}
+        .bch-dlg h4{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:700;margin-bottom:4px}
+        .bch-dlg p{font-size:.78rem;color:var(--dim);line-height:1.45;margin-bottom:14px}
+        .bch-dlg input{width:100%;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.4);border-radius:12px;padding:13px 14px;color:var(--txt);font-size:1rem;font-family:inherit}
+        .bch-dlg input:focus{outline:none;border-color:var(--gold)}
+        .bch-dlg .row{display:flex;gap:8px;margin-top:14px}
+        .bch-dlg .row button{flex:1;margin-top:0}
         /* incoming-call ring bar */
         #ringBar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:none;align-items:center;gap:10px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(135deg,#b3122f,#7d0a20);box-shadow:0 -10px 30px rgba(0,0,0,.6);animation:ringPulse 1s ease-in-out infinite}
         #ringBar.show{display:flex}
@@ -47876,19 +48140,27 @@ app.get('/staff/app', (c) => {
         </div>
         <div id="listChats"><div class="empty">Loading…</div></div>
 
-        <!-- BEACH: live map + bookings, built for phone and tablet -->
+        <!-- BEACH: live map + arrivals, built for phone and tablet -->
         <div id="listBeach" style="display:none">
             <div class="bch-bar">
-                <button class="bch-nav" onclick="beachDay(-1)"><i class="fas fa-chevron-left"></i></button>
+                <button class="bch-nav" onclick="beachDay(-1)" aria-label="Previous day"><i class="fas fa-chevron-left"></i></button>
                 <div class="bch-date"><span id="bchDateLabel">Today</span><small id="bchDateSub"></small></div>
-                <button class="bch-nav" onclick="beachDay(1)"><i class="fas fa-chevron-right"></i></button>
+                <button class="bch-nav" onclick="beachDay(1)" aria-label="Next day"><i class="fas fa-chevron-right"></i></button>
                 <button class="bch-scan" onclick="openScanner()"><i class="fas fa-qrcode"></i> Scan</button>
+            </div>
+
+            <div class="bch-slots" id="bchSlots" aria-label="Time slot"></div>
+
+            <div class="bch-meta">
+                <button type="button" class="bch-who" data-bact="who"><i class="fas fa-user-check"></i><span id="bchWhoTxt">Set your name</span><em>Change</em></button>
+                <button type="button" class="bch-print" data-bact="print"><i class="fas fa-print"></i> Print arrivals</button>
             </div>
 
             <div class="bch-stats">
                 <div class="st"><b id="bchBooked">0</b><span>Booked</span></div>
                 <div class="st ok"><b id="bchIn">0</b><span>Arrived</span></div>
                 <div class="st warn"><b id="bchWait">0</b><span>Waiting</span></div>
+                <div class="st bad"><b id="bchNoShow">0</b><span>No-show</span></div>
                 <div class="st"><b id="bchFree">0</b><span>Free</span></div>
             </div>
 
@@ -47898,13 +48170,20 @@ app.get('/staff/app', (c) => {
                         <span><i class="dot free"></i>Free</span>
                         <span><i class="dot booked"></i>Booked</span>
                         <span><i class="dot inn"></i>Arrived</span>
+                        <span><i class="dot ns"></i>No-show</span>
+                        <span id="bchSplitHint">Left half = morning · right half = afternoon</span>
                     </div>
                     <div id="bchMap" class="bch-map"></div>
-                    <p class="bch-hint"><span class="only-phone">Swipe the map sideways · </span>Tap any umbrella to see the guest and confirm their arrival</p>
+                    <p class="bch-hint"><span class="only-phone">Swipe the map sideways · </span>Tap an umbrella to see its guests and check them in</p>
                 </div>
                 <div class="bch-listwrap">
-                    <input id="bchSearch" class="bch-search" type="search" placeholder="Search name, room, spot or code…">
+                    <div class="bch-find">
+                        <input id="bchSearch" class="bch-search" type="search" placeholder="Guest name" autocomplete="off" enterkeyhint="search" aria-label="Search by guest name">
+                        <input id="bchRoom" class="bch-search" type="search" inputmode="numeric" placeholder="Room" autocomplete="off" enterkeyhint="search" aria-label="Search by room number">
+                    </div>
+                    <div class="bch-count" id="bchCount"></div>
                     <div id="bchList"></div>
+                    <div class="bch-upd" id="bchUpd"></div>
                 </div>
             </div>
         </div>
@@ -47926,6 +48205,18 @@ app.get('/staff/app', (c) => {
 
     <!-- Booking detail sheet -->
     <div id="bkSheet"><div class="bk-panel" id="bkPanel"></div></div>
+    <!-- Attendant name: asked once per device, recorded with each check-in -->
+    <div id="bchWho" role="dialog" aria-modal="true" aria-labelledby="bchWhoTitle">
+        <div class="bch-dlg">
+            <h4 id="bchWhoTitle">Who is on the beach desk?</h4>
+            <p>Your name is saved on this device and recorded with every check-in and no-show.</p>
+            <input id="bchWhoInput" type="text" maxlength="40" placeholder="Your name" autocomplete="name" enterkeyhint="done">
+            <div class="row">
+                <button type="button" class="bk-sec" data-bact="who-cancel">Cancel</button>
+                <button type="button" class="bk-cta" data-bact="who-save">Save</button>
+            </div>
+        </div>
+    </div>
 
     <div id="chat">
         <div id="chatHead">
@@ -48107,7 +48398,6 @@ app.get('/staff/app', (c) => {
             if(which==='beach') loadBeach();
         };
     });
-    document.getElementById('bchSearch').addEventListener('input', renderBeachList);
 
     // ── Chat view ──
     window.openChat=async function(i){
@@ -48129,54 +48419,233 @@ app.get('/staff/app', (c) => {
             ? '<button class="btn-release" onclick="endTakeover()"><i class="fas fa-robot"></i> Hand back to AI</button>'
             : '<button class="btn-take" onclick="takeOver()"><i class="fas fa-headset"></i> Take over this chat</button>';
     }
-    // ── Beach: live map, bookings and arrival confirmation ──
-    var bchDate = new Date();
-    var bchData = { spots: [], bookings: [] };
-    var bchSel = null;
+    // ── Beach: live map, arrivals, check-in and no-show for the beach attendant ──
+    // Every entry point is guarded: this script also runs the Chats tab and the
+    // guest-alert ring, so a beach error must never stop it.
+    var BCH_SLOT_NAME = {full_day:'Full day', half_day_am:'Morning', half_day_pm:'Afternoon'};
+    var BCH_COL = {
+        free:  {fill:'#ffffff', stroke:'rgba(0,0,0,.25)', txt:'#6b5a3a', op:'0.55'},
+        booked:{fill:'#D4AF37', stroke:'#8a6d1f', txt:'#231307', op:'1'},
+        inn:   {fill:'#34d399', stroke:'#0f7a55', txt:'#04310f', op:'1'},
+        noshow:{fill:'#fb7185', stroke:'#9f1239', txt:'#4c0519', op:'1'},
+        off:   {fill:'#9ca3af', stroke:'#4b5563', txt:'#1f2937', op:'0.8'}
+    };
+    var bchDateStr = bchCairoToday();
+    var bchLastToday = bchDateStr;
+    var bchData = { spots: [], bookings: [], slot_times: {} };
+    var bchSlot = 'all';
+    var bchSheetSpot = null;
+    var bchSeq = 0;
+    var bchBusy = {};
+    var bchLoadedAt = '';
+    var bchLoading = true;
+    var bchNameMem = '';
+    var bchPendingName = null;
+    var bchMapBox = null;
 
-    function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-    window.beachDay=function(delta){ bchDate.setDate(bchDate.getDate()+delta); loadBeach(); };
-
-    function slotLabel(s){
-        if(s==='full_day') return 'Full day';
-        if(s==='half_day_am') return 'Morning';
-        if(s==='half_day_pm') return 'Afternoon';
-        return s || '';
-    }
-
-    async function loadBeach(){
-        var d = ymd(bchDate);
-        var today = ymd(new Date());
-        var lbl = document.getElementById('bchDateLabel');
-        var sub = document.getElementById('bchDateSub');
-        if(lbl){
-            lbl.textContent = (d===today) ? 'Today' : bchDate.toLocaleDateString(undefined,{weekday:'long'});
-            sub.textContent = bchDate.toLocaleDateString(undefined,{day:'numeric',month:'long'});
-        }
+    function bchCairoToday(){
         try{
-            var r = await fetch('/api/staff/beach/day?property_id='+PROPERTY_ID+'&date='+d,{cache:'no-store'});
-            var j = await r.json();
-            if(!j.success) return;
-            bchData = j;
-            document.getElementById('bchBooked').textContent = j.summary.booked;
-            document.getElementById('bchIn').textContent = j.summary.checked_in;
-            document.getElementById('bchWait').textContent = j.summary.awaiting;
-            document.getElementById('bchFree').textContent = Math.max(0, j.summary.spots_total - j.summary.booked);
-            drawBeachMap();
-            renderBeachList();
+            var g = {};
+            new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'})
+                .formatToParts(new Date()).forEach(function(x){ g[x.type]=x.value; });
+            var s = g.year+'-'+g.month+'-'+g.day;
+            if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return s;
         }catch(e){}
+        var d = new Date();
+        return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+    function bchCairoHM(){
+        try{ return new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date()); }
+        catch(e){ var d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+    }
+    function bchNoon(s){ var p=String(s).split('-'); return new Date(Date.UTC(+p[0], +p[1]-1, +p[2], 12)); }
+    function bchShift(s, delta){ var d=bchNoon(s); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
+    function bchA(s){ return esc(s).replace(/"/g,'&quot;'); }
+    function slotLabel(s){ return BCH_SLOT_NAME[s] || s || ''; }
+    function bchSlotTimes(id){ var t=(bchData.slot_times||{})[id]; return (t && t.start && t.end) ? t.start+'–'+t.end : ''; }
+    function bchAllTimes(){ var st=bchData.slot_times||{}, a=st.half_day_am, p=st.half_day_pm; return (a && a.start && p && p.end) ? a.start+'–'+p.end : ''; }
+    function bchInSlot(b, slot){ return slot==='all' || b.slot_type===slot || b.slot_type==='full_day'; }
+    function bchIsIn(b){ return b.booking_status==='checked_in' || b.booking_status==='completed'; }
+    function bchDayWord(){ return bchDateStr===bchCairoToday() ? 'today' : 'on this day'; }
+    function bchKind(s){
+        if(!s) return 'Spot';
+        var t = String(s.spot_type||'umbrella').split('_').join(' ');
+        if(s.tier==='cabana' || t==='cabana') return 'Cabana';
+        t = t.charAt(0).toUpperCase()+t.slice(1);
+        return s.tier==='vip' ? 'VIP '+t.toLowerCase() : t;
+    }
+    function bchTag(b){
+        if(b.tier==='cabana' || b.spot_type==='cabana') return 'Cabana';
+        if(b.tier==='vip') return 'VIP';
+        return '';
+    }
+    function bchSetup(b){
+        var u = b.umbrellas!=null ? +b.umbrellas : 1;
+        var l = b.loungers!=null ? +b.loungers : (+b.num_loungers||0);
+        return u+' ☂'+(l ? ' + '+l+' lounger'+(l===1?'':'s') : '');
+    }
+    function bchSlotLine(b){
+        var t = (b.slot_start && b.slot_end) ? b.slot_start+'–'+b.slot_end : bchSlotTimes(b.slot_type);
+        return slotLabel(b.slot_type)+(t ? ' '+t : '');
+    }
+    function bchStatus(b){
+        var s=b.booking_status;
+        if(bchIsIn(b)) return {cls:'ok', txt:(s==='completed'?'Left':'Arrived')+(b.checked_in_time?' '+b.checked_in_time:'')+(b.checked_in_by?' · '+b.checked_in_by:'')};
+        if(s==='no_show') return {cls:'bad', txt:'No-show'+(b.checked_in_by?' · '+b.checked_in_by:'')};
+        return {cls:'wait', txt:'Waiting'};
     }
 
-    function bookingForSpot(spotId){
-        return bchData.bookings.find(function(b){ return b.spot_id===spotId; });
+    // ── Attendant name: asked once per device, sent with every check-in ──
+    function bchGetName(){
+        var n='';
+        try{ n=localStorage.getItem('beachStaffName')||''; }catch(e){}
+        return String(n||bchNameMem||'').trim();
+    }
+    function bchSetName(n){
+        bchNameMem=n;
+        try{ localStorage.setItem('beachStaffName', n); }catch(e){}
+        bchWhoLabel();
+    }
+    function bchWhoLabel(){
+        var t=document.getElementById('bchWhoTxt');
+        var n=bchGetName();
+        if(t) t.textContent = n ? n : 'Tap to set your name';
+        if(t && t.parentNode) t.parentNode.title = n ? 'Check-ins are recorded as '+n : '';
+        var em=t && t.parentNode ? t.parentNode.querySelector('em') : null;
+        if(em) em.style.display = n ? '' : 'none';
+    }
+    window.bchAskName=function(then){
+        bchPendingName = (typeof then==='function') ? then : null;
+        try{ closeSheet(); }catch(e){}
+        var d=document.getElementById('bchWho'), i=document.getElementById('bchWhoInput');
+        if(!d || !i){ var f=bchPendingName; bchPendingName=null; if(f) f('Beach staff'); return; }
+        i.value = bchGetName();
+        d.classList.add('open');
+        setTimeout(function(){ try{ i.focus(); i.select(); }catch(e){} }, 60);
+    };
+    function bchWhoSave(){
+        var i=document.getElementById('bchWhoInput');
+        var n=String((i && i.value) || '').trim().slice(0,40);
+        if(!n){ toast('Type your name first'); try{ i.focus(); }catch(e){} return; }
+        bchSetName(n);
+        bchWhoClose(true);
+    }
+    function bchWhoClose(saved){
+        var d=document.getElementById('bchWho'); if(d) d.classList.remove('open');
+        var f=bchPendingName; bchPendingName=null;
+        if(saved && f) f(bchGetName());
+    }
+    function bchWithName(fn){ var n=bchGetName(); if(n) fn(n); else bchAskName(fn); }
+
+    // ── Loading and rendering ──
+    function bchVisible(){
+        var el=document.getElementById('listBeach');
+        return !!el && el.style.display!=='none' && document.visibilityState==='visible';
+    }
+    window.beachDay=function(delta){
+        bchDateStr = bchShift(bchDateStr, delta);
+        bchData = { spots: bchData.spots||[], bookings: [], slot_times: bchData.slot_times||{} };
+        bchLoading = true;
+        bchRenderAll();
+        loadBeach();
+    };
+    async function loadBeach(quiet){
+        var d = bchDateStr, seq = ++bchSeq;
+        if(!quiet){ try{ bchDateHeader(); renderBeachList(); }catch(e){} }
+        try{
+            var r = await fetch('/api/staff/beach/day?property_id='+encodeURIComponent(PROPERTY_ID)+'&date='+encodeURIComponent(d),{cache:'no-store'});
+            var j = await r.json();
+            if(seq!==bchSeq || d!==bchDateStr) return;
+            bchLoading = false;
+            if(!j || !j.success){ bchRenderAll(); if(!quiet) toast('Could not load the beach'); return; }
+            bchData = { spots: j.spots||[], bookings: j.bookings||[], slot_times: j.slot_times||{}, date: j.date };
+            bchLoadedAt = bchCairoHM();
+            bchRenderAll();
+            var sh=document.getElementById('bkSheet');
+            if(bchSheetSpot!=null && sh && sh.classList.contains('open')) openSpot(bchSheetSpot);
+        }catch(e){
+            if(seq===bchSeq){ bchLoading=false; bchRenderAll(); if(!quiet) toast('No connection — the beach retries every 30 s'); }
+        }
+    }
+    function bchRenderAll(){
+        [bchDateHeader, bchRenderSlots, bchRenderStats, drawBeachMap, renderBeachList, bchRenderUpdated, bchWhoLabel].forEach(function(f){
+            try{ f(); }catch(e){ console.error('beach render', e); }
+        });
+    }
+    function bchDateHeader(){
+        var lbl=document.getElementById('bchDateLabel'), sub=document.getElementById('bchDateSub');
+        if(!lbl || !sub) return;
+        var today=bchCairoToday(), dt=bchNoon(bchDateStr);
+        var rel = bchDateStr===today ? 'Today' : (bchDateStr===bchShift(today,1) ? 'Tomorrow' : (bchDateStr===bchShift(today,-1) ? 'Yesterday' : ''));
+        try{
+            lbl.textContent = rel || dt.toLocaleDateString(undefined,{weekday:'long',timeZone:'UTC'});
+            sub.textContent = dt.toLocaleDateString(undefined, rel ? {weekday:'short',day:'numeric',month:'long',timeZone:'UTC'} : {day:'numeric',month:'long',timeZone:'UTC'});
+        }catch(e){ lbl.textContent = rel || bchDateStr; sub.textContent = rel ? bchDateStr : ''; }
+    }
+    function bchRenderSlots(){
+        var host=document.getElementById('bchSlots'); if(!host) return;
+        host.innerHTML = ['all','half_day_am','half_day_pm'].map(function(id){
+            var t = id==='all' ? bchAllTimes() : bchSlotTimes(id);
+            return '<button type="button" class="bch-slot'+(bchSlot===id?' on':'')+'" data-bact="slot" data-slot="'+id+'" aria-pressed="'+(bchSlot===id)+'">'+
+                (id==='all' ? 'All' : slotLabel(id))+(t ? '<small>'+esc(t)+'</small>' : '')+'</button>';
+        }).join('');
+    }
+    function bchCounts(){
+        var bs=(bchData.bookings||[]).filter(function(b){ return bchInSlot(b,bchSlot); });
+        var c={booked:bs.length, arrived:0, waiting:0, noshow:0, free:0}, taken={};
+        bs.forEach(function(b){
+            if(bchIsIn(b)) c.arrived++;
+            else if(b.booking_status==='no_show') c.noshow++;
+            else c.waiting++;
+            if(b.booking_status==='confirmed' || b.booking_status==='checked_in') taken[b.spot_id]=1;
+        });
+        (bchData.spots||[]).forEach(function(s){ if(!Number(s.maintenance_mode) && !taken[s.spot_id]) c.free++; });
+        return c;
+    }
+    function bchRenderStats(){
+        var c=bchCounts(), pending=bchLoading && !(bchData.bookings||[]).length;
+        var set=function(id,v){ var el=document.getElementById(id); if(el) el.textContent = pending ? '–' : String(v); };
+        set('bchBooked',c.booked); set('bchIn',c.arrived); set('bchWait',c.waiting); set('bchNoShow',c.noshow); set('bchFree',c.free);
+        var h=document.getElementById('bchSplitHint'); if(h) h.style.display = bchSlot==='all' ? '' : 'none';
+    }
+    function bchRenderUpdated(){
+        var el=document.getElementById('bchUpd'); if(!el) return;
+        el.textContent = bchLoadedAt ? 'Updated '+bchLoadedAt+' · refreshes every 30 s' : '';
     }
 
+    // ── Map: one marker per spot, coloured for the chosen slot ──
+    function bchState(list, slot){
+        var st='free';
+        list.forEach(function(b){
+            if(!bchInSlot(b,slot)) return;
+            var s=b.booking_status;
+            if(s==='checked_in' || s==='completed') st='inn';
+            else if(s==='confirmed'){ if(st!=='inn') st='booked'; }
+            else if(s==='no_show'){ if(st==='free') st='noshow'; }
+        });
+        return st;
+    }
+    function bchShape(cab, x, y, r, col, part){
+        var f=' fill="'+col.fill+'" fill-opacity="'+col.op+'"';
+        var line=' stroke="'+col.stroke+'" stroke-width="1.5"';
+        if(cab){
+            var w=r*2.6, h=r*1.7, x0=x-w/2, y0=y-h/2;
+            if(part==='left') return '<rect x="'+x0+'" y="'+y0+'" width="'+(w/2)+'" height="'+h+'"'+f+' stroke="none"/>';
+            if(part==='right') return '<rect x="'+x+'" y="'+y0+'" width="'+(w/2)+'" height="'+h+'"'+f+' stroke="none"/>';
+            if(part==='outline') return '<rect x="'+x0+'" y="'+y0+'" width="'+w+'" height="'+h+'" rx="5" fill="none"'+line+'/>';
+            return '<rect x="'+x0+'" y="'+y0+'" width="'+w+'" height="'+h+'" rx="5"'+f+line+'/>';
+        }
+        if(part==='left') return '<path d="M'+x+' '+(y-r)+' A'+r+' '+r+' 0 0 0 '+x+' '+(y+r)+' Z"'+f+' stroke="none"/>';
+        if(part==='right') return '<path d="M'+x+' '+(y-r)+' A'+r+' '+r+' 0 0 1 '+x+' '+(y+r)+' Z"'+f+' stroke="none"/>';
+        if(part==='outline') return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="none"'+line+'/>';
+        return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'"'+f+line+'/>';
+    }
     function drawBeachMap(){
         var host = document.getElementById('bchMap');
         if(!host) return;
-        var spots = bchData.spots || [];
-        if(!spots.length){ host.innerHTML=''; return; }
-        var xs = spots.map(function(s){return s.position_x;}), ys = spots.map(function(s){return s.position_y;});
+        var spots = (bchData.spots||[]).filter(function(s){ return s.position_x!=null && s.position_y!=null && isFinite(+s.position_x) && isFinite(+s.position_y); });
+        if(!spots.length){ host.innerHTML = bchLoading ? '' : '<div class="empty" style="padding:26px 12px">No spots on the map yet.</div>'; return; }
+        var xs = spots.map(function(s){return +s.position_x;}), ys = spots.map(function(s){return +s.position_y;});
         var pad = 34;
         var minX = Math.min.apply(null,xs)-pad, maxX = Math.max.apply(null,xs)+pad;
         var minY = Math.min.apply(null,ys)-pad, maxY = Math.max.apply(null,ys)+pad;
@@ -48193,99 +48662,317 @@ app.get('/staff/app', (c) => {
         svg += '<rect x="'+minX+'" y="'+minY+'" width="'+w+'" height="'+h+'" fill="url(#sand)"/>';
         svg += '<text x="'+(minX+w/2)+'" y="'+(minY-seaH*0.55)+'" text-anchor="middle" font-size="'+(w*0.035)+'" fill="#ffffff" opacity="0.65" font-family="system-ui">RED SEA</text>';
 
+        var bySpot = {};
+        (bchData.bookings||[]).forEach(function(b){ (bySpot[b.spot_id]=bySpot[b.spot_id]||[]).push(b); });
+        var hits = bchHitSpots();
         spots.forEach(function(s){
-            var b = bookingForSpot(s.spot_id);
-            var fill = '#ffffff', stroke = 'rgba(0,0,0,.25)', txt = '#6b5a3a', op = '0.55';
-            if(b){ op='1'; if(b.booking_status==='checked_in'){ fill='#34d399'; stroke='#0f7a55'; txt='#04310f'; }
-                   else { fill='#D4AF37'; stroke='#8a6d1f'; txt='#231307'; } }
-            var r = 15;
-            svg += '<g class="bspot" data-spot="'+s.spot_id+'" style="cursor:pointer">'+
-                   '<circle cx="'+s.position_x+'" cy="'+s.position_y+'" r="'+r+'" fill="'+fill+'" fill-opacity="'+op+'" stroke="'+stroke+'" stroke-width="1.5"/>'+
-                   '<text x="'+s.position_x+'" y="'+(s.position_y+4.5)+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+txt+'" font-family="system-ui">'+s.spot_number+'</text>'+
-                   '</g>';
+            var x=+s.position_x, y=+s.position_y, r=15, list=bySpot[s.spot_id]||[];
+            var cab = s.tier==='cabana' || s.spot_type==='cabana';
+            var vip = s.tier==='vip' || Number(s.is_premium)===1;
+            var lab = String(s.spot_number==null?'':s.spot_number);
+            var fs = lab.length>3 ? 8.5 : (lab.length>2 ? 10.5 : 12);
+            var g = '<g class="bspot" data-bact="spot" data-spot="'+(+s.spot_id)+'" style="cursor:pointer">', txt;
+            if(hits && hits[s.spot_id]) g += '<circle cx="'+x+'" cy="'+y+'" r="'+(r+8)+'" fill="#60a5fa" fill-opacity="0.25" stroke="#2563eb" stroke-width="3"/>';
+            if(vip) g += '<circle cx="'+x+'" cy="'+y+'" r="'+(r+3.5)+'" fill="none" stroke="#b8860b" stroke-width="2.2"/>';
+            if(Number(s.maintenance_mode)===1){ g += bchShape(cab,x,y,r,BCH_COL.off,'full'); txt=BCH_COL.off.txt; }
+            else if(bchSlot==='all'){
+                var am=bchState(list,'half_day_am'), pm=bchState(list,'half_day_pm');
+                if(am===pm){ g += bchShape(cab,x,y,r,BCH_COL[am],'full'); txt=BCH_COL[am].txt; }
+                else {
+                    g += bchShape(cab,x,y,r,BCH_COL[am],'left')+bchShape(cab,x,y,r,BCH_COL[pm],'right')+bchShape(cab,x,y,r,BCH_COL[am==='free'?pm:am],'outline');
+                    txt = '#231307';
+                }
+            } else {
+                var st=bchState(list,bchSlot);
+                g += bchShape(cab,x,y,r,BCH_COL[st],'full'); txt=BCH_COL[st].txt;
+            }
+            g += '<text x="'+x+'" y="'+(y+fs*0.37)+'" text-anchor="middle" font-size="'+fs+'" font-weight="700" fill="'+txt+'" font-family="system-ui">'+esc(lab)+'</text>';
+            if(vip) g += '<text x="'+x+'" y="'+(y-r-6)+'" text-anchor="middle" font-size="9" fill="#8a6d1f">★</text>';
+            svg += g+'</g>';
         });
         svg += '</svg>';
+        var keep = host.scrollLeft;
         host.innerHTML = svg;
-        host.querySelectorAll('.bspot').forEach(function(g){
-            g.addEventListener('click', function(){ openSpot(parseInt(g.dataset.spot,10)); });
-        });
+        host.scrollLeft = keep;
+        bchMapBox = { minX: minX, w: w };
+    }
+    // On phones the map scrolls sideways: bring the first search result into view
+    function bchScrollToHit(){
+        var host=document.getElementById('bchMap');
+        if(!host || !bchMapBox || host.scrollWidth<=host.clientWidth+4) return;
+        var q=bchQuery(); if(!q.name && !q.room) return;
+        var first=document.querySelector('#bchList .bch-row[data-spot]'); if(!first) return;
+        var sid=+first.getAttribute('data-spot');
+        var s=(bchData.spots||[]).find(function(x){ return +x.spot_id===sid; });
+        var svg=host.querySelector('svg');
+        if(!s || s.position_x==null || !svg) return;
+        var px=(+s.position_x - bchMapBox.minX) * (svg.getBoundingClientRect().width / bchMapBox.w);
+        host.scrollLeft = Math.max(0, px - host.clientWidth/2);
     }
 
+    // ── Arrivals list: name + room search, sorted by spot ──
+    function bchRoomNorm(s){ return String(s==null?'':s).toLowerCase().replace(/room/g,'').replace(/[^0-9a-z]/g,''); }
+    function bchQuery(){
+        var n=document.getElementById('bchSearch'), r=document.getElementById('bchRoom');
+        return { name: String((n && n.value) || '').toLowerCase().trim(), room: bchRoomNorm(r && r.value) };
+    }
+    function bchMatch(b, q){
+        if(q.name){
+            var hay=((b.guest_name||'')+' '+(b.booking_code||'')+' '+(b.spot_number||'')).toLowerCase();
+            var parts=q.name.split(' ').filter(Boolean);
+            for(var i=0;i<parts.length;i++){ if(hay.indexOf(parts[i])<0) return false; }
+        }
+        if(q.room && bchRoomNorm(b.guest_room_number).indexOf(q.room)<0) return false;
+        return true;
+    }
+    function bchHitSpots(){
+        var q=bchQuery(); if(!q.name && !q.room) return null;
+        var h={};
+        (bchData.bookings||[]).forEach(function(b){ if(bchInSlot(b,bchSlot) && bchMatch(b,q)) h[b.spot_id]=1; });
+        return h;
+    }
+    function bchActs(b, big){
+        var ref=bchA(b.booking_reference), dis=bchBusy[b.booking_reference] ? ' disabled' : '';
+        var s=b.booking_status;
+        if(s==='confirmed' && String(b.booking_date||bchDateStr) > bchCairoToday()) return big ? '<p class="bk-note">Check-in opens on the day.</p>' : '';
+        if(big){
+            if(bchIsIn(b)) return '<button class="bk-cta done" disabled><i class="fas fa-check"></i> '+(s==='completed'?'Left':'Arrived')+(b.checked_in_time?' '+esc(b.checked_in_time):'')+'</button>'+
+                (s==='checked_in' ? '<button class="bk-sec" data-bact="undo" data-ref="'+ref+'"'+dis+'>Undo arrival</button>' : '');
+            if(s==='no_show') return '<button class="bk-cta" data-bact="in" data-ref="'+ref+'"'+dis+'><i class="fas fa-check"></i> Arrived late — check in</button>'+
+                '<button class="bk-sec" data-bact="undo" data-ref="'+ref+'"'+dis+'>Undo no-show</button>';
+            return '<button class="bk-cta" data-bact="in" data-ref="'+ref+'"'+dis+'><i class="fas fa-check"></i> Check in</button>'+
+                '<button class="bk-sec bad" data-bact="noshow" data-ref="'+ref+'"'+dis+'>Mark no-show</button>';
+        }
+        if(s==='checked_in' || s==='no_show') return '<button class="bb undo" data-bact="undo" data-ref="'+ref+'"'+dis+'>Undo</button>';
+        if(s==='completed') return '';
+        return '<button class="bb ns" data-bact="noshow" data-ref="'+ref+'"'+dis+'>No-show</button>'+
+               '<button class="bb in" data-bact="in" data-ref="'+ref+'"'+dis+'><i class="fas fa-check"></i> Check in</button>';
+    }
+    function bchRowHtml(b, q){
+        var st=bchStatus(b), inn=bchIsIn(b), ns=b.booking_status==='no_show';
+        var exact=!!q.room && bchRoomNorm(b.guest_room_number)===q.room;
+        var tag=bchTag(b), acts=bchActs(b,false), g=+b.num_guests||0;
+        return '<div class="bch-row'+(inn?' inn':'')+(ns?' ns':'')+(exact?' hit':'')+'" data-bact="spot" data-spot="'+(+b.spot_id)+'">'+
+            '<div class="num">'+esc(b.spot_number==null?'?':b.spot_number)+(tag?'<em>'+tag+'</em>':'')+'</div>'+
+            '<div class="who"><b>'+esc(b.guest_name||'Guest')+(exact?'<span class="bch-hitchip">Room match</span>':'')+'</b>'+
+                '<span>'+(b.guest_room_number?'Room '+esc(b.guest_room_number)+' · ':'')+(g?g+' guest'+(g===1?'':'s')+' · ':'')+esc(bchSetup(b))+'</span>'+
+                '<span>'+esc(bchSlotLine(b))+(b.booking_code?' · '+esc(b.booking_code):'')+(Number(b.spot_active)===0?' · spot removed from map':'')+'</span>'+
+                '<span class="stt '+st.cls+'">'+esc(st.txt)+'</span>'+
+            '</div>'+
+            (acts ? '<div class="acts">'+acts+'</div>' : '')+
+        '</div>';
+    }
     function renderBeachList(){
         var host = document.getElementById('bchList');
         if(!host) return;
-        var q = (document.getElementById('bchSearch').value||'').toLowerCase().trim();
-        var rows = (bchData.bookings||[]).filter(function(b){
-            if(!q) return true;
-            return ((b.guest_name||'')+' '+(b.guest_room_number||'')+' '+(b.spot_number||'')+' '+(b.booking_code||'')).toLowerCase().indexOf(q)>=0;
-        });
-        if(!rows.length){ host.innerHTML='<div class="empty">No bookings for this day.</div>'; return; }
-        host.innerHTML = rows.map(function(b){
-            var inn = b.booking_status==='checked_in';
-            return '<div class="bch-row'+(inn?' inn':'')+'" onclick="openSpot('+b.spot_id+')">'+
-                '<div class="num">'+esc(b.spot_number)+'</div>'+
-                '<div class="who"><b>'+esc(b.guest_name||'Guest')+'</b>'+
-                '<span>'+(b.guest_room_number?'Room '+esc(b.guest_room_number)+' · ':'')+slotLabel(b.slot_type)+
-                (b.num_guests?' · '+b.num_guests+' guests':'')+'</span></div>'+
-                '<button class="go" onclick="event.stopPropagation();openSpot('+b.spot_id+')">'+(inn?'Arrived':'Confirm')+'</button>'+
-            '</div>';
-        }).join('');
+        var q=bchQuery(), searching=!!(q.name || q.room);
+        var rows=(bchData.bookings||[]).filter(function(b){ return bchInSlot(b,bchSlot) && bchMatch(b,q); });
+        if(q.room){
+            rows = rows.map(function(b,i){ return {b:b, i:i, x:(bchRoomNorm(b.guest_room_number)===q.room ? 0 : 1)}; })
+                       .sort(function(a,c){ return (a.x-c.x) || (a.i-c.i); })
+                       .map(function(o){ return o.b; });
+        }
+        var cnt=document.getElementById('bchCount');
+        if(cnt) cnt.textContent = searching ? rows.length+' match'+(rows.length===1?'':'es') : (rows.length ? rows.length+' booking'+(rows.length===1?'':'s')+' · by spot' : '');
+        if(!rows.length){
+            host.innerHTML = '<div class="empty">'+(bchLoading ? 'Loading…' : (searching ? 'No booking matches that search.' :
+                (bchSlot==='all' ? 'No bookings '+bchDayWord()+'.' : 'No '+slotLabel(bchSlot).toLowerCase()+' bookings '+bchDayWord()+'.')))+'</div>';
+            return;
+        }
+        host.innerHTML = rows.map(function(b){ return bchRowHtml(b,q); }).join('');
     }
 
+    // ── Spot sheet: every booking on the spot (morning and afternoon) ──
     window.openSpot=function(spotId){
-        var spot = (bchData.spots||[]).find(function(s){return s.spot_id===spotId;});
-        var b = bookingForSpot(spotId);
-        bchSel = b || null;
-        var panel = document.getElementById('bkPanel');
-        if(!b){
-            panel.innerHTML = '<h3>Umbrella '+esc(spot?spot.spot_number:'')+'</h3>'+
-                '<div class="sub">Free — no booking today</div>'+
-                '<button class="bk-sec" onclick="closeSheet()">Close</button>';
-        } else {
-            var inn = b.booking_status==='checked_in';
-            panel.innerHTML = '<h3>'+esc(b.guest_name||'Guest')+'</h3>'+
-                '<div class="sub">Umbrella '+esc(b.spot_number)+' · '+slotLabel(b.slot_type)+'</div>'+
-                '<div class="bk-facts">'+
-                  '<div><small>Room</small><b>'+esc(b.guest_room_number||'—')+'</b></div>'+
-                  '<div><small>Guests</small><b>'+esc(b.num_guests||1)+'</b></div>'+
-                  '<div><small>Code</small><b>'+esc(b.booking_code||'—')+'</b></div>'+
-                  '<div><small>Status</small><b>'+(inn?'Arrived':'Waiting')+'</b></div>'+
-                '</div>'+
-                (b.special_requests?'<p class="lux-sheet-desc" style="margin-bottom:14px;font-size:.8rem;color:var(--dim)">“'+esc(b.special_requests)+'”</p>':'')+
-                (inn
-                  ? '<button class="bk-cta done"><i class="fas fa-check"></i> Already arrived</button>'+
-                    '<button class="bk-sec" onclick="undoArrival(\\''+b.booking_reference+'\\')">Undo arrival</button>'
-                  : '<button class="bk-cta" onclick="confirmCode(\\''+(b.booking_code||b.booking_reference)+'\\')"><i class="fas fa-check"></i> Confirm arrival</button>')+
-                '<button class="bk-sec" onclick="closeSheet()">Close</button>';
-        }
-        document.getElementById('bkSheet').classList.add('open');
+        try{
+            var sid=+spotId;
+            var spot=(bchData.spots||[]).find(function(s){ return +s.spot_id===sid; });
+            var list=(bchData.bookings||[]).filter(function(b){ return +b.spot_id===sid; });
+            var panel=document.getElementById('bkPanel'); if(!panel) return;
+            bchSheetSpot=sid;
+            var ref=spot||list[0]||{}, bits=[];
+            if(ref.zone_name) bits.push(ref.zone_name);
+            if(ref.row_no!=null) bits.push(+ref.row_no===1 ? 'Front row' : 'Row '+ref.row_no);
+            if(spot && Number(spot.maintenance_mode)===1) bits.push('Out of service');
+            var h='<h3>'+esc(bchKind(ref))+' '+esc(ref.spot_number==null?'':ref.spot_number)+'</h3>'+
+                  '<div class="sub">'+esc(bits.join(' · ') || bchDayWord())+'</div>';
+            if(!list.length) h+='<p class="bk-free">Free — no booking '+bchDayWord()+'.</p>';
+            list.forEach(function(b){
+                var st=bchStatus(b), t=(b.slot_start && b.slot_end) ? b.slot_start+'–'+b.slot_end : bchSlotTimes(b.slot_type);
+                h+='<div class="bk-book'+(bchInSlot(b,bchSlot)?'':' dim')+'">'+
+                    '<div class="bk-bh"><b>'+esc(b.guest_name||'Guest')+'</b><span class="stt '+st.cls+'">'+esc(st.txt)+'</span></div>'+
+                    '<div class="bk-facts">'+
+                      '<div><small>Room</small><b>'+esc(b.guest_room_number||'—')+'</b></div>'+
+                      '<div><small>'+esc(slotLabel(b.slot_type)||'Slot')+'</small><b>'+esc(t||'—')+'</b></div>'+
+                      '<div><small>Guests</small><b>'+esc(b.num_guests||1)+'</b></div>'+
+                      '<div><small>Set-up</small><b>'+esc(bchSetup(b))+'</b></div>'+
+                      '<div><small>Code</small><b>'+esc(b.booking_code||'—')+'</b></div>'+
+                      '<div><small>Phone</small><b>'+esc(b.guest_phone||'—')+'</b></div>'+
+                    '</div>'+
+                    (b.special_requests ? '<p class="bk-note">“'+esc(b.special_requests)+'”</p>' : '')+
+                    bchActs(b,true)+
+                '</div>';
+            });
+            panel.innerHTML = h+'<button class="bk-sec" onclick="closeSheet()">Close</button>';
+            document.getElementById('bkSheet').classList.add('open');
+        }catch(e){ console.error('beach sheet', e); }
     };
-    window.closeSheet=function(){ document.getElementById('bkSheet').classList.remove('open'); };
+    window.closeSheet=function(){ var s=document.getElementById('bkSheet'); if(s) s.classList.remove('open'); bchSheetSpot=null; };
 
-    window.confirmCode=async function(code){
-        if(!code || !String(code).trim()){ toast('Enter or scan a code'); return; }
-        try{
-            var r = await fetch('/api/staff/beach/confirm',{method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({code:String(code).trim(), property_id:parseInt(PROPERTY_ID,10), staff_name:'Beach staff'})});
-            var j = await r.json();
-            if(!j.success){ toast(j.error||'Not found'); return; }
-            var b = j.booking||{};
-            toast(j.already ? (b.guest_name||'Guest')+' already checked in' : '✅ '+(b.guest_name||'Guest')+' — umbrella '+(b.spot_number||''));
-            closeSheet(); closeScanner();
-            loadBeach();
-        }catch(e){ toast('Could not confirm'); }
+    // ── Actions ──
+    async function bchPost(path, body){
+        var r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        var j=null;
+        try{ j=await r.json(); }catch(e){}
+        return (j && typeof j==='object') ? j : {success:false};
+    }
+    function bchPatch(ref, fields){
+        (bchData.bookings||[]).forEach(function(b){ if(b.booking_reference===ref){ for(var k in fields) b[k]=fields[k]; } });
+    }
+    function bchRun(ref, work){
+        if(!ref || bchBusy[ref]) return;
+        bchBusy[ref]=1;
+        bchRenderAll();
+        Promise.resolve().then(work).catch(function(){ toast('No connection — try again'); }).then(function(){
+            delete bchBusy[ref];
+            try{ closeSheet(); }catch(e){}
+            bchRenderAll();
+            loadBeach(true);
+        });
+    }
+    function bchCheckIn(ref){
+        if(!ref || bchBusy[ref]) return;
+        bchWithName(function(name){
+            bchRun(ref, async function(){
+                var j=await bchPost('/api/staff/beach/confirm',{code:ref, property_id:parseInt(PROPERTY_ID,10), staff_name:name, date:bchDateStr});
+                if(!j.success){ toast(j.error||'Could not check in'); return; }
+                var b=j.booking||{};
+                bchPatch(ref,{booking_status:'checked_in', checked_in_by:b.checked_in_by||name, checked_in_time:b.checked_in_time||bchCairoHM()});
+                toast(j.already ? (b.guest_name||'Guest')+' was already checked in' : '✅ '+(b.guest_name||'Guest')+' checked in · '+bchKind(b).toLowerCase()+' '+(b.spot_number||''));
+            });
+        });
+    }
+    function bchNoShow(ref){
+        if(!ref || bchBusy[ref]) return;
+        bchWithName(function(name){
+            bchRun(ref, async function(){
+                var j=await bchPost('/api/staff/beach/no-show',{booking_reference:ref, property_id:parseInt(PROPERTY_ID,10), staff_name:name, date:bchDateStr});
+                if(!j.success){ toast(j.error||'Could not mark the no-show'); return; }
+                bchPatch(ref,{booking_status:'no_show', checked_in_by:name, checked_in_time:''});
+                toast(((j.booking||{}).guest_name||'Guest')+' marked as no-show · Undo is on the row');
+            });
+        });
+    }
+    function bchUndo(ref){
+        bchRun(ref, async function(){
+            var j=await bchPost('/api/staff/beach/undo',{booking_reference:ref, property_id:parseInt(PROPERTY_ID,10)});
+            if(!j.success){ toast('Could not undo'); return; }
+            if(j.changed!==0) bchPatch(ref,{booking_status:'confirmed', checked_in_by:null, checked_in_time:''});
+            toast(j.changed===0 ? 'Nothing to undo' : 'Undone — back to waiting');
+        });
+    }
+    window.undoArrival=function(ref){ bchUndo(ref); };
+
+    // QR scans and typed codes: must be today's booking unless it is the day on screen
+    window.confirmCode=function(code){
+        var raw=String(code==null?'':code).trim();
+        if(!raw){ toast('Enter or scan a code'); return; }
+        bchWithName(async function(name){
+            try{
+                var j=await bchPost('/api/staff/beach/confirm',{code:raw, property_id:parseInt(PROPERTY_ID,10), staff_name:name});
+                if(!j.success){ toast(j.error||'No booking found for that code'); bchScanResume(); return; }
+                var b=j.booking||{};
+                toast(j.already ? (b.guest_name||'Guest')+' was already checked in' : '✅ '+(b.guest_name||'Guest')+' — '+bchKind(b).toLowerCase()+' '+(b.spot_number||''));
+                closeSheet(); closeScanner();
+                if(b.booking_date && b.booking_date!==bchDateStr){
+                    bchDateStr=b.booking_date;
+                    bchData={ spots: bchData.spots||[], bookings: [], slot_times: bchData.slot_times||{} };
+                    bchLoading=true;
+                }
+                loadBeach(true);
+            }catch(e){ toast('Could not confirm'); bchScanResume(); }
+        });
     };
-    window.undoArrival=async function(ref){
+
+    function bchPrint(){
+        var url='/staff/beach/arrivals?property_id='+encodeURIComponent(PROPERTY_ID)+'&date='+encodeURIComponent(bchDateStr)+'&slot='+encodeURIComponent(bchSlot)+'&print=1';
+        var inApp=false;
+        try{ inApp = (typeof IN_APP!=='undefined' && !!IN_APP) || window.matchMedia('(display-mode: standalone)').matches; }catch(e){}
+        // Inside the Ops app a new window would leave the /staff/ scope, so stay in place
+        if(inApp){ location.href=url; return; }
+        var w=null;
+        try{ w=window.open(url,'_blank'); }catch(e){}
+        if(!w) location.href=url;
+    }
+
+    document.addEventListener('click', function(e){
+        var t=null;
+        try{ t=(e.target && e.target.closest) ? e.target.closest('[data-bact]') : null; }catch(x){}
+        if(!t) return;
         try{
-            await fetch('/api/staff/beach/undo',{method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({booking_reference:ref, property_id:parseInt(PROPERTY_ID,10)})});
-            closeSheet(); loadBeach(); toast('Arrival undone');
-        }catch(e){ toast('Failed'); }
-    };
+            if(t.disabled) return;
+            var a=t.getAttribute('data-bact'), ref=t.getAttribute('data-ref');
+            if(a==='slot'){ bchSlot=t.getAttribute('data-slot')||'all'; bchRenderAll(); }
+            else if(a==='spot'){ openSpot(parseInt(t.getAttribute('data-spot'),10)); }
+            else if(a==='in'){ bchCheckIn(ref); }
+            else if(a==='noshow'){ bchNoShow(ref); }
+            else if(a==='undo'){ bchUndo(ref); }
+            else if(a==='who'){ bchAskName(); }
+            else if(a==='who-save'){ bchWhoSave(); }
+            else if(a==='who-cancel'){ bchWhoClose(false); }
+            else if(a==='print'){ bchPrint(); }
+        }catch(err){ console.error('beach action', err); }
+    });
+
+    (function(){
+        try{
+            ['bchSearch','bchRoom'].forEach(function(id){
+                var el=document.getElementById(id);
+                if(el) el.addEventListener('input', function(){ try{ renderBeachList(); drawBeachMap(); bchScrollToHit(); }catch(e){} });
+            });
+            var wi=document.getElementById('bchWhoInput');
+            if(wi) wi.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); bchWhoSave(); } else if(e.key==='Escape'){ bchWhoClose(false); } });
+            var wd=document.getElementById('bchWho');
+            if(wd) wd.addEventListener('click', function(e){ if(e.target===wd) bchWhoClose(false); });
+            var sm=document.getElementById('scanManual');
+            if(sm) sm.addEventListener('keydown', function(e){ if(e.key==='Enter') confirmCode(sm.value); });
+            bchRenderAll();
+        }catch(e){ console.error('beach init', e); }
+        // Other attendants' check-ins show up without a tap; the day rolls over at Cairo midnight
+        setInterval(function(){
+            try{
+                var t=bchCairoToday();
+                if(t!==bchLastToday){ if(bchDateStr===bchLastToday) bchDateStr=t; bchLastToday=t; }
+                if(bchVisible() && !Object.keys(bchBusy).length) loadBeach(true);
+            }catch(e){}
+        }, 30000);
+        document.addEventListener('visibilitychange', function(){ try{ if(bchVisible()) loadBeach(true); }catch(e){} });
+    })();
 
     // ── QR scanning: native BarcodeDetector where available, manual entry always ──
-    var scanStream=null, scanLoop=null;
-    window.openScanner=async function(){
+    var scanStream=null, scanLoop=null, scanDet=null;
+    function bchScanLoopStart(v){
+        if(!scanDet || !scanStream || scanLoop) return;
+        scanLoop = setInterval(async function(){
+            try{
+                var codes = await scanDet.detect(v);
+                if(codes && codes.length && scanLoop){
+                    var raw = codes[0].rawValue;
+                    clearInterval(scanLoop); scanLoop=null;
+                    if(navigator.vibrate) navigator.vibrate(120);
+                    confirmCode(raw);
+                }
+            }catch(e){}
+        }, 450);
+    }
+    // After a failed scan, look again so the attendant can present the next code
+    function bchScanResume(){
+        setTimeout(function(){
+            var wrap=document.getElementById('scanWrap');
+            if(wrap && wrap.classList.contains('open')) bchScanLoopStart(document.getElementById('scanVideo'));
+        }, 1500);
+    }
+    async function bchOpenScanner(){
         var wrap=document.getElementById('scanWrap');
         wrap.classList.add('open');
         var v=document.getElementById('scanVideo');
@@ -48295,26 +48982,16 @@ app.get('/staff/app', (c) => {
             await v.play();
         }catch(e){ toast('Camera unavailable — type the code instead'); return; }
         if(!('BarcodeDetector' in window)){ toast('Type the code below to confirm'); return; }
-        try{
-            var det = new BarcodeDetector({formats:['qr_code']});
-            scanLoop = setInterval(async function(){
-                try{
-                    var codes = await det.detect(v);
-                    if(codes && codes.length){
-                        var raw = codes[0].rawValue;
-                        clearInterval(scanLoop); scanLoop=null;
-                        if(navigator.vibrate) navigator.vibrate(120);
-                        confirmCode(raw);
-                    }
-                }catch(e){}
-            }, 450);
-        }catch(e){ toast('Type the code below to confirm'); }
-    };
+        try{ scanDet = new BarcodeDetector({formats:['qr_code']}); bchScanLoopStart(v); }
+        catch(e){ scanDet=null; toast('Type the code below to confirm'); }
+    }
+    window.openScanner=function(){ bchWithName(function(){ bchOpenScanner(); }); };
     window.closeScanner=function(){
         var wrap=document.getElementById('scanWrap');
         if(wrap) wrap.classList.remove('open');
         if(scanLoop){ clearInterval(scanLoop); scanLoop=null; }
         if(scanStream){ scanStream.getTracks().forEach(function(t){t.stop();}); scanStream=null; }
+        scanDet=null;
         var m=document.getElementById('scanManual'); if(m) m.value='';
     };
 
@@ -85841,43 +86518,208 @@ app.post('/api/admin/agent/coach-draft', async (c) => {
   }
 })
 
+// ── Beach attendant (Ops app): day view, check-in, no-show, undo ──
+// Unauthenticated by design, like the rest of /api/staff/*: the Ops TWA has no login.
+function attCairoDate(d: Date = new Date()): string {
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d)
+  const g = (t: string) => (p.find((x) => x.type === t) || { value: '' }).value
+  return g('year') + '-' + g('month') + '-' + g('day')
+}
+
+// D1 CURRENT_TIMESTAMP values are UTC without a zone ('YYYY-MM-DD HH:MM:SS').
+function attCairoTime(utc: any): string {
+  if (!utc) return ''
+  const s = String(utc)
+  const t = Date.parse(s.indexOf('T') > 0 ? s : s.replace(' ', 'T') + 'Z')
+  if (isNaN(t)) return ''
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(t))
+}
+
+function attNiceDate(ymd: any): string {
+  const s = String(ymd || '')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(s + 'T12:00:00Z'))
+}
+
+function attEsc(s: any): string {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+function attSlotId(s: any): string {
+  const v = String(s || '').trim().toLowerCase()
+  if (v === 'morning' || v === 'am' || v === 'half_day_am') return 'half_day_am'
+  if (v === 'afternoon' || v === 'pm' || v === 'half_day_pm') return 'half_day_pm'
+  if (v === 'full_day' || v === 'full' || v === 'fullday') return 'full_day'
+  return v
+}
+
+// A booking belongs to a slot view when it is that slot or a full day.
+function attInSlot(slotType: string, slot: string): boolean {
+  return !slot || slot === 'all' || slot === 'full_day' || slotType === slot || slotType === 'full_day'
+}
+
+// Row first, then numbers ascending, then non-numeric labels (VC-1..) naturally.
+function attSpotCmp(a: any, b: any): number {
+  const ra = a.row_no == null ? 9999 : Number(a.row_no)
+  const rb = b.row_no == null ? 9999 : Number(b.row_no)
+  if (ra !== rb) return ra - rb
+  const sa = String(a.spot_number == null ? '' : a.spot_number).trim()
+  const sb = String(b.spot_number == null ? '' : b.spot_number).trim()
+  const na = /^\d+$/.test(sa), nb = /^\d+$/.test(sb)
+  if (na && nb) return Number(sa) - Number(sb)
+  if (na !== nb) return na ? -1 : 1
+  return sa.localeCompare(sb, 'en', { numeric: true, sensitivity: 'base' })
+}
+
+const ATT_SLOT_ORDER: any = { full_day: 0, half_day_am: 1, half_day_pm: 2 }
+
+function attStaffName(v: any): string {
+  const s = String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, 40)
+  return s || 'Beach staff'
+}
+
+// QR payloads are JSON; a plain reference or short code also works (tried as both).
+function attParseCode(raw: string): { reference: string, code: string } {
+  let reference = '', code = ''
+  if (raw.startsWith('{')) {
+    try {
+      const j = JSON.parse(raw)
+      reference = String(j.booking_reference || '')
+      code = String(j.booking_code || '')
+    } catch (e) { /* fall through to plain text */ }
+  }
+  if (!reference && !code) {
+    reference = raw
+    code = raw.toUpperCase()
+  }
+  return { reference, code }
+}
+
+// Everything the attendant screens need for one day, in one D1 round trip plus
+// the slot resolver (sunrise/sunset). Shared by the Ops API and the print page.
+async function attBeachDay(env: any, pid: string, date: string) {
+  const DB = env.DB
+  const resolvedP = (async () => {
+    try {
+      if (typeof resolveBeachSlots === 'function') return await (resolveBeachSlots as any)(env, pid, date)
+    } catch (e) { console.error('beach slot resolve failed', e) }
+    return null
+  })()
+  const batchP = DB.batch([
+    DB.prepare(`
+      SELECT s.spot_id, s.spot_number, s.spot_type, s.tier, s.row_no, s.zone_id, z.zone_name,
+             s.position_x, s.position_y, s.map_x, s.map_y, s.map_w, s.map_h,
+             s.is_premium, s.max_capacity, s.max_loungers, s.maintenance_mode, s.guest_bookable
+      FROM beach_spots s
+      LEFT JOIN beach_zones z ON z.zone_id = s.zone_id
+      WHERE s.property_id = ? AND s.is_active = 1
+    `).bind(pid),
+    DB.prepare(`
+      SELECT bb.beach_booking_id, bb.booking_reference, bb.booking_code, bb.spot_id, bb.booking_date,
+             bb.guest_name, bb.guest_room_number, bb.guest_phone, bb.num_guests,
+             bb.num_loungers, bb.num_umbrellas, bb.booking_source,
+             bb.slot_type, bb.start_time, bb.end_time, bb.booking_status,
+             bb.checked_in_at, bb.checked_in_by, bb.updated_at, bb.special_requests,
+             bs.spot_number, bs.spot_type, bs.tier, bs.row_no, bs.is_active AS spot_active,
+             bs.max_loungers AS spot_max_loungers, z.zone_name, z.max_loungers AS zone_max_loungers
+      FROM beach_bookings bb
+      LEFT JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      LEFT JOIN beach_zones z ON z.zone_id = bs.zone_id
+      WHERE bb.property_id = ? AND bb.booking_date = ? AND bb.booking_status != 'cancelled'
+    `).bind(pid, date),
+    DB.prepare(`SELECT * FROM beach_settings WHERE property_id = ? LIMIT 1`).bind(pid)
+  ])
+  const [batch, resolved]: any = await Promise.all([batchP, resolvedP])
+  const settings: any = ((batch[2] && batch[2].results) || [])[0] || {}
+
+  let slots: any[] = Array.isArray(resolved) ? resolved : (resolved && Array.isArray(resolved.slots) ? resolved.slots : [])
+  let sunrise: string | null = resolved && !Array.isArray(resolved) ? (resolved.sunrise || null) : null
+  let sunset: string | null = resolved && !Array.isArray(resolved) ? (resolved.sunset || null) : null
+  if (!slots.length) {
+    let sun: any = null
+    try {
+      sun = await DB.prepare(`SELECT sunrise, sunset FROM beach_sun_times WHERE property_id = ? AND date = ?`).bind(pid, date).first()
+    } catch (e) { /* cache table optional here */ }
+    let legacy: any[] = []
+    try { legacy = JSON.parse(settings.time_slots || '[]') } catch (e) { legacy = [] }
+    if (!Array.isArray(legacy)) legacy = []
+    const lg = (id: string) => legacy.find((s: any) => s && s.id === id) || {}
+    sunrise = (sun && sun.sunrise) || null
+    sunset = (sun && sun.sunset) || null
+    const amS = settings.slot_am_start || sunrise || lg('half_day_am').start || '08:00'
+    const amE = settings.slot_am_end || lg('half_day_am').end || '13:00'
+    const pmS = settings.slot_pm_start || lg('half_day_pm').start || '13:30'
+    const pmE = settings.slot_pm_end || sunset || lg('half_day_pm').end || '18:00'
+    slots = [
+      { id: 'half_day_am', name: 'Morning', start: amS, end: amE, auto_start: !settings.slot_am_start },
+      { id: 'half_day_pm', name: 'Afternoon', start: pmS, end: pmE, auto_end: !settings.slot_pm_end }
+    ]
+    if (Number(settings.full_day_enabled) === 1) slots.push({ id: 'full_day', name: 'Full Day', start: amS, end: pmE })
+  }
+
+  // Historical full-day bookings still need times even when full day is switched off.
+  const slotTimes: any = {}
+  for (const s of slots) if (s && s.id) slotTimes[s.id] = { name: s.name, start: s.start || null, end: s.end || null }
+  const am = slotTimes.half_day_am || {}, pm = slotTimes.half_day_pm || {}
+  if (!slotTimes.full_day) slotTimes.full_day = { name: 'Full Day', start: am.start || null, end: pm.end || null }
+
+  const limit = Number(settings.max_loungers_per_booking) || 3
+  const spots = ((batch[0] && batch[0].results) || []).slice().sort(attSpotCmp)
+  const bookings = ((batch[1] && batch[1].results) || []).map((b: any) => {
+    const slotType = attSlotId(b.slot_type)
+    const t = slotTimes[slotType] || {}
+    const eff = Number(b.spot_max_loungers ?? b.zone_max_loungers ?? limit) || limit
+    return {
+      ...b,
+      slot_type: slotType,
+      // Legacy rows have no lounger count: same default a new booking gets.
+      loungers: b.num_loungers != null ? Number(b.num_loungers) : Math.max(1, Math.min(Number(b.num_guests) || 2, eff)),
+      umbrellas: b.num_umbrellas != null ? Number(b.num_umbrellas) : 1,
+      slot_start: b.start_time || t.start || null,
+      slot_end: b.end_time || t.end || null,
+      checked_in_time: attCairoTime(b.checked_in_at),
+      status_time: attCairoTime(b.booking_status === 'checked_in' ? b.checked_in_at : b.updated_at)
+    }
+  }).sort((a: any, b: any) => attSpotCmp(a, b) || ((ATT_SLOT_ORDER[a.slot_type] ?? 9) - (ATT_SLOT_ORDER[b.slot_type] ?? 9)) || (a.beach_booking_id - b.beach_booking_id))
+
+  return { date, spots, bookings, slots, slot_times: slotTimes, sunrise, sunset, settings }
+}
+
+function attSummary(spots: any[], bookings: any[]) {
+  let checkedIn = 0, noShow = 0, awaiting = 0
+  const taken: any = {}
+  for (const b of bookings) {
+    if (b.booking_status === 'checked_in' || b.booking_status === 'completed') checkedIn++
+    else if (b.booking_status === 'no_show') noShow++
+    else awaiting++
+    if (b.booking_status === 'confirmed' || b.booking_status === 'checked_in') taken[b.spot_id] = 1
+  }
+  const free = spots.filter((s: any) => !Number(s.maintenance_mode) && !taken[s.spot_id]).length
+  return { booked: bookings.length, checked_in: checkedIn, awaiting, no_show: noShow, free, spots_total: spots.length }
+}
+
 // ── Beach day view for the Ops app: the map, the bookings and the counts ──
 app.get('/api/staff/beach/day', async (c) => {
-  const { DB } = c.env
-  const pid = c.req.query('property_id') || '1'
-  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  const pid = String(c.req.query('property_id') || '1')
+  const qd = String(c.req.query('date') || '')
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(qd) ? qd : attCairoDate()
+  let slot = attSlotId(c.req.query('slot') || 'all')
+  if (slot !== 'half_day_am' && slot !== 'half_day_pm' && slot !== 'full_day') slot = 'all'
   try {
-    const spots = await DB.prepare(`
-      SELECT spot_id, spot_number, spot_type, position_x, position_y, is_premium, max_capacity
-      FROM beach_spots
-      WHERE property_id = ? AND is_active = 1
-      ORDER BY CAST(spot_number AS INTEGER)
-    `).bind(pid).all()
-
-    const bookings = await DB.prepare(`
-      SELECT bb.beach_booking_id, bb.booking_reference, bb.booking_code, bb.spot_id,
-             bb.guest_name, bb.guest_room_number, bb.guest_phone, bb.num_guests,
-             bb.slot_type, bb.booking_status, bb.checked_in_at, bb.checked_in_by,
-             bb.special_requests, bs.spot_number, bs.spot_type
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      WHERE bb.property_id = ? AND bb.booking_date = ? AND bb.booking_status != 'cancelled'
-      ORDER BY CAST(bs.spot_number AS INTEGER)
-    `).bind(pid, date).all()
-
-    const list = bookings.results || []
-    const checkedIn = list.filter((b: any) => b.booking_status === 'checked_in').length
+    const day = await attBeachDay(c.env, pid, date)
+    const list = slot === 'all' ? day.bookings : day.bookings.filter((b: any) => attInSlot(b.slot_type, slot))
     return c.json({
       success: true,
       date,
-      spots: spots.results || [],
+      today: attCairoDate(),
+      slot,
+      slots: day.slots,
+      slot_times: day.slot_times,
+      sunrise: day.sunrise,
+      sunset: day.sunset,
+      spots: day.spots,
       bookings: list,
-      summary: {
-        booked: list.length,
-        checked_in: checkedIn,
-        awaiting: list.length - checkedIn,
-        spots_total: (spots.results || []).length
-      }
+      summary: attSummary(day.spots, list)
     })
   } catch (error) {
     console.error('beach day error', error)
@@ -85885,67 +86727,132 @@ app.get('/api/staff/beach/day', async (c) => {
   }
 })
 
-// Confirm a guest's arrival — from a QR scan, a typed code, or a tap on the map
+// Confirm a guest's arrival — from a QR scan, a typed code, or a tap on the list/map.
+// `date` (the day on screen) is optional; without it the booking must be for today.
 app.post('/api/staff/beach/confirm', async (c) => {
   const { DB } = c.env
   try {
     const b = await c.req.json()
-    let raw = String(b.code || '').trim()
+    const raw = String(b.code || b.booking_reference || '').trim()
     if (!raw) return c.json({ success: false, error: 'No booking code supplied' }, 400)
-
-    // QR payloads are JSON; accept the raw reference or code too
-    let reference = '', code = ''
-    if (raw.startsWith('{')) {
-      try {
-        const j = JSON.parse(raw)
-        reference = j.booking_reference || ''
-        code = j.booking_code || ''
-      } catch (e) { /* fall through to plain text */ }
-    }
-    if (!reference && !code) {
-      if (raw.indexOf('BCH-') === 0) reference = raw
-      else code = raw.toUpperCase()
-    }
-
+    const { reference, code } = attParseCode(raw)
     const pid = b.property_id || 1
-    const booking = await DB.prepare(`
-      SELECT bb.*, bs.spot_number, bs.spot_type
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(String(b.date || '')) ? String(b.date) : attCairoDate()
+
+    // Short codes can repeat across months: prefer the booking on the target day.
+    const booking: any = await DB.prepare(`
+      SELECT bb.*, bs.spot_number, bs.spot_type, bs.tier
       FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      LEFT JOIN beach_spots bs ON bb.spot_id = bs.spot_id
       WHERE bb.property_id = ? AND bb.booking_status != 'cancelled'
         AND (bb.booking_reference = ? OR bb.booking_code = ?)
-      ORDER BY bb.beach_booking_id DESC LIMIT 1
-    `).bind(pid, reference || '~', code || '~').first()
+      ORDER BY (bb.booking_date = ?) DESC, bb.beach_booking_id DESC LIMIT 1
+    `).bind(pid, reference || '~', code || '~', day).first()
 
     if (!booking) return c.json({ success: false, error: 'No booking found for that code' }, 404)
 
-    if (booking.booking_status === 'checked_in') {
-      return c.json({ success: true, already: true, booking })
+    if (booking.booking_date !== day) {
+      return c.json({
+        success: false, wrong_day: true, booking_date: booking.booking_date,
+        booking: { booking_reference: booking.booking_reference, guest_name: booking.guest_name, booking_date: booking.booking_date, spot_number: booking.spot_number },
+        error: (booking.guest_name || 'This booking') + ' is booked for ' + attNiceDate(booking.booking_date) + (b.date ? ', not the day on screen' : ', not today')
+      }, 409)
+    }
+    if (booking.booking_date > attCairoDate()) {
+      return c.json({ success: false, error: (booking.guest_name || 'This booking') + ' is booked for ' + attNiceDate(booking.booking_date) + ' — check-in opens on the day' }, 409)
     }
 
-    await DB.prepare(`
-      UPDATE beach_bookings
-      SET booking_status = 'checked_in', checked_in_at = CURRENT_TIMESTAMP, checked_in_by = ?
-      WHERE beach_booking_id = ?
-    `).bind(b.staff_name || 'Beach staff', booking.beach_booking_id).run()
+    if (booking.booking_status === 'checked_in' || booking.booking_status === 'completed') {
+      return c.json({ success: true, already: true, booking: { ...booking, checked_in_time: attCairoTime(booking.checked_in_at) } })
+    }
 
-    return c.json({ success: true, booking })
+    const staff = attStaffName(b.staff_name)
+    const res: any = await DB.prepare(`
+      UPDATE beach_bookings
+      SET booking_status = 'checked_in', checked_in_at = CURRENT_TIMESTAMP, checked_in_by = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE beach_booking_id = ? AND booking_status IN ('confirmed', 'no_show')
+    `).bind(staff, booking.beach_booking_id).run()
+
+    if (!res || !res.meta || !res.meta.changes) {
+      const now: any = await DB.prepare(`SELECT booking_status, checked_in_at, checked_in_by FROM beach_bookings WHERE beach_booking_id = ?`).bind(booking.beach_booking_id).first()
+      if (now && now.booking_status === 'checked_in') {
+        return c.json({ success: true, already: true, booking: { ...booking, ...now, checked_in_time: attCairoTime(now.checked_in_at) } })
+      }
+      return c.json({ success: false, error: 'This booking can no longer be checked in' }, 409)
+    }
+
+    const nowUtc = new Date().toISOString().replace('T', ' ').slice(0, 19)
+    return c.json({
+      success: true,
+      booking: { ...booking, booking_status: 'checked_in', checked_in_at: nowUtc, checked_in_by: staff, checked_in_time: attCairoTime(nowUtc) }
+    })
   } catch (error) {
     console.error('beach confirm error', error)
     return c.json({ success: false, error: 'Could not confirm the booking' }, 500)
   }
 })
 
+// The guest never came. Who marked it is kept in checked_in_by (checked_in_at stays NULL).
+app.post('/api/staff/beach/no-show', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    const raw = String(b.booking_reference || b.code || '').trim()
+    if (!raw) return c.json({ success: false, error: 'No booking reference supplied' }, 400)
+    const { reference, code } = attParseCode(raw)
+    const pid = b.property_id || 1
+    const today = attCairoDate()
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(String(b.date || '')) ? String(b.date) : today
+
+    const booking: any = await DB.prepare(`
+      SELECT beach_booking_id, booking_reference, booking_code, guest_name, booking_date, booking_status
+      FROM beach_bookings
+      WHERE property_id = ? AND booking_status != 'cancelled'
+        AND (booking_reference = ? OR booking_code = ?)
+      ORDER BY (booking_date = ?) DESC, beach_booking_id DESC LIMIT 1
+    `).bind(pid, reference || '~', code || '~', day).first()
+
+    if (!booking) return c.json({ success: false, error: 'No booking found' }, 404)
+    if (b.date && booking.booking_date !== day) {
+      return c.json({ success: false, wrong_day: true, error: 'That booking is for ' + attNiceDate(booking.booking_date) }, 409)
+    }
+    if (booking.booking_date > today) {
+      return c.json({ success: false, error: 'That booking is for ' + attNiceDate(booking.booking_date) + ' — it can only be a no-show on the day' }, 409)
+    }
+    if (booking.booking_status === 'no_show') return c.json({ success: true, already: true, booking })
+    if (booking.booking_status !== 'confirmed') {
+      return c.json({
+        success: false,
+        error: booking.booking_status === 'checked_in' ? 'Already checked in — undo the arrival first' : 'This booking cannot be marked as a no-show'
+      }, 409)
+    }
+
+    const staff = attStaffName(b.staff_name)
+    const res: any = await DB.prepare(`
+      UPDATE beach_bookings
+      SET booking_status = 'no_show', checked_in_at = NULL, checked_in_by = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE beach_booking_id = ? AND booking_status = 'confirmed'
+    `).bind(staff, booking.beach_booking_id).run()
+    if (!res || !res.meta || !res.meta.changes) return c.json({ success: false, error: 'The booking changed meanwhile — refresh and try again' }, 409)
+
+    return c.json({ success: true, booking: { ...booking, booking_status: 'no_show', checked_in_by: staff } })
+  } catch (error) {
+    console.error('beach no-show error', error)
+    return c.json({ success: false, error: 'Could not mark the no-show' }, 500)
+  }
+})
+
+// Reverts an arrival or a no-show back to an expected booking (never a cancellation).
 app.post('/api/staff/beach/undo', async (c) => {
   const { DB } = c.env
   try {
     const b = await c.req.json()
-    await DB.prepare(`
+    const res: any = await DB.prepare(`
       UPDATE beach_bookings
-      SET booking_status = 'confirmed', checked_in_at = NULL, checked_in_by = NULL
-      WHERE booking_reference = ? AND property_id = ?
-    `).bind(b.booking_reference, b.property_id || 1).run()
-    return c.json({ success: true })
+      SET booking_status = 'confirmed', checked_in_at = NULL, checked_in_by = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE booking_reference = ? AND property_id = ? AND booking_status IN ('checked_in', 'no_show')
+    `).bind(String(b.booking_reference || ''), b.property_id || 1).run()
+    return c.json({ success: true, changed: (res && res.meta && res.meta.changes) || 0 })
   } catch (e) {
     return c.json({ success: false }, 500)
   }
