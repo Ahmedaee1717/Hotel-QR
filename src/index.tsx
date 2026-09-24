@@ -14255,12 +14255,19 @@ app.get('/api/admin/beach/settings/:property_id', async (c) => {
       SELECT * FROM beach_settings WHERE property_id = ?
     `).bind(property_id).first()
     
-    // Create default settings if not exists
+    // Create default settings if not exists — only for a real property: this
+    // GET is public, and each new row would also unlock sun-API calls + cache writes.
     if (!settings) {
+      const prop = /^\d+$/.test(String(property_id))
+        ? await DB.prepare('SELECT property_id FROM properties WHERE property_id = ?').bind(property_id).first()
+        : null
+      if (!prop) {
+        return c.json({ success: false, error: 'Property not found' }, 404)
+      }
       await DB.prepare(`
-        INSERT INTO beach_settings (property_id) VALUES (?)
-      `).bind(property_id).run()
-      
+        INSERT INTO beach_settings (property_id) SELECT ? WHERE NOT EXISTS (SELECT 1 FROM beach_settings WHERE property_id = ?)
+      `).bind(property_id, property_id).run()
+
       settings = await DB.prepare(`
         SELECT * FROM beach_settings WHERE property_id = ?
       `).bind(property_id).first()
