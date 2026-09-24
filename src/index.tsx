@@ -25894,6 +25894,118 @@ window.luxTogglePassForm = function() {
           .lux-bch-when { color: var(--lux-gold-2); font-weight: 600; }
           .lux-bch-code { font-family: var(--lux-serif); font-size: 1.6rem; font-weight: 800; color: #241318; letter-spacing: 0.12em; text-align: center; margin-top: 0.5rem; }
 
+          /* ── Main restaurant table booking (restaurants with the booking module) ── */
+          .lux-rst-lead { font-size: 0.8rem; line-height: 1.55; color: var(--lux-text-dim); margin: -0.1rem 0 0.9rem; }
+          .lux-rst-meals {
+            display: flex; gap: 0.3rem; padding: 0.3rem; margin-bottom: 0.75rem;
+            border-radius: 999px; border: 1px solid rgba(212, 175, 55, 0.3);
+            background: rgba(250, 246, 236, 0.04);
+          }
+          .lux-rst-meals[hidden] { display: none; }
+          .lux-rst-meal {
+            flex: 1; min-width: 0;
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+            padding: 0.62rem 0.35rem; border-radius: 999px;
+            background: transparent; border: none;
+            color: var(--lux-text-dim); font-size: 0.7rem; font-weight: 700;
+            letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; white-space: nowrap;
+          }
+          .lux-rst-meal i { color: var(--lux-gold-2); font-size: 0.78rem; }
+          .lux-rst-meal.dim { opacity: 0.5; }
+          .lux-rst-meal.on { background: var(--lux-gold-grad); color: #231307; opacity: 1; box-shadow: 0 8px 18px -10px rgba(212, 175, 55, 0.7); }
+          .lux-rst-meal.on i { color: #231307; }
+          .lux-rst-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 0.5rem; transition: opacity 0.2s; }
+          .lux-rst-slots.loading { opacity: 0.5; pointer-events: none; }
+          .lux-rst-slot {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 0.22rem;
+            padding: 0.72rem 0.85rem; border-radius: 0.95rem; text-align: left;
+            background: rgba(250, 246, 236, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.32);
+            color: var(--lux-text); cursor: pointer;
+          }
+          .lux-rst-slot .tm { font-size: 0.95rem; font-weight: 700; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+          .lux-rst-slot .av { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.03em; color: #6ee7b7; }
+          .lux-rst-slot .av.low { color: #fcd34d; }
+          .lux-rst-slot.on { background: var(--lux-gold-grad); border-color: transparent; color: #231307; box-shadow: 0 10px 22px -12px rgba(212, 175, 55, 0.75); }
+          .lux-rst-slot.on .av { color: #3a2a10; }
+          .lux-rst-slot:disabled { opacity: 0.42; cursor: not-allowed; }
+          .lux-rst-slot:disabled .av { color: var(--lux-text-dim); }
+          .lux-rst-empty {
+            grid-column: 1 / -1; padding: 0.95rem; text-align: center;
+            font-size: 0.78rem; line-height: 1.5; color: var(--lux-text-dim);
+            border: 1px dashed rgba(212, 175, 55, 0.32); border-radius: 0.95rem;
+          }
+          .lux-rst-empty i { color: var(--lux-gold-2); margin-right: 0.35rem; }
+          .lux-rst-retry { background: none; border: none; color: var(--lux-gold-2); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+          .lux-rst-prefs { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+          .lux-rst-pref {
+            padding: 0.5rem 0.85rem; border-radius: 999px;
+            background: rgba(250, 246, 236, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: var(--lux-text); font-size: 0.74rem; font-weight: 600; cursor: pointer;
+          }
+          .lux-rst-pref small { font-size: 0.62rem; font-weight: 500; opacity: 0.75; margin-left: 0.3rem; }
+          .lux-rst-pref.on { background: var(--lux-gold-grad); border-color: transparent; color: #231307; }
+          .lux-rst-pref:disabled { opacity: 0.4; cursor: not-allowed; }
+          .lux-rst-hint { font-size: 0.68rem; color: var(--lux-text-dim); margin-top: 0.4rem; }
+          .lux-rst-fine { font-size: 0.7rem; line-height: 1.5; color: var(--lux-text-dim); text-align: center; margin-top: 0.75rem; }
+          .lux-rst-hours {
+            border: 1px solid rgba(212, 175, 55, 0.35); border-radius: 1.1rem;
+            background: linear-gradient(160deg, rgba(52, 29, 39, 0.6) 0%, rgba(26, 14, 19, 0.88) 100%);
+            padding: 0.25rem 1.05rem;
+          }
+          .lux-rst-hrow { display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 0; border-bottom: 1px solid rgba(212, 175, 55, 0.14); }
+          .lux-rst-hrow:last-child { border-bottom: none; }
+          .lux-rst-hrow .ic {
+            width: 2.3rem; height: 2.3rem; flex-shrink: 0; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid rgba(212, 175, 55, 0.45); background: rgba(212, 175, 55, 0.1);
+            color: var(--lux-gold-2); font-size: 0.85rem;
+          }
+          .lux-rst-hrow .mn { font-family: var(--lux-serif); font-size: 1.12rem; font-weight: 600; color: var(--lux-text); line-height: 1.15; }
+          .lux-rst-hrow .ms { font-size: 0.66rem; color: var(--lux-text-dim); margin-top: 0.15rem; }
+          .lux-rst-hrow .tm { margin-left: auto; font-size: 0.85rem; font-weight: 700; color: var(--lux-gold-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+          .lux-rst-mine { display: flex; flex-direction: column; gap: 0.5rem; }
+          .lux-rst-mrow {
+            display: flex; align-items: center; gap: 0.8rem; width: 100%; text-align: left;
+            padding: 0.75rem 0.95rem; border-radius: 0.95rem;
+            border: 1px solid rgba(212, 175, 55, 0.55); background: rgba(212, 175, 55, 0.1);
+            color: var(--lux-text); cursor: pointer;
+          }
+          .lux-rst-mrow .cd { font-family: var(--lux-serif); font-size: 1.05rem; font-weight: 800; letter-spacing: 0.08em; color: var(--lux-gold-2); }
+          .lux-rst-mrow .tx { flex: 1; min-width: 0; font-size: 0.7rem; line-height: 1.4; color: var(--lux-text-dim); }
+          .lux-rst-mrow .tx strong { display: block; font-size: 0.82rem; color: var(--lux-text); }
+          .lux-rst-mrow > i { color: var(--lux-gold-2); font-size: 0.75rem; }
+          .lux-rst-okh { font-family: var(--lux-serif); font-size: 1.8rem; color: var(--lux-text); margin-bottom: 0.3rem; }
+          .lux-rst-ticket {
+            max-width: 340px; margin: 1.2rem auto 0.95rem; padding: 1.1rem 1.2rem 1rem;
+            border-radius: 1.1rem; background: var(--lux-ivory); color: #241318;
+            box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.7);
+          }
+          .lux-rst-ticket .lb { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(36, 19, 24, 0.55); }
+          .lux-rst-ticket .code { font-family: var(--lux-serif); font-size: 2.6rem; font-weight: 800; letter-spacing: 0.12em; line-height: 1.1; margin: 0.15rem 0 0.85rem; word-break: break-all; }
+          .lux-rst-ticket .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 0.9rem; padding-top: 0.85rem; border-top: 1px dashed rgba(36, 19, 24, 0.25); text-align: left; }
+          .lux-rst-ticket .grid span { display: block; font-size: 0.56rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(36, 19, 24, 0.5); }
+          .lux-rst-ticket .grid strong { display: block; font-size: 0.95rem; font-weight: 800; line-height: 1.25; }
+          .lux-rst-ticket .grid em { display: block; font-style: normal; font-size: 0.7rem; color: rgba(36, 19, 24, 0.65); }
+          .lux-rst-ticket .ref { margin-top: 0.85rem; font-size: 0.64rem; letter-spacing: 0.08em; color: rgba(36, 19, 24, 0.5); }
+          .lux-rst-arrive {
+            max-width: 380px; margin: 0 auto; padding: 0.8rem 1rem; text-align: left;
+            border-radius: 0.9rem; border: 1px solid rgba(212, 175, 55, 0.45); background: rgba(212, 175, 55, 0.1);
+            font-size: 0.8rem; line-height: 1.5; color: var(--lux-text);
+          }
+          .lux-rst-arrive i { color: var(--lux-gold-2); margin-right: 0.45rem; }
+          .lux-rst-arrive strong { color: var(--lux-gold-2); }
+          .lux-rst-show { font-size: 0.74rem; margin-top: 0.8rem; }
+          .lux-rst-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin-top: 1rem; }
+          .lux-rst-link {
+            background: none; border: none; padding: 0.3rem 0; cursor: pointer;
+            color: var(--lux-gold-2); font-size: 0.74rem; font-weight: 600; letter-spacing: 0.04em;
+            text-decoration: underline; text-underline-offset: 3px;
+          }
+          .lux-rst-link.danger { color: #fda4af; }
+          .lux-rst-link:disabled { opacity: 0.5; cursor: default; }
+
           /* ── Live resort map ── */
           .lux-map-head { padding: 2.6rem 1.25rem 0.8rem; }
           .lux-map-head h2 { font-family: var(--lux-serif); font-size: 1.9rem; font-weight: 600; color: var(--lux-text); }
@@ -29202,7 +29314,9 @@ window.luxTogglePassForm = function() {
                     console.log('Checking beach booking after content is visible');
                     checkBeachBookingEnabled();
                 }
-                
+
+                try { luxRstOpenFromUrl(); } catch (e) { console.error('open param', e); }
+
                 // Initialize chatbot after all data is loaded
                 if (typeof initChatbot === 'function') {
                     initChatbot();
@@ -30355,6 +30469,11 @@ window.luxTogglePassForm = function() {
                 window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
                 return;
             }
+            // Restaurants with the table-booking module get the slot flow instead of the legacy form;
+            // the config fetch runs alongside the translations below
+            const rstSeq = ++luxRst.seq;
+            const rstId = o.offering_type === 'restaurant' ? luxRstOfferingNum(o) : null;
+            const rstCfg = rstId ? luxRstFetchConfig(rstId) : null;
             const title = await getTranslatedField(o, 'title');
             let about = '';
             try { about = await getTranslatedField(o, 'full_description'); } catch (e) {}
@@ -30381,9 +30500,10 @@ window.luxTogglePassForm = function() {
                 (chips ? '<div class="lux-sheet-chips">' + chips + '</div>' : '') +
                 (about ? '<h3>About</h3><p class="lux-sheet-desc">' + about + '</p>' : '') +
                 '<div id="luxSheetMenus"></div>' +
-                (canBook ? luxBookingFormHtml(o) : '') +
+                (rstCfg ? '<div id="luxRstHost">' + (canBook ? luxBookingFormHtml(o) : '') + '</div>' : (canBook ? luxBookingFormHtml(o) : '')) +
             '</div>';
             luxSheetOpen(html);
+            if (rstCfg) luxRstMount(o, title, rstCfg, rstSeq);
 
             if (o.offering_type === 'restaurant') {
                 try {
@@ -30403,6 +30523,757 @@ window.luxTogglePassForm = function() {
             }
             if (canBook) luxWireBookingForm(o, price, currency);
         };
+
+        // ── Restaurant table booking (offerings with a restaurant_settings row) ──
+        // seq drops late responses once the guest has opened another sheet.
+        var luxRst = { seq: 0, o: null, oid: null, title: '', cfg: null, days: [], date: null, meal: null, slot: null, avail: null, party: 2, pref: '', posting: false };
+        var LUX_RST_MEALS = { breakfast: ['Breakfast', 'fas fa-mug-hot'], lunch: ['Lunch', 'fas fa-sun'], dinner: ['Dinner', 'fas fa-moon'] };
+        var LUX_RST_KEY = 'luxRstMine';
+
+        function luxRstOfferingNum(o) {
+            if (o.source_table && o.source_table !== 'hotel') return null;
+            var n = parseInt(o.original_id != null ? o.original_id : String(o.offering_id).replace(/^H/, ''), 10);
+            return n > 0 ? n : null;
+        }
+
+        function luxRstFetchConfig(id) {
+            return fetch('/api/restaurant-module/' + encodeURIComponent(id) + '/config')
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .catch(function() { return null; });
+        }
+
+        function luxRstMin(t) {
+            var p = String(t == null ? '' : t).split(':');
+            var h = parseInt(p[0], 10), m = parseInt(p[1], 10);
+            return (isNaN(h) || isNaN(m)) ? null : h * 60 + m;
+        }
+
+        function luxRstHM(mins) {
+            mins = ((mins % 1440) + 1440) % 1440;
+            var h = Math.floor(mins / 60), m = mins % 60;
+            return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+        }
+
+        function luxRstT(t) { return String(t == null ? '' : t).slice(0, 5); }
+
+        function luxRstMealName(m) {
+            var d = LUX_RST_MEALS[m];
+            if (d) return d[0];
+            return m ? String(m).charAt(0).toUpperCase() + String(m).slice(1) : 'Dining';
+        }
+
+        function luxRstMealIcon(m) { var d = LUX_RST_MEALS[m]; return d ? d[1] : 'fas fa-utensils'; }
+
+        function luxRstMealOrder(m) { var i = ['breakfast', 'lunch', 'dinner'].indexOf(m); return i < 0 ? 9 : i; }
+
+        function luxRstByStart(a, b) { return (luxRstMin(a.start_time) || 0) - (luxRstMin(b.start_time) || 0); }
+
+        function luxRstGuestsLabel(n) { return n + (Number(n) === 1 ? ' guest' : ' guests'); }
+
+        function luxRstSettings() { return (luxRst.cfg && luxRst.cfg.settings) || {}; }
+
+        function luxRstGrace() {
+            var g = parseInt(luxRstSettings().grace_minutes, 10);
+            return g >= 0 ? g : 15;
+        }
+
+        function luxRstMaxParty() {
+            var a = parseInt(luxRstSettings().max_party_size, 10);
+            if (!(a > 0)) a = 10;
+            var b = parseInt(luxRst.cfg && luxRst.cfg.max_table_capacity, 10);
+            if (isNaN(b)) return a;
+            return b > 0 ? Math.min(a, b) : 0;
+        }
+
+        function luxRstGuest() {
+            try {
+                var sess = JSON.parse(localStorage.getItem('guestPassSession') || 'null');
+                if (sess && sess.guest) return sess.guest;
+            } catch (e) {}
+            return {};
+        }
+
+        function luxRstDays() {
+            var n = parseInt(luxRstSettings().booking_window_days, 10);
+            if (!(n >= 0)) n = 3;
+            n = Math.min(n, 30);
+            var start = luxBeachCairoToday(), out = [];
+            for (var i = 0; i <= n; i++) out.push(luxBeachAddDays(start, i));
+            return out;
+        }
+
+        async function luxRstMount(o, title, cfgP, seq) {
+            try {
+                var cfg = await cfgP;
+                if (!cfg || !cfg.success || !cfg.enabled || seq !== luxRst.seq) return;
+                var host = document.getElementById('luxRstHost');
+                if (!host) return;
+                luxRst.o = o;
+                luxRst.oid = String(luxRstOfferingNum(o));
+                luxRst.title = String(title || o.title_en || '');
+                luxRst.cfg = cfg;
+                luxRst.posting = false;
+                luxRst.slot = null;
+                luxRst.meal = null;
+                luxRst.pref = '';
+                luxRst.avail = null;
+                var maxP = luxRstMaxParty();
+                if (Number(luxRstSettings().guest_booking_enabled) !== 1 || maxP < 1) {
+                    host.innerHTML = '<div id="luxRstMine"></div>' + luxRstHoursHtml('');
+                    luxRstWire(host);
+                    luxRstRenderMine();
+                    luxRstVerifyMine();
+                    return;
+                }
+                luxRst.party = Math.max(1, Math.min(2, maxP));
+                luxRst.days = luxRstDays();
+                luxRst.date = luxRst.days[0];
+                host.innerHTML = luxRstShellHtml();
+                var g = luxRstGuest();
+                var nameEl = document.getElementById('luxRstName'), roomEl = document.getElementById('luxRstRoom');
+                if (nameEl && g.full_name) nameEl.value = g.full_name;
+                if (roomEl && g.room_number) roomEl.value = g.room_number;
+                luxRstWire(host);
+                luxRstRenderMine();
+                luxRstVerifyMine();
+                luxRstRenderDays();
+                luxRstRenderParty();
+                luxRstRenderMeals();
+                luxRstRenderSlots('loading');
+                luxRstRenderPrefs();
+                luxRstRenderSubmit();
+                await luxRstLoadAvail(true);
+            } catch (e) {
+                console.error('restaurant booking', e);
+            }
+        }
+
+        // Meal times only: shown while guest booking is switched off (or paused by the server)
+        function luxRstHoursHtml(msg) {
+            var by = {}, meals = [];
+            ((luxRst.cfg && luxRst.cfg.slots) || []).forEach(function(s) {
+                if (Number(s.is_active) === 0 || luxRstMin(s.start_time) == null) return;
+                var m = s.meal || 'other';
+                if (!by[m]) { by[m] = []; meals.push(m); }
+                by[m].push(s);
+            });
+            meals.sort(function(a, b) { return luxRstMealOrder(a) - luxRstMealOrder(b); });
+            var rows = '';
+            meals.forEach(function(m) {
+                var list = by[m].slice().sort(luxRstByStart);
+                var end = null;
+                list.forEach(function(s) { var e = luxRstMin(s.end_time); if (e != null && (end == null || e > end)) end = e; });
+                var starts = list.map(function(s) { return luxRstT(s.start_time); }).join(', ');
+                rows += '<div class="lux-rst-hrow">' +
+                    '<span class="ic"><i class="' + luxRstMealIcon(m) + '"></i></span>' +
+                    '<div><div class="mn">' + luxEsc(luxRstMealName(m)) + '</div>' +
+                    '<div class="ms">' + (list.length > 1 ? list.length + ' seatings · ' : 'Seating · ') + luxEsc(starts) + '</div></div>' +
+                    '<div class="tm">' + luxEsc(luxRstT(list[0].start_time)) + (end != null ? ' – ' + luxRstHM(end) : '') + '</div>' +
+                '</div>';
+            });
+            return '<h3>Dining Hours</h3>' +
+                (rows ? '<div class="lux-rst-hours">' + rows + '</div>' : '') +
+                '<div class="lux-beach-override"><i class="fas fa-concierge-bell"></i>' + luxEsc(msg || 'Booking opens soon — ask the front desk') + '</div>';
+        }
+
+        function luxRstShellHtml() {
+            return '' +
+            '<div id="luxRstMine"></div>' +
+            '<h3>Reserve a Table</h3>' +
+            '<p class="lux-rst-lead">Choose a day, a meal and your seating time. We will hold the right table for your party.</p>' +
+            '<div class="lux-day-strip" id="luxRstDays"></div>' +
+            '<div class="lux-rst-meals" id="luxRstMeals" hidden></div>' +
+            '<div class="lux-rst-slots" id="luxRstSlots"></div>' +
+            '<form id="luxRstForm" class="lux-form" novalidate>' +
+                '<label>Guests</label>' +
+                '<div class="lux-bch-step">' +
+                    '<button type="button" class="lux-bch-stepbtn" data-rst-step="-1" aria-label="Fewer guests">−</button>' +
+                    '<span class="lux-bch-stepval" id="luxRstParty"></span>' +
+                    '<button type="button" class="lux-bch-stepbtn" data-rst-step="1" aria-label="More guests">+</button>' +
+                '</div>' +
+                '<p class="lux-rst-hint" id="luxRstPartyHint" hidden></p>' +
+                '<div id="luxRstPrefWrap" hidden><label>Seating preference</label><div class="lux-rst-prefs" id="luxRstPrefs"></div></div>' +
+                '<label for="luxRstName">Your Name</label><input type="text" id="luxRstName" autocomplete="name" maxlength="80">' +
+                '<label for="luxRstRoom">Room Number</label><input type="text" id="luxRstRoom" autocomplete="off" maxlength="12">' +
+                '<label for="luxRstNotes">Special Requests (optional)</label><textarea id="luxRstNotes" rows="2" maxlength="300" placeholder="High chair, celebration, allergies..."></textarea>' +
+                '<div class="lux-beach-msg" id="luxRstMsg" role="alert" hidden></div>' +
+                '<button type="submit" class="lux-cta" id="luxRstSubmit" disabled>Choose a seating time above</button>' +
+                '<p class="lux-rst-fine" id="luxRstFine"></p>' +
+            '</form>';
+        }
+
+        function luxRstWire(host) {
+            host.addEventListener('click', function(e) {
+                var t = e.target.closest('[data-rst-date],[data-rst-meal],[data-rst-slot],[data-rst-step],[data-rst-pref],[data-rst-retry],[data-rst-view]');
+                if (!t || !host.contains(t) || t.disabled) return;
+                try {
+                    if (t.hasAttribute('data-rst-view')) { luxRstShowMine(t.getAttribute('data-rst-view')); return; }
+                    if (luxRst.posting) return;
+                    if (t.hasAttribute('data-rst-date')) {
+                        luxRstSetDate(t.getAttribute('data-rst-date'));
+                    } else if (t.hasAttribute('data-rst-meal')) {
+                        luxRst.meal = t.getAttribute('data-rst-meal');
+                        var cur = luxRstSelSlot();
+                        if (cur && (cur.meal || 'other') !== luxRst.meal) luxRst.slot = null;
+                        luxRstMsg('');
+                        luxRstRenderMeals();
+                        luxRstRenderSlots();
+                        luxRstRenderPrefs();
+                        luxRstRenderSubmit();
+                    } else if (t.hasAttribute('data-rst-slot')) {
+                        luxRst.slot = t.getAttribute('data-rst-slot');
+                        luxRstMsg('');
+                        luxRstRenderSlots();
+                        luxRstRenderPrefs();
+                        luxRstRenderSubmit();
+                    } else if (t.hasAttribute('data-rst-step')) {
+                        var max = luxRstMaxParty();
+                        luxRst.party = Math.max(1, Math.min(luxRst.party + parseInt(t.getAttribute('data-rst-step'), 10), max));
+                        var sel = luxRstSelSlot();
+                        if (sel && luxRstSlotState(sel) !== 'open') luxRst.slot = null;
+                        luxRstRenderParty();
+                        luxRstRenderMeals();
+                        luxRstRenderSlots();
+                        luxRstRenderPrefs();
+                        luxRstRenderSubmit();
+                    } else if (t.hasAttribute('data-rst-pref')) {
+                        luxRst.pref = t.getAttribute('data-rst-pref');
+                        luxRstRenderPrefs();
+                    } else if (t.hasAttribute('data-rst-retry')) {
+                        luxRstRenderSlots('loading');
+                        luxRstLoadAvail(false);
+                    }
+                } catch (err) {
+                    console.error('restaurant booking', err);
+                }
+            });
+            var form = document.getElementById('luxRstForm');
+            if (form) form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                luxRstSubmit();
+            });
+        }
+
+        function luxRstSelSlot() {
+            var found = null;
+            if (luxRst.slot != null) (luxRst.avail || []).forEach(function(s) { if (String(s.slot_id) === String(luxRst.slot)) found = s; });
+            return found;
+        }
+
+        function luxRstSlotStarted(s) {
+            if (s.started === true || s.started === 1) return true;
+            if (luxRst.date !== luxBeachCairoToday()) return false;
+            var now = luxRstMin(luxBeachCairoNow()), st = luxRstMin(s.start_time);
+            return now != null && st != null && st <= now;
+        }
+
+        // 'open' | 'started' | 'full' | 'nofit' (no free table big enough for the party)
+        function luxRstSlotState(s) {
+            if (luxRstSlotStarted(s)) return 'started';
+            if (parseInt(s.free_tables, 10) === 0 || parseInt(s.free_chairs, 10) === 0) return 'full';
+            var fit = parseInt(s.max_party_fit, 10);
+            if (!isNaN(fit) && fit < luxRst.party) return fit > 0 ? 'nofit' : 'full';
+            return 'open';
+        }
+
+        function luxRstMeals() {
+            var seen = {}, out = [];
+            (luxRst.avail || []).forEach(function(s) {
+                var m = s.meal || 'other';
+                if (!seen[m]) { seen[m] = 1; out.push(m); }
+            });
+            return out.sort(function(a, b) { return luxRstMealOrder(a) - luxRstMealOrder(b); });
+        }
+
+        function luxRstMealSlots(m) {
+            return (luxRst.avail || []).filter(function(s) { return (s.meal || 'other') === m; }).sort(luxRstByStart);
+        }
+
+        function luxRstMealOpen(m) {
+            return luxRstMealSlots(m).some(function(s) { return luxRstSlotState(s) === 'open'; });
+        }
+
+        function luxRstPickMeal() {
+            var meals = luxRstMeals();
+            if (luxRst.meal && meals.indexOf(luxRst.meal) >= 0) return;
+            luxRst.meal = null;
+            meals.some(function(m) { if (luxRstMealOpen(m)) { luxRst.meal = m; return true; } return false; });
+            if (!luxRst.meal) luxRst.meal = meals[0] || null;
+        }
+
+        async function luxRstSetDate(ds) {
+            if (!ds || ds === luxRst.date) return;
+            luxRst.date = ds;
+            luxRst.slot = null;
+            luxRstMsg('');
+            luxRstRenderDays();
+            luxRstRenderSubmit();
+            await luxRstLoadAvail(false);
+        }
+
+        // Availability for the selected day; false when stale (another day or sheet meanwhile) or failed
+        async function luxRstLoadAvail(initial) {
+            var seq = luxRst.seq, date = luxRst.date, oid = luxRst.oid;
+            var box = document.getElementById('luxRstSlots');
+            if (box) box.classList.add('loading');
+            var d = null;
+            try {
+                var r = await fetch('/api/restaurant-module/' + encodeURIComponent(oid) + '/availability?date=' + encodeURIComponent(date));
+                d = await r.json();
+            } catch (e) {}
+            if (seq !== luxRst.seq || date !== luxRst.date) return false;
+            box = document.getElementById('luxRstSlots');
+            if (box) box.classList.remove('loading');
+            if (!d || !d.success || !Array.isArray(d.slots)) {
+                luxRst.avail = null;
+                luxRst.slot = null;
+                luxRstRenderMeals();
+                luxRstRenderSlots('error');
+                luxRstRenderPrefs();
+                luxRstRenderSubmit();
+                return false;
+            }
+            luxRst.avail = d.slots;
+            if (initial && luxRst.days.length > 1 && date === luxRst.days[0] &&
+                !d.slots.some(function(s) { return luxRstSlotState(s) === 'open'; })) {
+                // Nothing left to book today: start the guest on tomorrow
+                luxRst.date = luxRst.days[1];
+                luxRstRenderDays();
+                return luxRstLoadAvail(false);
+            }
+            var cur = luxRstSelSlot();
+            if (!cur || luxRstSlotState(cur) !== 'open') luxRst.slot = null;
+            luxRstPickMeal();
+            luxRstRenderMeals();
+            luxRstRenderSlots();
+            luxRstRenderPrefs();
+            luxRstRenderSubmit();
+            return true;
+        }
+
+        function luxRstRenderDays() {
+            var el = document.getElementById('luxRstDays');
+            if (!el) return;
+            var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            var today = luxBeachCairoToday(), html = '';
+            luxRst.days.forEach(function(ds) {
+                var d = luxBeachUtcDate(ds);
+                html += '<button type="button" class="lux-day-chip' + (ds === luxRst.date ? ' on' : '') + '" data-rst-date="' + luxEsc(ds) + '">' +
+                    '<span class="dw">' + (ds === today ? 'Today' : names[d.getUTCDay()]) + '</span>' +
+                    '<span class="dn">' + d.getUTCDate() + '</span>' +
+                '</button>';
+            });
+            el.innerHTML = html;
+        }
+
+        function luxRstRenderMeals() {
+            var el = document.getElementById('luxRstMeals');
+            if (!el) return;
+            var meals = luxRstMeals();
+            el.hidden = !meals.length;
+            el.innerHTML = meals.map(function(m) {
+                return '<button type="button" class="lux-rst-meal' + (m === luxRst.meal ? ' on' : '') + (luxRstMealOpen(m) ? '' : ' dim') + '" data-rst-meal="' + luxEsc(m) + '">' +
+                    '<i class="' + luxRstMealIcon(m) + '"></i>' + luxEsc(luxRstMealName(m)) + '</button>';
+            }).join('');
+        }
+
+        function luxRstRenderSlots(mode) {
+            var el = document.getElementById('luxRstSlots');
+            if (!el) return;
+            if (mode === 'loading') {
+                el.innerHTML = '<div class="lux-rst-empty"><i class="fas fa-circle-notch fa-spin"></i>Checking availability...</div>';
+                return;
+            }
+            if (mode === 'error' || !luxRst.avail) {
+                el.innerHTML = '<div class="lux-rst-empty">Availability could not be loaded. <button type="button" class="lux-rst-retry" data-rst-retry="1">Try again</button></div>';
+                return;
+            }
+            var list = luxRst.meal ? luxRstMealSlots(luxRst.meal) : [];
+            if (!list.length) {
+                el.innerHTML = '<div class="lux-rst-empty">No seatings on this day. Please choose another date.</div>';
+                return;
+            }
+            el.innerHTML = list.map(function(s) {
+                var st = luxRstSlotState(s), fc = parseInt(s.free_chairs, 10), txt, low = false;
+                if (st === 'started') txt = 'Started';
+                else if (st === 'full') txt = 'Full';
+                else if (st === 'nofit') txt = 'No table for ' + luxRst.party;
+                else if (isNaN(fc)) txt = 'Available';
+                else { low = fc <= 8; txt = (low ? 'Only ' : '') + fc + (fc === 1 ? ' seat left' : ' seats left'); }
+                var range = luxRstT(s.start_time) + '–' + luxRstT(s.end_time);
+                var on = String(s.slot_id) === String(luxRst.slot);
+                return '<button type="button" class="lux-rst-slot' + (on ? ' on' : '') + '" data-rst-slot="' + luxEsc(s.slot_id) + '"' +
+                    ' aria-pressed="' + (on ? 'true' : 'false') + '" aria-label="' + luxEsc(range + ' · ' + txt) + '"' + (st === 'open' ? '' : ' disabled') + '>' +
+                    '<span class="tm">' + luxEsc(range) + '</span>' +
+                    '<span class="av' + (low ? ' low' : '') + '">' + luxEsc(txt) + '</span>' +
+                '</button>';
+            }).join('');
+        }
+
+        function luxRstRenderParty() {
+            var max = luxRstMaxParty(), n = luxRst.party;
+            var v = document.getElementById('luxRstParty');
+            if (v) v.textContent = luxRstGuestsLabel(n);
+            document.querySelectorAll('#luxRstForm [data-rst-step]').forEach(function(b) {
+                b.disabled = parseInt(b.getAttribute('data-rst-step'), 10) < 0 ? n <= 1 : n >= max;
+            });
+            var h = document.getElementById('luxRstPartyHint');
+            if (h) {
+                h.hidden = n < max;
+                h.textContent = 'Online bookings are for up to ' + max + ' guests per table. For a larger group, please ask the front desk.';
+            }
+        }
+
+        function luxRstZoneCount(z) {
+            var keys = ['tables', 'table_count', 'tables_count', 'seats', 'seat_count', 'seats_count'];
+            for (var i = 0; i < keys.length; i++) {
+                if (z[keys[i]] != null && !isNaN(parseInt(z[keys[i]], 10))) return parseInt(z[keys[i]], 10);
+            }
+            return null;
+        }
+
+        // No preference / Indoor / Outdoor (when both exist), plus zone names when a type has several zones
+        function luxRstPrefOptions() {
+            var zones = ((luxRst.cfg && luxRst.cfg.zones) || []).filter(function(z) {
+                if (Number(z.is_active) === 0 || Number(z.guest_bookable) === 0 || !z.code) return false;
+                var n = luxRstZoneCount(z);
+                return n == null || n > 0;
+            });
+            var code = function(z) { return String(z.code); };
+            var indoor = zones.filter(function(z) { return Number(z.is_outdoor) !== 1; });
+            var outdoor = zones.filter(function(z) { return Number(z.is_outdoor) === 1; });
+            var opts = [{ v: '', label: 'No preference', codes: null }];
+            if (indoor.length && outdoor.length) {
+                opts.push({ v: 'indoor', label: 'Indoor', codes: indoor.map(code) });
+                opts.push({ v: 'outdoor', label: 'Outdoor', codes: outdoor.map(code) });
+            }
+            [indoor, outdoor].forEach(function(group) {
+                if (group.length > 1) group.forEach(function(z) { opts.push({ v: code(z), label: z.name || ('Zone ' + z.code), codes: [code(z)] }); });
+            });
+            return opts;
+        }
+
+        function luxRstRenderPrefs() {
+            var wrap = document.getElementById('luxRstPrefWrap'), el = document.getElementById('luxRstPrefs');
+            if (!wrap || !el) return;
+            var opts = luxRstPrefOptions();
+            wrap.hidden = opts.length < 2;
+            if (opts.length < 2) { luxRst.pref = ''; el.innerHTML = ''; return; }
+            var s = luxRstSelSlot(), bz = (s && s.by_zone) || null;
+            opts.forEach(function(op) {
+                op.full = false;
+                if (!bz || !op.codes) return;
+                var known = 0, free = 0;
+                op.codes.forEach(function(cd) {
+                    var z = bz[cd];
+                    if (z) { known++; free += parseInt(z.free_tables, 10) || 0; }
+                });
+                op.full = known === op.codes.length && free === 0;
+            });
+            if (!opts.some(function(op) { return op.v === luxRst.pref && !op.full; })) luxRst.pref = '';
+            el.innerHTML = opts.map(function(op) {
+                return '<button type="button" class="lux-rst-pref' + (op.v === luxRst.pref ? ' on' : '') + '" data-rst-pref="' + luxEsc(op.v) + '"' + (op.full ? ' disabled' : '') + '>' +
+                    luxEsc(op.label) + (op.full ? '<small>Full</small>' : '') + '</button>';
+            }).join('');
+        }
+
+        function luxRstRenderSubmit() {
+            var b = document.getElementById('luxRstSubmit');
+            if (b) {
+                var s = luxRstSelSlot();
+                var ready = !!s && luxRstSlotState(s) === 'open';
+                b.disabled = !ready || luxRst.posting;
+                if (luxRst.posting) b.textContent = 'Reserving...';
+                else if (ready) b.innerHTML = '<i class="fas fa-utensils mr-2"></i>Reserve ' + luxEsc(luxRstT(s.start_time)) + ' · ' + luxEsc(luxRstGuestsLabel(luxRst.party));
+                else b.textContent = 'Choose a seating time above';
+            }
+            var f = document.getElementById('luxRstFine');
+            if (f) {
+                f.textContent = Number(luxRstSettings().auto_release) === 0
+                    ? 'Please arrive at the start of your seating time.'
+                    : 'Your table is held until ' + luxRstGrace() + ' minutes after your seating starts.';
+            }
+        }
+
+        function luxRstMsg(msg) {
+            var el = document.getElementById('luxRstMsg');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.hidden = !msg;
+            if (msg) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        async function luxRstSubmit() {
+            if (luxRst.posting) return;
+            var s = luxRstSelSlot();
+            if (!s || luxRstSlotState(s) !== 'open') { luxRstMsg('Please choose a seating time.'); return; }
+            var nameEl = document.getElementById('luxRstName'), roomEl = document.getElementById('luxRstRoom'), notesEl = document.getElementById('luxRstNotes');
+            var name = ((nameEl && nameEl.value) || '').trim();
+            var room = ((roomEl && roomEl.value) || '').trim();
+            if (!name || !room) { luxRstMsg('Please enter your name and room number.'); return; }
+            var req = {
+                slot_id: s.slot_id,
+                booking_date: luxRst.date,
+                party_size: luxRst.party,
+                guest_name: name,
+                room_number: room,
+                special_requests: ((notesEl && notesEl.value) || '').trim(),
+                source: 'guest'
+            };
+            if (luxRst.pref) req.zone_pref = luxRst.pref;
+            var g = luxRstGuest();
+            if (g.phone) req.guest_phone = String(g.phone);
+            var seq = luxRst.seq, ctx = { slot: s, date: luxRst.date, party: luxRst.party, room: room };
+            luxRst.posting = true;
+            luxRstMsg('');
+            luxRstRenderSubmit();
+            var status = 0, data = null;
+            try {
+                var resp = await fetch('/api/restaurant-module/' + encodeURIComponent(luxRst.oid) + '/bookings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(req)
+                });
+                status = resp.status;
+                data = await resp.json().catch(function() { return null; });
+            } catch (err) {
+                console.error('restaurant booking', err);
+            }
+            luxRst.posting = false;
+            if (data && data.success && data.booking) {
+                // Saved even if the guest moved on meanwhile, so the next visit still shows it
+                var rec = luxRstRecord(data.booking, ctx);
+                luxRstSaveMine(rec);
+                if (seq === luxRst.seq) luxRstRenderTicket(rec, true);
+                return;
+            }
+            if (seq !== luxRst.seq) return;
+            await luxRstFailed(status, data || {});
+        }
+
+        async function luxRstFailed(status, data) {
+            var msg = typeof data.message === 'string' ? data.message : '';
+            var err = typeof data.error === 'string' ? data.error : '';
+            var human = msg || (err.indexOf(' ') > 0 ? err : '');
+            if (status === 403) {
+                var host = document.getElementById('luxRstHost');
+                if (host) {
+                    host.innerHTML = '<div id="luxRstMine"></div>' + luxRstHoursHtml('Online table booking is paused right now — please ask the front desk.');
+                    luxRstRenderMine();
+                }
+                return;
+            }
+            if (status === 409 || err === 'full') {
+                luxRst.slot = null;
+                luxRstRenderSubmit();
+                await luxRstLoadAvail(false);
+                luxRstMsg(human || 'Sorry, that seating has just filled up. Please choose another time.');
+                return;
+            }
+            luxRstRenderSubmit();
+            if (status === 400) {
+                // e.g. the seating started while the form was open: refresh the chips too
+                await luxRstLoadAvail(false);
+                luxRstMsg(human || 'Please check your booking details and try again.');
+                return;
+            }
+            luxRstMsg(status ? (human || 'Booking failed. Please try again.') : 'Connection problem. Please check your internet and try again.');
+        }
+
+        function luxRstRecord(b, ctx) {
+            return {
+                ref: String(b.booking_reference || ''),
+                code: String(b.booking_code || ''),
+                oid: luxRst.oid,
+                key: luxRst.o ? String(luxRst.o.offering_id) : '',
+                title: luxRst.title,
+                date: String(b.booking_date || ctx.date),
+                start: luxRstT(b.start_time || ctx.slot.start_time),
+                end: luxRstT(b.end_time || ctx.slot.end_time),
+                meal: String(b.meal || ctx.slot.meal || ''),
+                table: b.table_number != null ? String(b.table_number) : '',
+                zone: String(b.zone_name || ''),
+                party: parseInt(b.party_size, 10) || ctx.party,
+                room: String(b.room_number || ctx.room),
+                grace: luxRstGrace()
+            };
+        }
+
+        // This guest's upcoming tables, kept on the device so the code and Cancel survive closing the sheet
+        function luxRstLoadMine() {
+            var list = [];
+            try { list = JSON.parse(localStorage.getItem(LUX_RST_KEY) || '[]'); } catch (e) {}
+            if (!Array.isArray(list)) return [];
+            var today = luxBeachCairoToday(), now = luxRstMin(luxBeachCairoNow());
+            return list.filter(function(r) {
+                if (!r || !r.ref || !r.date) return false;
+                if (r.date !== today) return r.date > today;
+                var e = luxRstMin(r.end);
+                return e == null || now == null || e > now;
+            });
+        }
+
+        function luxRstStoreMine(list) {
+            try { localStorage.setItem(LUX_RST_KEY, JSON.stringify(list.slice(-8))); } catch (e) {}
+        }
+
+        function luxRstSaveMine(rec) {
+            if (!rec.ref) return;
+            var list = luxRstLoadMine().filter(function(r) { return r.ref !== rec.ref; });
+            list.push(rec);
+            luxRstStoreMine(list);
+        }
+
+        function luxRstDropMine(ref) {
+            luxRstStoreMine(luxRstLoadMine().filter(function(r) { return r.ref !== ref; }));
+        }
+
+        function luxRstMineHere() {
+            return luxRstLoadMine()
+                .filter(function(r) { return String(r.oid) === String(luxRst.oid); })
+                .sort(function(a, b) { return (a.date + ' ' + a.start) < (b.date + ' ' + b.start) ? -1 : 1; });
+        }
+
+        function luxRstRenderMine() {
+            var el = document.getElementById('luxRstMine');
+            if (!el) return;
+            var mine = luxRstMineHere();
+            if (!mine.length) { el.innerHTML = ''; return; }
+            el.innerHTML = '<h3>Your Reservations</h3><div class="lux-rst-mine">' + mine.map(function(r) {
+                var where = [r.table ? 'Table ' + r.table : '', r.zone, luxRstGuestsLabel(r.party)].filter(Boolean).join(' · ');
+                return '<button type="button" class="lux-rst-mrow" data-rst-view="' + luxEsc(r.ref) + '">' +
+                    '<span class="cd">' + luxEsc(r.code || r.ref) + '</span>' +
+                    '<span class="tx"><strong>' + luxEsc(luxBeachDayLabel(r.date) + ' · ' + r.start) + '</strong>' + luxEsc(where) + '</span>' +
+                    '<i class="fas fa-chevron-right"></i>' +
+                '</button>';
+            }).join('') + '</div>';
+        }
+
+        // Drop saved bookings that staff cancelled, released or completed meanwhile
+        function luxRstVerifyMine() {
+            var mine = luxRstMineHere().slice(0, 4);
+            if (!mine.length) return;
+            Promise.all(mine.map(function(r) {
+                return fetch('/api/restaurant-module/booking/' + encodeURIComponent(r.ref))
+                    .then(function(x) { return x.ok ? x.json() : null; })
+                    .then(function(d) {
+                        var b = d && (d.booking || d);
+                        var st = b && b.status;
+                        return (st === 'cancelled' || st === 'no_show' || st === 'completed') ? r.ref : null;
+                    })
+                    .catch(function() { return null; });
+            })).then(function(gone) {
+                gone = gone.filter(Boolean);
+                if (!gone.length) return;
+                luxRstStoreMine(luxRstLoadMine().filter(function(r) { return gone.indexOf(r.ref) < 0; }));
+                luxRstRenderMine();
+            });
+        }
+
+        function luxRstShowMine(ref) {
+            var rec = null;
+            luxRstLoadMine().forEach(function(r) { if (r.ref === ref) rec = r; });
+            if (rec) luxRstRenderTicket(rec, false);
+            else luxRstRenderMine();
+        }
+
+        function luxRstRenderTicket(r, fresh) {
+            var body = document.getElementById('luxSheetBody');
+            if (!body) return;
+            var sm = luxRstMin(r.start), gr = parseInt(r.grace, 10);
+            var arrive = sm == null ? '' : luxRstHM(sm + (gr >= 0 ? gr : 15));
+            body.innerHTML = '' +
+            '<div class="lux-sheet-ok">' +
+                '<div class="ic"><i class="fas fa-utensils"></i></div>' +
+                '<h2 class="lux-rst-okh">' + (fresh ? 'Your table is reserved' : 'Your reservation') + '</h2>' +
+                (r.title ? '<p class="lux-sheet-desc">' + luxEsc(r.title) + '</p>' : '') +
+                '<div class="lux-rst-ticket">' +
+                    '<div class="lb">Booking code</div>' +
+                    '<div class="code">' + luxEsc(r.code || r.ref) + '</div>' +
+                    '<div class="grid">' +
+                        '<div><span>Table</span><strong>' + luxEsc(r.table || 'On arrival') + '</strong>' + (r.zone ? '<em>' + luxEsc(r.zone) + '</em>' : '') + '</div>' +
+                        '<div><span>Guests</span><strong>' + luxEsc(r.party) + '</strong>' + (r.room ? '<em>Room ' + luxEsc(r.room) + '</em>' : '') + '</div>' +
+                        '<div><span>Date</span><strong>' + luxEsc(luxBeachDayLabel(r.date)) + '</strong>' + (r.meal ? '<em>' + luxEsc(luxRstMealName(r.meal)) + '</em>' : '') + '</div>' +
+                        '<div><span>Seating</span><strong>' + luxEsc(r.start + (r.end ? '–' + r.end : '')) + '</strong></div>' +
+                    '</div>' +
+                    (r.code && r.ref ? '<div class="ref">' + luxEsc(r.ref) + '</div>' : '') +
+                '</div>' +
+                (arrive ? '<div class="lux-rst-arrive"><i class="fas fa-clock"></i>Please arrive by <strong>' + luxEsc(arrive) + '</strong>; after that your table may be released.</div>' : '') +
+                '<p class="lux-sheet-desc lux-rst-show">Show this code at the restaurant entrance, or simply give your room number.</p>' +
+                '<div class="lux-beach-msg" id="luxRstTicketMsg" role="alert" hidden></div>' +
+                '<button type="button" class="lux-cta" style="max-width: 280px; margin: 1.3rem auto 0; display: block;" onclick="luxCloseSheet()">Done</button>' +
+                '<div class="lux-rst-links">' +
+                    (r.key ? '<button type="button" class="lux-rst-link" id="luxRstAgainBtn">Reserve another table</button>' : '') +
+                    '<button type="button" class="lux-rst-link danger" id="luxRstCancelBtn">Cancel booking</button>' +
+                '</div>' +
+            '</div>';
+            body.scrollTop = 0;
+            var cb = document.getElementById('luxRstCancelBtn');
+            if (cb) cb.addEventListener('click', function() { luxRstCancel(r); });
+            var ab = document.getElementById('luxRstAgainBtn');
+            if (ab) ab.addEventListener('click', function() { window.luxOpenOffering(r.key); });
+        }
+
+        async function luxRstCancel(r) {
+            if (!r || !r.ref) return;
+            if (!confirm('Cancel your table for ' + luxBeachDayLabel(r.date) + ' at ' + r.start + '?')) return;
+            var btn = document.getElementById('luxRstCancelBtn');
+            var box = document.getElementById('luxRstTicketMsg');
+            if (btn) { btn.disabled = true; btn.textContent = 'Cancelling...'; }
+            if (box) box.hidden = true;
+            var status = 0, data = null;
+            try {
+                var resp = await fetch('/api/restaurant-module/booking/' + encodeURIComponent(r.ref) + '/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ room_number: r.room, source: 'guest' })
+                });
+                status = resp.status;
+                data = await resp.json().catch(function() { return null; });
+            } catch (e) {
+                console.error('restaurant cancel', e);
+            }
+            if (data && data.success) {
+                luxRstDropMine(r.ref);
+                var body = document.getElementById('luxSheetBody');
+                if (!body || !document.getElementById('luxRstCancelBtn')) return;
+                body.innerHTML = '' +
+                '<div class="lux-sheet-ok">' +
+                    '<div class="ic"><i class="fas fa-calendar-xmark"></i></div>' +
+                    '<h2 class="lux-rst-okh">Booking cancelled</h2>' +
+                    '<p class="lux-sheet-desc">Your table for ' + luxEsc(luxBeachDayLabel(r.date)) + ' at ' + luxEsc(r.start) + ' has been released. We hope to welcome you another time.</p>' +
+                    '<button type="button" class="lux-cta" style="max-width: 280px; margin: 1.6rem auto 0; display: block;" onclick="luxCloseSheet()">Done</button>' +
+                    (r.key ? '<div class="lux-rst-links"><button type="button" class="lux-rst-link" id="luxRstAgainBtn">Choose another time</button></div>' : '') +
+                '</div>';
+                body.scrollTop = 0;
+                var ab = document.getElementById('luxRstAgainBtn');
+                if (ab) ab.addEventListener('click', function() { window.luxOpenOffering(r.key); });
+                return;
+            }
+            var msg = data && typeof data.message === 'string' ? data.message : '';
+            var err = data && typeof data.error === 'string' ? data.error : '';
+            if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = 'Cancel booking'; }
+            if (box) {
+                box.textContent = status
+                    ? (msg || (err.indexOf(' ') > 0 ? err : '') || 'This booking could not be cancelled online. Please ask the front desk.')
+                    : 'Connection problem. Please check your internet and try again.';
+                box.hidden = false;
+            }
+        }
+
+        // /hotel/:slug?open=offering-H3 (the legacy restaurant booking URL redirects here)
+        function luxRstOpenFromUrl() {
+            var p = new URLSearchParams(window.location.search);
+            var v = p.get('open');
+            if (!v) return;
+            var m = /^offering-([A-Za-z]?[0-9]+)$/.exec(v);
+            if (m && allOfferings.some(function(x) { return String(x.offering_id) === m[1]; })) {
+                (window.viewOffering || window.luxOpenOffering)(m[1]);
+            }
+            p.delete('open');
+            var qs = p.toString();
+            try { history.replaceState(history.state, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash); } catch (e) {}
+        }
 
         function luxBookingFormHtml(o) {
             const isRestaurant = o.offering_type === 'restaurant';
@@ -77107,17 +77978,27 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
 app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
   const { DB } = c.env
   const { slug, offering_id } = c.req.param()
-  
+
+  // Restaurants with the table-booking module book inside the guest app's offering sheet
+  if (/^\d+$/.test(offering_id)) {
+    try {
+      const mod = await DB.prepare('SELECT offering_id FROM restaurant_settings WHERE offering_id = ?').bind(Number(offering_id)).first()
+      if (mod) return c.redirect('/hotel/' + encodeURIComponent(slug) + '?open=offering-H' + offering_id, 302)
+    } catch (e) {
+      console.error('restaurant module redirect', e)
+    }
+  }
+
   try {
     // Get property details
     const property = await DB.prepare(`
       SELECT * FROM properties WHERE slug = ?
     `).bind(slug).first()
-    
+
     if (!property) {
       return c.text('Property not found', 404)
     }
-    
+
     // Get restaurant details
     const restaurant = await DB.prepare(`
       SELECT * FROM hotel_offerings WHERE offering_id = ?
