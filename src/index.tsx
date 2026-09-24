@@ -25793,50 +25793,78 @@ window.luxTogglePassForm = function() {
           }
           .lux-flatspot.booked { filter: grayscale(1) brightness(0.6); cursor: not-allowed; opacity: 0.8; }
 
-          /* Seat-map highlight cells: outline the umbrella + beds, number tucked below */
+          /* Seat-map markers: a round number badge sitting on each set of loungers */
           .lux-seat {
             position: absolute;
-            border-radius: 10px;
-            border: 1.5px solid rgba(255, 255, 255, 0.55);
-            background: rgba(255, 255, 255, 0.07);
+            padding: 0;
+            margin: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(212, 175, 55, 0.95);
+            background: radial-gradient(circle at 35% 30%, #ffffff 0%, #faf3e3 70%, #f1e3c2 100%);
+            color: #2a1810;
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: center;
-            padding: 0 0 3px;
             cursor: pointer;
-            transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+            box-shadow: 0 3px 9px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(255, 255, 255, 0.22);
+            transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.25s ease;
+            -webkit-tap-highlight-color: transparent;
           }
-          .lux-seat:hover { background: rgba(255, 255, 255, 0.17); border-color: rgba(255, 255, 255, 0.85); }
+          .lux-seat::before { content: ''; position: absolute; inset: -9px; border-radius: 50%; }
+          .lux-seat:hover { transform: scale(1.12); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), 0 0 0 4px rgba(212, 175, 55, 0.35); z-index: 2; }
           .lux-seat .n {
-            background: rgba(250, 246, 236, 0.95);
-            color: #241318;
-            font-size: 0.56rem;
+            font-size: 0.64rem;
             font-weight: 800;
             line-height: 1;
-            padding: 0.16rem 0.36rem;
-            border-radius: 999px;
-            border: 1px solid rgba(138, 106, 56, 0.55);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+            letter-spacing: -0.02em;
             white-space: nowrap;
-            transform: translateY(50%);
+            pointer-events: none;
           }
-          .lux-seat.t-vip { border-color: rgba(232, 197, 106, 0.8); background: rgba(212, 175, 55, 0.12); }
-          .lux-seat.t-vip .n { border-color: rgba(212, 175, 55, 0.9); color: #6b4a12; }
-          .lux-seat.t-cabana { border-style: dashed; border-color: rgba(186, 230, 253, 0.85); background: rgba(125, 211, 252, 0.12); border-radius: 6px; }
-          .lux-seat.t-cabana .n { background: #eaf7fb; border-color: rgba(14, 116, 144, 0.55); color: #0c4a5a; }
+          .lux-seat .st {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: #2a1810;
+            color: #e9cd76;
+            font-size: 8px;
+            line-height: 13px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+          }
+          .lux-seat.t-vip { border-color: #e9cd76; background: radial-gradient(circle at 35% 30%, #fffaf0 0%, #f6e2a8 70%, #e7c56a 100%); }
+          .lux-seat.t-cabana { border-color: rgba(125, 211, 252, 0.95); background: radial-gradient(circle at 35% 30%, #ffffff 0%, #eaf7fb 75%, #cdeef9 100%); color: #0c4a5a; }
+          .lux-seat.t-cabana .n { font-size: 0.56rem; }
           .lux-seat.selected {
-            border-color: var(--lux-gold);
-            border-width: 2px;
-            background: rgba(212, 175, 55, 0.24);
-            box-shadow: 0 0 18px rgba(212, 175, 55, 0.8), inset 0 0 14px rgba(212, 175, 55, 0.25);
+            background: var(--lux-gold-grad);
+            border-color: #fff;
+            color: #231307;
+            transform: scale(1.22);
+            box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.4), 0 0 22px rgba(212, 175, 55, 0.95), 0 4px 10px rgba(0, 0, 0, 0.5);
+            z-index: 3;
           }
-          .lux-seat.selected .n { background: var(--lux-gold-grad); border-color: transparent; }
+          .lux-seat.selected::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid rgba(233, 205, 118, 0.9);
+            animation: luxSeatPulse 1.6s ease-out infinite;
+            pointer-events: none;
+          }
+          @keyframes luxSeatPulse { from { transform: scale(1); opacity: 0.9; } to { transform: scale(1.7); opacity: 0; } }
           .lux-seat.booked {
-            background: rgba(16, 9, 12, 0.45);
-            border-color: rgba(255, 255, 255, 0.12);
+            background: rgba(22, 13, 16, 0.72);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.55);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
             cursor: not-allowed;
           }
-          .lux-seat.booked .n { filter: grayscale(1) brightness(0.7); opacity: 0.75; }
+          .lux-seat.booked:hover { transform: none; }
+          .lux-seat.booked .n { text-decoration: line-through; text-decoration-thickness: 1.5px; }
           .lux-beach-selcard.t-vip { border-color: rgba(232, 197, 106, 0.75); background: rgba(212, 175, 55, 0.12); }
           .lux-beach-selcard.t-cabana { border-color: rgba(186, 230, 253, 0.6); background: rgba(125, 211, 252, 0.08); }
           .lux-bch-step {
@@ -30855,15 +30883,15 @@ window.luxTogglePassForm = function() {
                 placed.forEach(function(f) {
                     var s = f.s;
                     var mx = Number(s.map_x);
-                    var mw = s.map_w != null ? Number(s.map_w) : 4;
-                    var mh = s.map_h != null ? Number(s.map_h) : 11.8;
-                    var my = s.map_y != null ? Number(s.map_y) : 58.8;
+                    var mw = s.map_w != null ? Number(s.map_w) : 2.6;
+                    var mh = s.map_h != null ? Number(s.map_h) : 5.2;
+                    var my = s.map_y != null ? Number(s.map_y) : 65.7;
                     var tier = luxBeachTier(s);
                     var freeS = luxBeachSpotOpen(s);
                     var selS = luxBeach.spot && luxBeach.spot.spot_id === s.spot_id;
                     hero += '<button class="lux-seat' + (tier === 'vip' ? ' t-vip' : '') + (tier === 'cabana' ? ' t-cabana' : '') + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + '" data-idx="' + f.idx + '"' +
                         ' style="left:' + (mx - mw / 2).toFixed(2) + '%; width:' + mw.toFixed(2) + '%; top:' + my.toFixed(2) + '%; height:' + mh.toFixed(2) + '%;">' +
-                        '<span class="n">' + luxEsc(s.spot_number) + ((tier === 'vip' || s.is_premium) ? '★' : '') + '</span>' +
+                        '<span class="n">' + luxEsc(s.spot_number) + '</span>' + ((tier === 'vip' || s.is_premium) ? '<span class="st">★</span>' : '') +
                     '</button>';
                 });
                 hero += '</div>';
@@ -40635,21 +40663,23 @@ input:disabled{background:#f3f4f6;color:#6b7280}
 #photo{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;-webkit-user-drag:none}
 #cells{position:absolute;inset:0}
 .mapmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:#fff;background:rgba(15,23,42,.62);font-weight:600;padding:20px;text-align:center;z-index:5}
-.cell{position:absolute;border:2px solid;border-radius:7px;cursor:grab;touch-action:none;display:flex;align-items:flex-end;justify-content:center;transition:box-shadow .15s}
-.cell:hover{box-shadow:0 0 0 2px rgba(255,255,255,.75)}
-.cell .n{transform:translateY(58%);background:#fff;color:#111827;font-size:10px;font-weight:800;line-height:1;padding:3px 5px;border-radius:999px;border:1.5px solid #94a3b8;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.35);pointer-events:none;display:flex;align-items:center;gap:3px}
-.cell.t-first_line .n{border-color:#0ea5e9;color:#075985}
-.cell.t-vip .n{border-color:#f59e0b;color:#92400e}
-.cell.t-cabana .n{border-color:#8b5cf6;color:#5b21b6}
-.cell .n s{color:#9ca3af;font-weight:600}
+.cell{position:absolute;border-radius:50%;cursor:grab;touch-action:none;display:flex;align-items:center;justify-content:center;background:#fff;border:2.5px solid #0ea5e9;box-shadow:0 2px 7px rgba(0,0,0,.45),0 0 0 2px rgba(255,255,255,.55);transition:box-shadow .15s,transform .15s}
+.cell::before{content:"";position:absolute;inset:-7px;border-radius:50%}
+.cell:hover{transform:scale(1.1);z-index:2}
+.cell .n{color:#0c4a6e;font-size:10px;font-weight:800;line-height:1;letter-spacing:-.02em;white-space:nowrap;pointer-events:none;display:flex;align-items:center;gap:1px}
+.cell.t-first_line{border-color:#0ea5e9}
+.cell.t-standard{border-color:#64748b}.cell.t-standard .n{color:#334155}
+.cell.t-vip{border-color:#f59e0b;background:#fffbeb}.cell.t-vip .n{color:#92400e}
+.cell.t-cabana{border-color:#8b5cf6;background:#f5f3ff}.cell.t-cabana .n{color:#5b21b6;font-size:9px}
+.cell .n s{color:#9ca3af;font-weight:600;font-size:8px}
 .cell.nobook{border-style:dashed}
-.cell.maint{background-image:repeating-linear-gradient(45deg,rgba(220,38,38,.4) 0 5px,transparent 5px 10px)}
-.cell.maint .n i{color:#dc2626}
-.cell.sel{outline:3px solid #2563eb;outline-offset:1px;box-shadow:0 0 0 6px rgba(37,99,235,.35);z-index:2}
-.cell.moved::after{content:'';position:absolute;top:-5px;right:-5px;width:10px;height:10px;border-radius:50%;background:#f59e0b;border:1.5px solid #fff}
-.cell.dragging{cursor:grabbing;z-index:3;opacity:.92}
-.cell.pv .n{background:#fef3c7}
-.cell.ghost{border:2px dashed #fff!important;background:rgba(37,99,235,.45)!important;pointer-events:none;z-index:4}
+.cell.maint{background:repeating-linear-gradient(45deg,#fee2e2 0 4px,#fff 4px 8px)}
+.cell.maint .n i{color:#dc2626;font-size:8px}
+.cell.sel{box-shadow:0 0 0 3px #fff,0 0 0 6px #2563eb,0 4px 12px rgba(0,0,0,.45);z-index:3}
+.cell.moved::after{content:"";position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:#f59e0b;border:1.5px solid #fff}
+.cell.dragging{cursor:grabbing;z-index:4;opacity:.92;transform:scale(1.15)}
+.cell.pv{background:#fef3c7}
+.cell.ghost{border:2px dashed #fff!important;background:rgba(37,99,235,.55)!important;pointer-events:none;z-index:4}
 .hint{font-size:.8rem;color:#6b7280;margin:8px 2px 0}
 .banner{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:10px 12px;font-size:.86rem}
 .edhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
@@ -40844,7 +40874,8 @@ var UID = String(ADMIN.user_id || localStorage.getItem('user_id') || '');
 
 var TIER_KEYS = ['first_line', 'standard', 'vip', 'cabana'];
 var TIERS = { first_line: { label: 'First line' }, standard: { label: 'Standard' }, vip: { label: 'VIP ★' }, cabana: { label: 'Cabana' } };
-var SIZE = { sunbed: { w: 4.0, h: 11.8 }, cabana: { w: 6.5, h: 9 } };
+// Markers are circles: the photo is 2:1, so w% = h%/2 keeps them round
+var SIZE = { sunbed: { w: 2.6, h: 5.2 }, cabana: { w: 3.4, h: 6.8 } };
 var ZOOMS = [1, 1.5, 2, 3];
 var BULK = '/api/admin/beach/layout/bulk';
 var ZONE_TYPES = ['standard', 'premium', 'vip', 'family', 'quiet'];
@@ -41613,7 +41644,7 @@ async function addCabanas() {
   var names = todo.map(function (i) { return 'VC-' + i; });
   if (!confirm('Create cabana' + (todo.length > 1 ? 's ' : ' ') + names.join(', ') + ' by the white gazebos (top right of the photo)? They start as staff only: drag each box onto its gazebo, then tick "Guests can book it".')) return;
   S.busy = true;
-  var mk = function (i) { return api('POST', '/api/admin/beach/spots', newSpotBody('VC-' + i, 'cabana', null, null, false, { x: X[i - 1], y: 35.5, w: SIZE.cabana.w, h: SIZE.cabana.h })); };
+  var mk = function (i) { return api('POST', '/api/admin/beach/spots', newSpotBody('VC-' + i, 'cabana', null, null, false, { x: X[i - 1], y: 40 - SIZE.cabana.h / 2, w: SIZE.cabana.w, h: SIZE.cabana.h })); };
   var results = [];
   if (!S.zones.length) {
     // With no zones the server creates a default one; the rest must join it rather than race to create more
