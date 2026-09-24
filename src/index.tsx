@@ -40690,7 +40690,7 @@ input[type=range]{width:100%;accent-color:#2563eb;min-height:28px}
 .mapwrap{position:relative;overflow:auto;border-radius:12px;border:1px solid #d6d3d1;background:#fff;max-height:78vh;-webkit-overflow-scrolling:touch}
 .stage{position:relative;width:100%;min-width:640px;aspect-ratio:16/10;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;--ch:8px;--fs:12px;background-color:#f8fafc}
 .stage::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(15,23,42,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(15,23,42,.055) 1px,transparent 1px);background-size:5% 8%}
-.stage.f-tile{background-color:#f8fafc;background-image:linear-gradient(45deg,rgba(148,163,184,.09) 25%,transparent 25%,transparent 75%,rgba(148,163,184,.09) 75%),linear-gradient(45deg,rgba(148,163,184,.09) 25%,transparent 25%,transparent 75%,rgba(148,163,184,.09) 75%);background-size:10% 16%;background-position:0 0,5% 8%}
+.stage.f-tile{background-color:#f8fafc;background-image:repeating-conic-gradient(rgba(148,163,184,.07) 0 25%,transparent 0 50%);background-size:10% 16%}
 .stage.f-parquet{background-color:#f5e8d5;background-image:repeating-linear-gradient(90deg,rgba(146,98,52,.11) 0 1px,transparent 1px 3.125%),repeating-linear-gradient(0deg,rgba(146,98,52,.06) 0 1px,transparent 1px 10%)}
 .stage.f-grass{background-color:#ecfdf3;background-image:radial-gradient(rgba(22,163,74,.13) 1px,transparent 1.6px);background-size:14px 14px}
 .stage.adding{cursor:crosshair}
@@ -40748,7 +40748,7 @@ input[type=range]{width:100%;accent-color:#2563eb;min-height:28px}
 .bufw{display:flex;align-items:center;gap:6px}
 .bufw input{width:78px!important}
 .days{display:flex;gap:3px}
-.day{width:30px;height:30px;border-radius:50%;border:1.5px solid #d1d5db;background:#fff;font-weight:800;font-size:.72rem;color:#6b7280;cursor:pointer;font-family:inherit;flex:none}
+.day{width:31px;height:31px;border-radius:50%;border:1.5px solid #d1d5db;background:#fff;font-weight:800;font-size:.68rem;color:#6b7280;cursor:pointer;font-family:inherit;flex:none;padding:0}
 .day.on{background:#2563eb;border-color:#2563eb;color:#fff}
 .slt tr.off td{opacity:.55}
 .slt tr.draft td{background:#f0f9ff}
@@ -41957,7 +41957,7 @@ function daysText(mask) {
 function slotRow(v) {
   var id = v.id, draft = !!v.draft;
   var days = DAYS.map(function (d, i) {
-    return '<button type="button" class="day' + (((v.days_mask >> i) & 1) ? ' on' : '') + '" data-act="day" data-id="' + id + '" data-bit="' + i + '" title="' + d + '" aria-label="' + d + '">' + d.charAt(0) + '</button>';
+    return '<button type="button" class="day' + (((v.days_mask >> i) & 1) ? ' on' : '') + '" data-act="day" data-id="' + id + '" data-bit="' + i + '" title="' + d + '" aria-label="' + d + '">' + d.slice(0, 2) + '</button>';
   }).join('');
   return '<tr id="sr-' + id + '" class="' + (v.is_active ? '' : 'off') + (draft ? ' draft' : '') + '">' +
     '<td><input type="text" data-sid="' + id + '" data-k="label" maxlength="40" value="' + esc(v.label) + '" aria-label="Label"></td>' +
