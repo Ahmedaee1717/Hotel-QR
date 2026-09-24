@@ -91927,6 +91927,8 @@ const RST_DEFAULTS: any = {
 }
 // El Kasr: the Ops app may omit offering_id while it is the only module restaurant.
 const RST_DEFAULT_OFFERING = 3
+// An arrival up to this long before its own slot is seated now, holding the table until the slot ends
+const RST_EARLY_SEAT_MINUTES = 60
 
 function rstMinutes(hm: any): number {
   const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(hm == null ? '' : hm).trim())
@@ -92541,7 +92543,7 @@ function rstChoice(b: any, s: any, now: any) {
 // target table must be big enough and free of other holding bookings for its time.
 // slotTo: seat a booking from another slot of today NOW — it is moved into that slot
 // (slot_id/start/end/buffer re-snapshotted) so its table is held in the slot being served.
-async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo: number, slotTo?: any) {
+async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo: number, slotTo?: any, widenStart?: string) {
   const s = ctx.settings, now = ctx.now
   if (booking.status === 'checked_in' || booking.status === 'completed') {
     return { status: 200, body: { success: true, already: true, booking: rstBookingView(booking, s, now) } }
@@ -92550,9 +92552,10 @@ async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo
     return rstErr(409, 'not_checkable', 'This booking can no longer be checked in')
   }
   const reslot = !!slotTo && slotTo.slot_id !== booking.slot_id
+  // widenStart: an early arrival keeps its own slot but holds the table from now on
   const win = reslot
     ? { start_time: slotTo.start_time, end_time: slotTo.end_time, buffer_minutes: Number(slotTo.buffer_minutes) || 0 }
-    : { start_time: booking.start_time, end_time: booking.end_time, buffer_minutes: Number(booking.buffer_minutes) || 0 }
+    : { start_time: widenStart || booking.start_time, end_time: booking.end_time, buffer_minutes: Number(booking.buffer_minutes) || 0 }
   const party = Number(booking.party_size) || 1
   const targetId = moveTo || booking.table_id || 0
   const target = targetId ? ctx.tables.find((t: any) => t.table_id === targetId) : null
@@ -92614,7 +92617,7 @@ async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo
     ...(reslot ? {
       slot_id: slotTo.slot_id, start_time: win.start_time, end_time: win.end_time, buffer_minutes: win.buffer_minutes,
       meal: slotTo.meal || null, slot_label: slotTo.label || null
-    } : {})
+    } : (widenStart ? { start_time: win.start_time } : {}))
   }
   return {
     status: 200,
@@ -93802,19 +93805,37 @@ app.post('/api/staff/restaurant/arrive', async (c) => {
       }
       booking = pick[0]
     }
-    // Seating a booking of another slot of today now (late, or early outside its own grace
-    // window): move it into the slot being served so its table is held there.
+    // Arriving outside the booking's own slot:
+    //  - own slot running, or starts within the grace/10-min margin → keep its own window;
+    //  - own slot already over (late) → move it into the slot being served now;
+    //  - own slot starts within the next hour (early) → seat now, holding the table from now
+    //    until the own slot ends (keeps the reservation, blocks the table in between);
+    //  - own slot is further away → don't touch the reservation; offer a walk-in instead.
     let slotTo: any = null
+    let widenStart = ''
     if (date === now.date) {
-      const curId = rstCurrentSlotId(ctx.slots, date, now)
-      const cur = curId ? ctx.slots.find((x: any) => x.slot_id === curId) : null
-      if (cur && cur.slot_id !== booking.slot_id && now.min < rstMinutes(cur.end_time)) {
-        const bStart = rstMinutes(booking.start_time)
-        const earlyForOwn = !isNaN(bStart) && now.min < bStart && bStart - now.min <= Math.max(10, Number(ctx.settings.grace_minutes) || 0)
-        if (!earlyForOwn) slotTo = cur
+      const bStart = rstMinutes(booking.start_time), bEnd = rstMinutes(booking.end_time)
+      const margin = Math.max(10, Number(ctx.settings.grace_minutes) || 0)
+      if (!isNaN(bStart) && !isNaN(bEnd)) {
+        if (now.min >= bEnd) {
+          const curId = rstCurrentSlotId(ctx.slots, date, now)
+          const cur = curId ? ctx.slots.find((x: any) => x.slot_id === curId) : null
+          if (cur && cur.slot_id !== booking.slot_id && now.min < rstMinutes(cur.end_time)) slotTo = cur
+        } else if (now.min < bStart && bStart - now.min > margin) {
+          if (bStart - now.min <= RST_EARLY_SEAT_MINUTES) {
+            widenStart = String(Math.floor(now.min / 60)).padStart(2, '0') + ':' + String(now.min % 60).padStart(2, '0')
+          } else {
+            return c.json({
+              success: false, error: 'too_early', booking_reference: booking.booking_reference,
+              booking: rstChoice(booking, ctx.settings, now),
+              message: (booking.guest_name || 'This family') + ' is booked for ' + (booking.slot_label || booking.start_time) +
+                ' — too early to seat that booking. Use Walk-in to seat them now; their booking stays for later.'
+            }, 409)
+          }
+        }
       }
     }
-    const r = await rstCheckIn(DB, ctx, booking, staff, rstId(b.table_id), slotTo)
+    const r = await rstCheckIn(DB, ctx, booking, staff, rstId(b.table_id), slotTo, widenStart)
     return c.json(r.body, r.status as any)
   } catch (e) {
     console.error('restaurant arrive', e)
@@ -93906,7 +93927,9 @@ app.post('/api/staff/restaurant/undo', async (c) => {
     const res = await DB.batch([
       DB.prepare(`
         UPDATE restaurant_bookings
-        SET status = 'confirmed', checked_in_at = NULL, checked_in_by = NULL, auto_released = 0, released_at = NULL, updated_at = CURRENT_TIMESTAMP
+        SET status = 'confirmed', checked_in_at = NULL, checked_in_by = NULL, auto_released = 0, released_at = NULL, updated_at = CURRENT_TIMESTAMP,
+            start_time = COALESCE((SELECT CASE WHEN s.start_time > restaurant_bookings.start_time THEN s.start_time END
+                                   FROM restaurant_slots s WHERE s.slot_id = restaurant_bookings.slot_id), start_time)
         WHERE ${RST_REF_WHERE} AND (status = 'checked_in' OR (status = 'no_show' AND ${rstFreeSql('restaurant_bookings.table_id')}))
       `).bind(...ref, now.stamp),
       DB.prepare(`
