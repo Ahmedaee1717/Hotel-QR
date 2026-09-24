@@ -56028,6 +56028,9 @@ app.get('/admin/dashboard', (c) => {
                     <button data-tab="beach" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-umbrella-beach w-5"></i><span>Beach</span>
                     </button>
+                    <button data-tab="mainrestaurant" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-chair w-5"></i><span>Main Restaurant</span>
+                    </button>
                     <button data-tab="callbacks" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-phone w-5"></i><span>Callbacks</span>
                     </button>
@@ -61171,14 +61174,14 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
-    <!-- Restaurants Management Tab -->
-    <div id="restaurantsTab" class="tab-content hidden">
+    <!-- Main Restaurant (El Kasr) booking module: its own tab, separate from the legacy F&B tools -->
+    <div id="mainrestaurantTab" class="tab-content hidden">
         <!-- Main restaurant booking (El Kasr): floor plan per zone, time slots, no-show rules (embedded page) -->
         <div id="restaurantSetupCard" class="bg-white border-2 border-orange-200 rounded-lg p-4 mb-6">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div>
                     <h3 class="text-xl font-bold">
-                        <i class="fas fa-chair mr-2 text-orange-600"></i>Main restaurant booking — El Kasr
+                        <i class="fas fa-chair mr-2 text-orange-600"></i>Main Restaurant — El Kasr bookings
                     </h3>
                     <p class="text-sm text-gray-600">Tables and seats per zone, meal time slots with clearance, and the no-show grace rules staff and guests book against.</p>
                 </div>
@@ -61189,6 +61192,10 @@ app.get('/admin/dashboard', (c) => {
             <iframe id="restaurantSetupFrame" data-src="/admin/restaurant-setup/3?embed=1" title="Main restaurant booking setup"
                     style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
         </div>
+    </div>
+
+    <!-- Restaurants Management Tab -->
+    <div id="restaurantsTab" class="tab-content hidden">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -63221,6 +63228,7 @@ app.get('/admin/dashboard', (c) => {
         }
         // Embedded tools load their iframe only when first opened
         if (tab === 'resortmap') lazyFrame('resortmapFrame');
+        if (tab === 'mainrestaurant') loadRestaurantSetupFrame();
         if (tab === 'chatbot') chatbotSub(window.__cbSub || 'agent');
         if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
@@ -73069,7 +73077,6 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       async function loadRestaurantsTab() {
-        loadRestaurantSetupFrame();
         try {
           const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
