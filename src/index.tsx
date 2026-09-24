@@ -62916,6 +62916,7 @@ app.get('/admin/dashboard', (c) => {
         'infopages': 'infopages_manage',
         'activities': 'activities_manage',
         'restaurants': 'restaurant_view',
+        'mainrestaurant': 'restaurant_view',
         'vendors': 'vendors_view',
         'beach': 'beach_view',
         'callbacks': 'callbacks_view',
