@@ -31014,6 +31014,8 @@ window.luxTogglePassForm = function() {
             var nameEl = document.getElementById('luxRstName'), roomEl = document.getElementById('luxRstRoom'), notesEl = document.getElementById('luxRstNotes');
             var name = ((nameEl && nameEl.value) || '').trim();
             var room = ((roomEl && roomEl.value) || '').trim();
+            // 'Room 204' / '#204' → '204' (staff match rooms the same way either way)
+            room = room.replace(/^ *(room|rm)[ .:#-]*/i, '').replace(/^#+ */, '').trim() || room;
             if (!name || !room) { luxRstMsg('Please enter your name and room number.'); return; }
             var req = {
                 slot_id: s.slot_id,
@@ -31027,6 +31029,17 @@ window.luxTogglePassForm = function() {
             if (luxRst.pref) req.zone_pref = luxRst.pref;
             var g = luxRstGuest();
             if (g.phone) req.guest_phone = String(g.phone);
+            // Idempotency key: new for every booking attempt, reused only to retry the same
+            // attempt after a network error, so the retry returns the booking it already made.
+            var reqKey = JSON.stringify([luxRst.oid, req]);
+            if (!luxRst.reqId || luxRst.reqKey !== reqKey) {
+                var rid = '';
+                try { if (window.crypto && crypto.randomUUID) rid = crypto.randomUUID(); } catch (e) {}
+                if (!rid) rid = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+                luxRst.reqId = rid;
+                luxRst.reqKey = reqKey;
+            }
+            req.request_id = luxRst.reqId;
             var seq = luxRst.seq, ctx = { slot: s, date: luxRst.date, party: luxRst.party, room: room };
             luxRst.posting = true;
             luxRstMsg('');
@@ -31044,11 +31057,15 @@ window.luxTogglePassForm = function() {
                 console.error('restaurant booking', err);
             }
             luxRst.posting = false;
+            // Any server answer ends this attempt; only a network error keeps the key for a retry
+            if (status) { luxRst.reqId = null; luxRst.reqKey = null; }
             if (data && data.success && data.booking) {
-                // Saved even if the guest moved on meanwhile, so the next visit still shows it
+                // Saved even if the guest moved on meanwhile, so the next visit still shows it.
+                // duplicate = a retry of a booking that already went through: the same booking
+                // (same ref, so no second entry) shown as the existing reservation, not a new one.
                 var rec = luxRstRecord(data.booking, ctx);
                 luxRstSaveMine(rec);
-                if (seq === luxRst.seq) luxRstRenderTicket(rec, true);
+                if (seq === luxRst.seq) luxRstRenderTicket(rec, data.duplicate ? 'dup' : true);
                 return;
             }
             if (seq !== luxRst.seq) return;
@@ -31189,8 +31206,9 @@ window.luxTogglePassForm = function() {
             body.innerHTML = '' +
             '<div class="lux-sheet-ok">' +
                 '<div class="ic"><i class="fas fa-utensils"></i></div>' +
-                '<h2 class="lux-rst-okh">' + (fresh ? 'Your table is reserved' : 'Your reservation') + '</h2>' +
+                '<h2 class="lux-rst-okh">' + (fresh === 'dup' ? 'Already reserved' : fresh ? 'Your table is reserved' : 'Your reservation') + '</h2>' +
                 (r.title ? '<p class="lux-sheet-desc">' + luxEsc(r.title) + '</p>' : '') +
+                (fresh === 'dup' ? '<p class="lux-sheet-desc">This reservation had already gone through — here it is. No second table was booked.</p>' : '') +
                 '<div class="lux-rst-ticket">' +
                     '<div class="lb">Booking code</div>' +
                     '<div class="code">' + luxEsc(r.code || r.ref) + '</div>' +
@@ -52805,7 +52823,7 @@ app.get('/staff/app', (c) => {
           .rst-st b,.rst-st.big b{font-size:3rem}
           .rst-st span{font-size:.68rem}
           .rst-split{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-areas:"map room" "map list";grid-template-rows:auto 1fr;align-items:start}
-          .rst-mapwrap{position:sticky;top:76px}
+          .rst-mapwrap{position:sticky;top:76px;max-height:calc(100vh - 90px);overflow:auto;overscroll-behavior:contain}
           .rst-pad{display:grid}
           .rst-padtog{display:none}
           .rst-pad button{height:62px}
@@ -53859,6 +53877,7 @@ app.get('/staff/app', (c) => {
     var rstSlotAuto = true;      // follow the slot in progress until the waiter picks another
     var rstZone = 'all';
     var rstSeq = 0, rstBusy = {}, rstLoading = true, rstStale = false, rstLoadedAt = '', rstLoadErr = '';
+    var rstLoadedDate = null, rstLoadedSlot = null;  // what the table states on screen were loaded for
     var rstTimer = null;
     var rstOverride = {};        // table_id -> state after a local action, until the next load
     var rstSheetKind = '', rstSheetTable = null, rstWalk = null, rstPick = null, rstChoices = null, rstTaken = null;
@@ -53976,6 +53995,18 @@ app.get('/staff/app', (c) => {
     function rstGrace(){ var g=parseInt((rstData.settings||{}).grace_minutes,10); return (isFinite(g) && g>=0) ? g : 15; }
     function rstAutoRelease(){ var s=rstData.settings||{}; return !(s.auto_release===0 || s.auto_release==='0' || s.auto_release===false); }
     function rstWalkOk(){ var s=rstData.settings||{}; return !(s.allow_walk_ins===0 || s.allow_walk_ins==='0' || s.allow_walk_ins===false); }
+    // Walk-ins sit down now: slot id (default: the one on screen) unless it has already ended
+    // today, then the first slot of today that has not ended; null when none is left.
+    function rstWalkSlot(id){
+        var sl=rstSlotObj(id==null ? rstSlot : id), now=rstCairo();
+        if(rstDateStr!==now.date) return sl;
+        var ended=function(s){ var e=rstMin(s && s.end_time); return e!=null && now.min>=e; };
+        if(sl && !ended(sl)) return sl;
+        var list=(rstData.slots||[]).slice().sort(function(a, b){ return (rstMin(a.start_time)||0)-(rstMin(b.start_time)||0); });
+        for(var i=0;i<list.length;i++){ if(!ended(list[i])) return list[i]; }
+        return null;
+    }
+    var rstWalkReload=false;
     // Walk-ins are limited by the largest table (max_party_size only limits guest bookings)
     function rstMaxParty(){
         var mx=0; (rstData.tables||[]).forEach(function(t){ mx=Math.max(mx, +t.capacity||0); });
@@ -54079,10 +54110,27 @@ app.get('/staff/app', (c) => {
 
     // ── Loading ──
     function rstVisible(){ var el=document.getElementById('listRest'); return !!el && el.style.display!=='none' && document.visibilityState==='visible'; }
+    // After a failed load: keep the view dimmed while the table colours on screen belong to another date/slot
+    function rstShownStale(){
+        return rstLoadedDate!=null && (rstLoadedDate!==rstDateStr || String(rstLoadedSlot)!==String(rstSlot));
+    }
+    // Midnight rollover: a view left on "today" moves to the new day (also when the tab was hidden overnight)
+    function rstRollover(){
+        var t=rstToday();
+        if(t!==rstLastToday){
+            if(rstDateStr===rstLastToday){
+                rstDateStr=t; rstSlotAuto=true; rstPick=null; rstOverride={};
+                rstData={ slots:rstData.slots||[], tables:rstData.tables||[], bookings:[], zones:rstData.zones||[], settings:rstData.settings||{}, current_slot_id:null };
+                rstStale=rstShownStale();
+            }
+            rstLastToday=t;
+        }
+    }
     function rstTab(on){
         try{
             if(rstTimer){ clearInterval(rstTimer); rstTimer=null; }
             if(!on){ rstPick=null; rstCloseSheet(); return; }
+            try{ rstRollover(); }catch(e){}
             rstRenderAll();
             rstLoad();
             rstLoadConfig();
@@ -54091,8 +54139,7 @@ app.get('/staff/app', (c) => {
     }
     function rstTick(){
         try{
-            var t=rstToday();
-            if(t!==rstLastToday){ if(rstDateStr===rstLastToday){ rstDateStr=t; rstSlotAuto=true; } rstLastToday=t; }
+            rstRollover();
             if(rstVisible() && !Object.keys(rstBusy).length) rstLoad(true);
             else if(rstVisible()){ rstRenderSlots(); }
         }catch(e){}
@@ -54106,7 +54153,7 @@ app.get('/staff/app', (c) => {
             if(seq!==rstSeq || d!==rstDateStr) return;
             rstLoading=false;
             if(!j || j.success===false || !Array.isArray(j.tables)){
-                rstStale=false; rstLoadErr=rstErr(j, 'Could not load the restaurant');
+                rstStale=rstShownStale(); rstLoadErr=rstErr(j, 'Could not load the restaurant');
                 rstRenderAll();
                 if(!quiet) toast(rstLoadErr);
                 return;
@@ -54117,11 +54164,14 @@ app.get('/staff/app', (c) => {
             if(pick==null && rstData.slots.length) pick=rstData.slots[0].slot_id;
             rstSlot = pick==null ? null : pick;
             rstOverride={}; rstStale=false;
+            rstLoadedDate=rstDateStr; rstLoadedSlot=rstSlot;
             rstLoadedAt=rstCairo().hm;
             rstRenderAll();
             if(rstSheetKind==='table' && rstSheetTable!=null) rstOpenTable(rstSheetTable, true);
+            // Walk-in sheet opened while switching to the current slot: redraw it with that slot's tables
+            if(rstWalkReload){ rstWalkReload=false; try{ if(rstSheetKind==='walk' && rstWalk){ rstWalkSync(); rstRenderWalk(); } }catch(e){} }
         }catch(e){
-            if(seq===rstSeq){ rstLoading=false; rstStale=false; rstLoadErr='No connection'; rstRenderAll(); if(!quiet) toast('No connection — the restaurant retries every 15 s'); }
+            if(seq===rstSeq){ rstLoading=false; rstStale=rstShownStale(); rstLoadErr='No connection'; rstRenderAll(); if(!quiet) toast('No connection — the restaurant retries every 15 s'); }
         }
     }
     // Zone names/colours when the day view does not carry them
@@ -54407,7 +54457,8 @@ app.get('/staff/app', (c) => {
                   '<div class="rst-tstate '+st+'">'+rstE(RST_STATE_TXT[st]||st)+(ge ? ' · grace ends '+rstE(ge) : '')+(sl ? ' · '+rstE(rstSlotShort(sl)+' '+rstSlotTimes(sl)) : '')+'</div>';
             if(!mine.length) h+='<p class="bk-free">No booking in this slot.</p>';
             mine.forEach(function(b){ h+=rstBookHtml(b, false); });
-            if(rstIsFree(st) && rstWalkOk() && rstDateStr===rstToday()) h+='<button type="button" class="bk-cta" data-ract="walkin" data-tid="'+rstE(t.table_id)+'"><i class="fas fa-person-walking"></i> Seat a walk-in here</button>';
+            var wsl=rstWalkSlot();
+            if(rstIsFree(st) && rstWalkOk() && rstDateStr===rstToday() && wsl && String(wsl.slot_id)===String(rstSlot)) h+='<button type="button" class="bk-cta" data-ract="walkin" data-tid="'+rstE(t.table_id)+'"><i class="fas fa-person-walking"></i> Seat a walk-in here</button>';
             other.forEach(function(b){ h+=rstBookHtml(b, true); });
             panel.innerHTML=h+'<button type="button" class="bk-sec" data-ract="close">Close</button>';
             rstShowSheet();
@@ -54426,7 +54477,7 @@ app.get('/staff/app', (c) => {
                  '<div><small>Table</small><b>'+rstE((b.table_number || (t && t.table_number) || '?')+(zc ? ' · Zone '+zc : ''))+'</b></div>'+
                  '<div><small>'+rstE(s ? s.label : (b.slot_label || 'Time'))+'</small><b>'+rstE(b.start_time ? b.start_time+(b.end_time ? '–'+b.end_time : '') : rstSlotTimes(s))+'</b></div>'+
                '</div>'+
-               '<button type="button" class="bk-cta" data-ract="choice" data-ref="'+rstE(b.booking_reference)+'"><i class="fas fa-check"></i> Seat this booking</button></div>';
+               '<button type="button" class="bk-cta" data-ract="choice" data-ref="'+rstE(b.booking_reference)+'"><i class="fas fa-check"></i> '+(ctx && ctx.other ? 'Seat them now' : 'Seat this booking')+'</button></div>';
         });
         if(ch.length>1) h+='<button type="button" class="bk-sec" data-ract="choice-all">Seat all '+ch.length+' bookings</button>';
         panel.innerHTML=h+'<button type="button" class="bk-sec" data-ract="close">Cancel</button>';
@@ -54463,9 +54514,19 @@ app.get('/staff/app', (c) => {
         if(!rstWalkOk()){ toast('Walk-ins are switched off for this restaurant'); return; }
         if(rstDateStr!==rstToday()){ toast('Walk-ins are for today — go back to today first'); return; }
         if(!rstSlotObj(rstSlot)){ toast('Pick a time slot first'); return; }
+        // Only the current slot or a later one of today: an ended slot would not hold the table
+        var ws=rstWalkSlot();
+        if(!ws){ toast('Today’s last slot has ended — no walk-ins can be seated now'); return; }
+        var moved=String(ws.slot_id)!==String(rstSlot);
         var mx=rstMaxParty(), p=parseInt(o.party,10);
+        if(moved){
+            toast((rstSlotObj(rstSlot)||{}).label ? rstSlotObj(rstSlot).label+' has ended — the walk-in goes into '+(ws.label||'the current slot') : 'The walk-in goes into '+(ws.label||'the current slot'));
+            rstPickSlot(ws.slot_id);
+            rstWalkReload=true;
+            o.tid=null;  // a table tapped in the ended slot's map says nothing about this slot
+        }
         rstPick=null;
-        rstWalk={ party: Math.max(1, Math.min(mx, p>0 ? p : 2)), room: o.room||'', name: o.name||'', table_id: (o.tid!=null && o.tid!=='') ? o.tid : null };
+        rstWalk={ party: Math.max(1, Math.min(mx, p>0 ? p : 2)), room: o.room||'', name: o.name||'', table_id: (o.tid!=null && o.tid!=='') ? o.tid : null, moved: moved };
         rstRenderWalk();
         rstRenderAll();
     }
@@ -54481,7 +54542,7 @@ app.get('/staff/app', (c) => {
         var sl=rstSlotObj(rstSlot), mx=rstMaxParty(), t=w.table_id!=null ? rstTableById(w.table_id) : null, busy=!!rstBusy.walkin;
         var fits=(rstData.tables||[]).filter(function(x){ return rstIsFree(rstState(x)) && (+x.capacity||0)>=w.party; });
         var inZone=rstZone==='all' ? fits : fits.filter(function(x){ return rstTZone(x)===rstZone; });
-        var h='<h3>Walk-in</h3><div class="sub">'+rstE(sl ? sl.label+' · '+rstSlotTimes(sl) : '')+'</div>'+
+        var h='<h3>Walk-in</h3><div class="sub">'+rstE(sl ? sl.label+' · '+rstSlotTimes(sl) : '')+(w.moved ? ' · '+rstE('the slot on screen had ended, so this is the current one') : '')+'</div>'+
               '<div class="rst-step"><button type="button" data-ract="wi-minus" aria-label="Fewer guests"'+(w.party<=1?' disabled':'')+'>−</button>'+
               '<div><b>'+w.party+'</b><small>guest'+(w.party===1?'':'s')+'</small></div>'+
               '<button type="button" data-ract="wi-plus" aria-label="More guests"'+(w.party>=mx?' disabled':'')+'>+</button></div>'+
@@ -54506,7 +54567,10 @@ app.get('/staff/app', (c) => {
         if(!w || rstBusy.walkin) return;
         rstWithName(function(name){
             rstRun('walkin', async function(){
-                var body={offering_id:RST_OFFERING, slot_id:rstId(rstSlot), date:rstDateStr, party_size:w.party, room_number:w.room||null, guest_name:w.name||null, staff_name:name};
+                var ws=rstWalkSlot();
+                if(!ws){ toast('Today’s last slot has ended — no walk-ins can be seated now'); return; }
+                if(String(ws.slot_id)!==String(rstSlot)){ toast((ws.label||'The next slot')+' is now the current slot — check the table and tap again'); rstPickSlot(ws.slot_id); rstWalkReload=true; w.moved=true; w.table_id=null; return 'keep'; }
+                var body={offering_id:RST_OFFERING, slot_id:rstId(ws.slot_id), date:rstDateStr, party_size:w.party, room_number:w.room||null, guest_name:w.name||null, staff_name:name};
                 if(tid!=null && tid!=='') body.table_id=rstId(tid);
                 else if(rstZone!=='all' && rstZone) body.zone_pref=rstZone;
                 var j=await rstPost('/api/staff/restaurant/walk-in', body);
@@ -54546,7 +54610,7 @@ app.get('/staff/app', (c) => {
     // Seat a booking; ctx.room = typed room number, ctx.table_id = seat at another table
     function rstAfterArrive(j, name, ctx){
         j=j||{}; ctx=ctx||{};
-        if(Array.isArray(j.choices) && j.choices.length){ rstShowChoices(j.choices, ctx, j.message); return 'keep'; }
+        if(Array.isArray(j.choices) && j.choices.length){ rstShowChoices(j.choices, {room:ctx.room, ref:ctx.ref, other:!!j.other_slot}, j.message); return 'keep'; }
         if(!j.success && (j.error==='table_taken' || j.suggest_table_id!=null)){ rstShowTaken(j, ctx); return 'keep'; }
         if(!j.success){
             if(ctx.room && (j._status===404 || j.error==='not_found' || j.error==='no_booking')){ rstShowNoBooking(ctx.room, j); return 'keep'; }
@@ -54559,6 +54623,8 @@ app.get('/staff/app', (c) => {
         list.forEach(function(b){
             var ref=b.booking_reference || ctx.ref, loc=rstFindBk(ref);
             var f={status:'checked_in', auto_released:0, checked_in_by:b.checked_in_by||name, checked_in_time:b.checked_in_time||tm};
+            // A booking from another slot is moved into the slot being served now
+            if(j.reslotted && b.slot_id!=null){ f.slot_id=b.slot_id; f.start_time=b.start_time; f.end_time=b.end_time; f.buffer_minutes=b.buffer_minutes; }
             var tid=b.table_id!=null ? b.table_id : (ctx.table_id!=null ? ctx.table_id : (loc && loc.table_id));
             if(tid!=null){ f.table_id=tid; if(b.table_number) f.table_number=b.table_number; else if(ctx.table_id!=null) f.table_number=(rstTableById(tid)||{}).table_number; }
             rstPatch(ref, f);
@@ -54566,7 +54632,8 @@ app.get('/staff/app', (c) => {
         });
         var b0=rstFindBk((list[0]||{}).booking_reference || ctx.ref) || list[0] || {};
         var tn=b0.table_number || (rstTableById(b0.table_id)||{}).table_number || '';
-        toast(j.already ? (b0.guest_name||'Guest')+' is already seated' : '✅ '+(b0.guest_name||'Guest')+(b0.room_number ? ' · room '+b0.room_number : '')+(tn ? ' → table '+tn : '')+(list.length>1 ? ' (+'+(list.length-1)+' more)' : ''));
+        var rs=j.reslotted ? rstSlotObj(b0.slot_id) : null;
+        toast(j.already ? (b0.guest_name||'Guest')+' is already seated' : '✅ '+(b0.guest_name||'Guest')+(b0.room_number ? ' · room '+b0.room_number : '')+(tn ? ' → table '+tn : '')+(list.length>1 ? ' (+'+(list.length-1)+' more)' : '')+(j.reslotted ? ' · moved to '+(rs ? rs.label : 'this slot') : ''));
         if(ctx.room || (b0.room_number && rstRoomNorm(b0.room_number)===rstRoomQ())) rstRoomClear();
     }
     function rstArrive(ref){
@@ -54584,10 +54651,14 @@ app.get('/staff/app', (c) => {
         if(rstDateStr!==rstToday()){ toast(rstDateStr>rstToday() ? 'Arrivals open on the day' : 'Arrivals are for today — go back to today first'); return; }
         var key='room:'+room;
         if(rstBusy[key]) return;
+        // One booking for this room in the slot on screen: keep its reference so a 409 still offers "Seat at table X"
+        var ex=[];
+        try{ var rq=rstRoomNorm(room); ex=rstSlotBookings().filter(function(b){ return rstRoomNorm(b.room_number)===rq; }); }catch(e){}
+        var ctxRef=ex.length===1 ? (ex[0].booking_reference||'') : '';
         rstWithName(function(name){
             rstRun(key, async function(){
                 var j=await rstPost('/api/staff/restaurant/arrive', {offering_id:RST_OFFERING, room_number:room, date:rstDateStr, slot_id:rstId(rstSlot), staff_name:name});
-                return rstAfterArrive(j, name, {room:room});
+                return rstAfterArrive(j, name, {room:room, ref:ctxRef});
             });
         });
     }
@@ -54602,7 +54673,10 @@ app.get('/staff/app', (c) => {
                     if(j.success && !(j.choices && j.choices.length)){
                         ok++;
                         var b=j.booking||{}, loc=rstFindBk(ref), tid=b.table_id!=null ? b.table_id : (loc && loc.table_id);
-                        rstPatch(ref, {status:'checked_in', auto_released:0, checked_in_by:b.checked_in_by||name, checked_in_time:b.checked_in_time||rstCairo().hm});
+                        var pf={status:'checked_in', auto_released:0, checked_in_by:b.checked_in_by||name, checked_in_time:b.checked_in_time||rstCairo().hm};
+                        if(b.table_id!=null){ pf.table_id=b.table_id; if(b.table_number) pf.table_number=b.table_number; }
+                        if(j.reslotted && b.slot_id!=null){ pf.slot_id=b.slot_id; pf.start_time=b.start_time; pf.end_time=b.end_time; pf.buffer_minutes=b.buffer_minutes; }
+                        rstPatch(ref, pf);
                         if(tid!=null) rstOverride[String(tid)]='seated';
                     } else if(!fail) fail=rstErr(j, 'one booking could not be seated');
                 }
@@ -54622,7 +54696,8 @@ app.get('/staff/app', (c) => {
                 if(j.success) return rstAfterArrive(j, name, {ref:ref, table_id:tid});
                 // Same suggestion again = this server cannot move a booking: seat them as a walk-in there
                 if(j.error==='table_taken' && String(j.suggest_table_id)===String(tid)){
-                    var w=await rstPost('/api/staff/restaurant/walk-in', {offering_id:RST_OFFERING, slot_id:sid, date:rstDateStr, party_size:+bk.party_size||1, room_number:bk.room_number||null, guest_name:bk.guest_name||null, table_id:tid, staff_name:name});
+                    var wsl=rstWalkSlot(sid);
+                    var w=await rstPost('/api/staff/restaurant/walk-in', {offering_id:RST_OFFERING, slot_id:wsl ? rstId(wsl.slot_id) : sid, date:rstDateStr, party_size:+bk.party_size||1, room_number:bk.room_number||null, guest_name:bk.guest_name||null, table_id:tid, staff_name:name});
                     if(!w.success){ toast(rstErr(w, 'Could not seat them')); return 'keep'; }
                     rstOverride[String(tid)]='seated';
                     toast('✅ '+(bk.guest_name||'Guest')+' seated at table '+((w.booking && w.booking.table_number) || (rstTableById(tid)||{}).table_number || ''));
