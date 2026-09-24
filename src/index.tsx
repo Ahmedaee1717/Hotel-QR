@@ -12765,6 +12765,17 @@ When guest asks "my tier", "my benefits", "what's included", "what do I have", o
         }).format(new Date())
         const tomorrowCairo = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'long' })
           .format(new Date(Date.now() + 24 * 60 * 60 * 1000))
+        // Part of day drives the greeting: the model otherwise says
+        // "Good morning" at 2 am because the date has rolled over.
+        const hourCairo = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', hour12: false })
+          .format(new Date())) % 24
+        const dayPart = hourCairo >= 5 && hourCairo < 12 ? 'morning'
+          : hourCairo >= 12 && hourCairo < 18 ? 'afternoon'
+          : hourCairo >= 18 ? 'evening'
+          : 'late night'
+        const dayGreeting = dayPart === 'morning' ? 'Good morning'
+          : dayPart === 'afternoon' ? 'Good afternoon'
+          : 'Good evening'
 
         const systemPrompt = `You are ${chatbotName}, the AI concierge of ${hotelName} — a luxury Red Sea resort in Sahl Hasheesh, Egypt. You speak with the polish, warmth and competence of the best concierge the guest has ever met. Reply in the guest's language, always.
 
@@ -12796,7 +12807,8 @@ ${lessons ? '\n════════ MANAGEMENT COACHING (standing orders fro
 - End with a helpful next step when natural (an app link from APP NAVIGATION, a venue, or the front desk).
 
 ════════ NOW (resort local time, Egypt) ════════
-It is ${nowCairo}. Tomorrow is ${tomorrowCairo}.
+It is ${nowCairo}. Tomorrow is ${tomorrowCairo}. It is ${dayPart} at the resort.
+GREETINGS: any time-of-day greeting must be "${dayGreeting}" (or its equivalent in the guest's language, e.g. ${dayGreeting === 'Good morning' ? '"Guten Morgen", "صباح الخير"' : dayGreeting === 'Good afternoon' ? '"Guten Tag", "مساء الخير"' : '"Guten Abend", "مساء الخير"'}) — never another part of the day.${dayPart === 'late night' ? ' It is after midnight: never say "Good morning"; keep your voice calm and considerate of the hour.' : ''}
 Use this for "today", "tonight", "tomorrow", "now", "still open?" and any weekday-based schedule (e.g. which restaurants are open tonight) — work out the weekday yourself for other dates.`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
