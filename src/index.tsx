@@ -40576,6 +40576,1754 @@ app.get('/admin/beach-management', (c) => {
   `)
 })
 
+// ADMIN: Restaurant booking setup for module restaurants (El Kasr): floor plan per zone, meal time slots, no-show rules
+app.get('/admin/restaurant-setup/:offering_id', (c) => {
+  const oid = Number(c.req.param('offering_id'))
+  if (!Number.isInteger(oid) || oid <= 0) return c.text('Not found', 404)
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restaurant booking setup</title>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#f3f4f6}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#111827;font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
+body.embed,html.embed{background:transparent}
+body.embed header.top{display:none}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;background:#fff;border-bottom:1px solid #e5e7eb}
+header.top h1{font-size:1.25rem;font-weight:800}
+header.top h1 i{color:#ea580c;margin-right:9px}
+header.top a{color:#2563eb;text-decoration:none;font-weight:600;font-size:.85rem;white-space:nowrap}
+.wrap{max-width:1480px;margin:0 auto;padding:14px 20px 40px}
+body.embed .wrap{padding:0 0 24px;max-width:none}
+.hidden{display:none!important}
+.tabs{display:flex;align-items:center;gap:2px;border-bottom:1px solid #e5e7eb;margin-bottom:14px;overflow-x:auto}
+.tabs .sp{flex:1}
+.tabs .pill{margin:0 4px;white-space:nowrap}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:11px 16px;font-weight:700;color:#6b7280;cursor:pointer;font-size:.92rem;white-space:nowrap;font-family:inherit}
+.tab i{margin-right:6px}
+.tab.on{color:#2563eb;border-bottom-color:#2563eb}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.pane>.card+.card{margin-top:14px}
+.card h2{font-size:1.02rem;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 i{color:#ea580c}
+.card h3{font-size:.98rem;font-weight:800;margin-bottom:8px}
+.card h3 i{color:#2563eb;margin-right:6px}
+.muted{color:#6b7280}
+.sm{font-size:.84rem}
+.xs{font-size:.76rem;margin-top:10px}
+.lb{display:block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:4px}
+.field{margin-bottom:10px;min-width:0}
+input[type=text],input[type=number],input[type=time],select{width:100%;border:1px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:.92rem;background:#fff;color:#111827;min-height:38px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+input:disabled{background:#f3f4f6;color:#6b7280}
+input[type=range]{width:100%;accent-color:#2563eb;min-height:28px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.chk{display:flex;align-items:center;gap:8px;font-size:.88rem;font-weight:600;color:#374151;margin:6px 0 8px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:#2563eb;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:8px;padding:7px 12px;font-weight:700;font-size:.84rem;cursor:pointer;min-height:38px;font-family:inherit;white-space:nowrap}
+.btn:hover{background:#f9fafb}
+.btn.pri{background:#2563eb;border-color:#2563eb;color:#fff}
+.btn.pri:hover{background:#1d4ed8}
+.btn.danger{color:#dc2626;border-color:#fecaca;background:#fef2f2}
+.btn.on{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
+.btn.icon{width:38px;padding:0}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.lnk{background:none;border:0;color:#2563eb;font-weight:700;cursor:pointer;font-size:inherit;font-family:inherit;text-decoration:underline;margin-top:8px}
+.err{color:#b91c1c;font-size:.84rem;font-weight:600;margin:6px 0}
+.err:empty{display:none}
+.err ul{margin:4px 0 0 18px;font-weight:500}
+.warn{color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 11px;font-size:.84rem;margin:10px 0}
+.warn:empty{display:none}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:800;padding:2px 9px;border-radius:999px;background:#f3f4f6;color:#4b5563}
+.pill.on{background:#dcfce7;color:#166534}
+.pill.off{background:#fee2e2;color:#991b1b}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.toolbar .sp{flex:1}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.zoom{display:flex;align-items:center;gap:6px}
+.zoom span{min-width:44px;text-align:center;font-weight:700;font-size:.82rem;color:#374151}
+.unsaved{color:#b45309;font-weight:700;font-size:.84rem}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#f59e0b;margin-right:5px}
+/* seat summary: zone cards double as the zone tabs */
+.sumcard{display:flex;flex-wrap:wrap;gap:12px;padding:12px}
+.zsum{display:flex;flex-wrap:wrap;gap:8px;flex:3 1 460px;min-width:0}
+.zs{flex:1 1 160px;display:flex;align-items:center;gap:10px;text-align:left;border:1.5px solid #e5e7eb;background:#fff;border-radius:10px;padding:9px 11px;cursor:pointer;font-family:inherit;color:inherit;min-height:58px;min-width:0}
+.zs:hover{border-color:#cbd5e1}
+.zs.on{border-color:var(--zc,#2563eb);box-shadow:inset 0 -3px 0 var(--zc,#2563eb);background:#fcfcfd}
+.zs.add{flex:0 0 auto;justify-content:center;color:#2563eb;font-weight:700;border-style:dashed;padding:9px 14px}
+.zcode{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:var(--zc,#64748b);color:#fff;font-weight:800;font-size:1rem;flex:none;text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.zst{display:flex;flex-direction:column;min-width:0;font-size:.8rem;color:#4b5563;line-height:1.3}
+.zst .zt{font-weight:700;color:#111827;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zst b{color:#111827;font-size:.98rem}
+.zst .nb{color:#b45309;font-weight:700}
+.tgts{display:flex;flex-wrap:wrap;gap:8px;flex:2 1 360px}
+.tgt{flex:1 1 150px;border:1px solid #e5e7eb;border-radius:10px;padding:9px 11px;background:#fcfcfd}
+.tgl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.84rem;font-weight:700;color:#374151}
+.tgl i{margin-right:6px;color:#6b7280}
+.tgl b{font-size:1.1rem;color:#111827}
+.meter{height:8px;border-radius:99px;background:#e5e7eb;overflow:hidden;margin:7px 0 4px}
+.meter i{display:block;height:100%;background:#2563eb;border-radius:99px;transition:width .3s}
+.tgt.ok .meter i{background:#16a34a}
+.tgt.over .meter i{background:#f59e0b}
+.tgn{font-size:.74rem;color:#6b7280;font-weight:600}
+.tot{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;border-radius:10px;background:#111827;color:#fff;padding:8px 16px;font-size:.78rem;min-width:96px;text-align:center}
+.tot b{font-size:1.35rem;line-height:1.1}
+.tot span{color:#cbd5e1}
+.zonebar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 12px;margin:12px 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:12px}
+.zonebar:empty{display:none}
+.zonebar .field{margin:0}
+.zonebar .zf{flex:1 1 200px;max-width:320px}
+.zonebar input[type=color]{width:54px;height:38px;border:1px solid #d1d5db;border-radius:8px;padding:2px;background:#fff;cursor:pointer;display:block}
+.zonebar .chk{margin:0 0 9px}
+.zonebar .pill{margin-bottom:11px}
+.zonebar .zcode{margin-bottom:2px}
+.zonebar .sp{flex:1}
+/* floor plan */
+.lgrid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+.gmap{min-width:0}
+.side{position:sticky;top:8px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.mapwrap{position:relative;overflow:auto;border-radius:12px;border:1px solid #d6d3d1;background:#fff;max-height:78vh;-webkit-overflow-scrolling:touch}
+.stage{position:relative;width:100%;min-width:640px;aspect-ratio:16/10;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;--ch:8px;--fs:12px;background-color:#f8fafc}
+.stage::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(15,23,42,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(15,23,42,.055) 1px,transparent 1px);background-size:5% 8%}
+.stage.f-tile{background-color:#f8fafc;background-image:repeating-conic-gradient(rgba(148,163,184,.07) 0 25%,transparent 0 50%);background-size:10% 16%}
+.stage.f-parquet{background-color:#f5e8d5;background-image:repeating-linear-gradient(90deg,rgba(146,98,52,.11) 0 1px,transparent 1px 3.125%),repeating-linear-gradient(0deg,rgba(146,98,52,.06) 0 1px,transparent 1px 10%)}
+.stage.f-grass{background-color:#ecfdf3;background-image:radial-gradient(rgba(22,163,74,.13) 1px,transparent 1.6px);background-size:14px 14px}
+.stage.adding{cursor:crosshair}
+#tbls{position:absolute;inset:0}
+.wm{position:absolute;right:1.5%;bottom:2.5%;font-weight:800;font-size:calc(var(--fs) * 1.3);color:rgba(15,23,42,.16);pointer-events:none;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.fempty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#6b7280;font-weight:600;pointer-events:none;padding:20px;font-size:.95rem}
+.mapmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:#fff;background:rgba(15,23,42,.62);font-weight:600;padding:20px;text-align:center;z-index:5}
+.tb{position:absolute;touch-action:none;cursor:grab;transform-origin:50% 50%}
+.tb::before{content:"";position:absolute;inset:-9px}
+.tb .tt{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;background:#fffdf8;border:2px solid var(--zc,#64748b);border-radius:6px;box-shadow:0 2px 6px rgba(15,23,42,.18)}
+.tb.s-circle .tt{border-radius:50%}
+.tb.s-square .tt{border-radius:5px}
+.tb .ch{position:absolute;width:var(--ch);height:var(--ch);border-radius:50%;background:#fff;border:1.5px solid #94a3b8;box-shadow:0 1px 2px rgba(0,0,0,.14);pointer-events:none}
+.tb .lbl{display:flex;flex-direction:column;align-items:center;line-height:1.05;pointer-events:none;white-space:nowrap}
+.tb .lbl b{font-size:var(--fs);font-weight:800;color:#111827}
+.tb .lbl small{font-size:calc(var(--fs) * .74);color:#6b7280;font-weight:700}
+.tb:hover .tt{box-shadow:0 3px 10px rgba(15,23,42,.28)}
+.tb.sel{z-index:3}
+.tb.sel .tt{box-shadow:0 0 0 3px #fff,0 0 0 6px #2563eb,0 4px 12px rgba(0,0,0,.3)}
+.tb.moved .tt::after{content:"";position:absolute;top:-5px;right:-5px;width:10px;height:10px;border-radius:50%;background:#f59e0b;border:1.5px solid #fff}
+.tb.dragging{cursor:grabbing;z-index:4;opacity:.9}
+.tb.ghost{pointer-events:none;z-index:4}
+.tb.ghost .tt{border-style:dashed;border-color:#2563eb;background:rgba(219,234,254,.85)}
+.tb.new .tt{animation:pulse 1.1s ease-out 3}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(37,99,235,.55)}100%{box-shadow:0 0 0 16px rgba(37,99,235,0)}}
+.hint{font-size:.8rem;color:#6b7280;margin:8px 2px 0}
+.edhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:44px;padding:0 8px;border-radius:10px;border:2.5px solid var(--zc,#64748b);background:#fffdf8;font-weight:800;font-size:.95rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{border:1.5px solid #d1d5db;background:#fff;border-radius:999px;padding:5px 11px;font-weight:700;font-size:.82rem;cursor:pointer;min-width:42px;min-height:34px;font-family:inherit;color:#111827;display:inline-flex;align-items:center;justify-content:center}
+.chip.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.capin{width:74px!important;min-height:34px!important;border-radius:999px!important;text-align:center}
+.capin.on{border-color:#2563eb!important;box-shadow:0 0 0 2px rgba(37,99,235,.25)}
+.mini{display:inline-block;width:12px;height:12px;border:2px solid currentColor;margin-right:6px;flex:none}
+.mini.c{border-radius:50%}
+.mini.r{width:18px;height:10px;border-radius:2px}
+.mini.s{border-radius:2px}
+.rng .lb{display:flex;justify-content:space-between}
+.tips{margin:12px 0 0 18px;font-size:.82rem;color:#4b5563}
+.tips li{margin-bottom:5px}
+.pvlist{display:flex;flex-wrap:wrap;gap:4px;max-height:150px;overflow:auto;padding:6px;background:#f9fafb;border:1px solid #f3f4f6;border-radius:8px;margin:6px 0}
+.pvlist span{font-size:.78rem;padding:2px 8px;border-radius:6px;background:#fff;border:1px solid #e5e7eb;color:#374151}
+.pvlist span.x{color:#9ca3af;text-decoration:line-through}
+/* time slots */
+.meal .mealhead{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:4px}
+.meal .mealhead h2{margin:0}
+.meal .mealhead .sp{flex:1}
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:8px}
+.tbl th,.tbl td{text-align:left;padding:8px 6px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+.tbl th{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:800;white-space:nowrap}
+.slt input[type=text]{min-width:150px}
+.slt input[type=time]{min-width:112px}
+.slt .chk{margin:0}
+.bufw{display:flex;align-items:center;gap:6px}
+.bufw input{width:78px!important}
+.days{display:flex;gap:3px}
+.day{width:31px;height:31px;border-radius:50%;border:1.5px solid #d1d5db;background:#fff;font-weight:800;font-size:.68rem;color:#6b7280;cursor:pointer;font-family:inherit;flex:none;padding:0}
+.day.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.slt tr.off td{opacity:.55}
+.slt tr.draft td{background:#f0f9ff}
+.slt tr.bad td:first-child{box-shadow:inset 3px 0 0 #dc2626}
+.slt tr.hw td{border-bottom:0}
+.slt td.held{white-space:nowrap;font-size:.82rem;line-height:1.3}
+.slt td.acts{white-space:nowrap}
+.slt td.acts .btn+.btn{margin-left:6px}
+.slt tr.swarn td{padding:0 6px 10px}
+.swarn .e,.swarn .w{display:block;font-size:.8rem;font-weight:600;margin-top:3px}
+.swarn i{margin-right:6px}
+.e{color:#b91c1c}
+.w{color:#92400e}
+.gen{border:1px dashed #93c5fd;background:#f8fbff;border-radius:10px;padding:12px 14px;margin:10px 0 12px}
+.gengrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 12px}
+.genrow{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.84rem;margin:6px 0}
+.genrow span{white-space:nowrap}
+/* rules */
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,260px));gap:0 14px;margin-top:10px}
+.inl{display:flex;align-items:center;gap:8px}
+.inl input{max-width:120px}
+.ex{background:#f0fdf4;border:1px solid #bbf7d0;color:#14532d;border-radius:8px;padding:8px 11px;font-size:.84rem;margin:4px 0 10px}
+.ex:empty{display:none}
+.savebar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 0 4px;margin-top:6px;background:linear-gradient(rgba(243,244,246,0),#f3f4f6 35%)}
+body.embed .savebar{background:none}
+/* dialog */
+.modal{position:fixed;inset:0;z-index:80;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 14px;overflow:auto}
+.dlgbox{background:#fff;border-radius:14px;max-width:540px;width:100%;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.dlgbox h3{font-size:1.05rem;font-weight:800;margin-bottom:10px}
+.dlgbox h3 i{color:#2563eb;margin-right:6px}
+.dlgbox .lb{margin-top:8px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;background:#111827;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:.88rem;transition:opacity .2s,transform .2s;z-index:100;max-width:min(560px,92vw);pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:#b91c1c}
+.toast.ok{background:#15803d}
+@media (max-width:1100px){
+  .lgrid{grid-template-columns:minmax(0,1fr)}
+  .side{position:static}
+  .mapwrap{max-height:66vh}
+}
+@media (max-width:560px){
+  .wrap{padding:10px 12px 30px}
+  .grid2{grid-template-columns:1fr}
+  .zs{flex-basis:100%}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><i class="fas fa-utensils"></i><span id="pgTitle">Restaurant booking setup</span></h1>
+  <a href="/admin/dashboard"><i class="fas fa-arrow-left"></i> Dashboard</a>
+</header>
+<div class="wrap">
+  <nav class="tabs" role="tablist">
+    <button class="tab" data-tab="floor" onclick="showTab('floor')"><i class="fas fa-chair"></i>Floor plan</button>
+    <button class="tab" data-tab="slots" onclick="showTab('slots')"><i class="fas fa-clock"></i>Time slots</button>
+    <button class="tab" data-tab="rules" onclick="showTab('rules')"><i class="fas fa-sliders"></i>Rules</button>
+    <span class="sp"></span>
+    <span class="pill hidden" id="gbPill"></span>
+  </nav>
+  <div class="warn hidden" id="loadErr"></div>
+
+  <section id="pane-floor" class="pane">
+    <div class="card sumcard" id="seatSum"><span class="muted sm">Loading seat totals…</span></div>
+    <div class="zonebar" id="zoneBar"></div>
+    <div class="toolbar">
+      <div class="seg">
+        <button class="btn" id="mSelect" onclick="modeSelect()"><i class="fas fa-arrow-pointer"></i>Select &amp; move</button>
+        <button class="btn" id="mAdd" onclick="toggleAdd()"><i class="fas fa-plus"></i>Add table</button>
+        <button class="btn" onclick="openQuickFill()"><i class="fas fa-wand-magic-sparkles"></i>Quick fill</button>
+      </div>
+      <span class="sp"></span>
+      <span class="unsaved" id="unsavedTxt"></span>
+      <div class="zoom">
+        <button class="btn icon" onclick="zoomBy(-1)" title="Zoom out" aria-label="Zoom out"><i class="fas fa-magnifying-glass-minus"></i></button>
+        <span id="zoomLbl">100%</span>
+        <button class="btn icon" onclick="zoomBy(1)" title="Zoom in" aria-label="Zoom in"><i class="fas fa-magnifying-glass-plus"></i></button>
+      </div>
+      <button class="btn" id="discardBtn" onclick="discardLayout()" disabled>Discard</button>
+      <button class="btn pri" id="saveBtn" onclick="saveLayout()" disabled><i class="fas fa-floppy-disk"></i>Save layout</button>
+    </div>
+    <div class="lgrid">
+      <div class="gmap">
+        <div class="mapwrap" id="mapwrap">
+          <div class="stage" id="stage">
+            <div class="wm" id="wm"></div>
+            <div class="fempty hidden" id="fempty">No tables in this zone yet. Press Add table, or Quick fill to create several at once.</div>
+            <div id="tbls"></div>
+          </div>
+          <div id="mapMsg" class="mapmsg"><i class="fas fa-spinner fa-spin"></i> Loading the floor plan…</div>
+        </div>
+        <p class="hint" id="modeHint"></p>
+      </div>
+      <aside class="side" id="side"></aside>
+    </div>
+  </section>
+
+  <section id="pane-slots" class="pane hidden">
+    <div class="card">
+      <h2><i class="fas fa-clock"></i>Time slots</h2>
+      <p class="muted sm">Each slot is one sitting that guests and staff book a table for. After a slot ends, its table stays blocked for the <b>clearance</b> minutes so it can be cleared and re-laid before the next sitting. Existing bookings keep the times they were made with.</p>
+    </div>
+    <div id="mealCards"><div class="card muted sm" style="margin-top:14px">Loading…</div></div>
+  </section>
+
+  <section id="pane-rules" class="pane hidden">
+    <div class="card">
+      <h2><i class="fas fa-hourglass-half"></i>No-show grace period</h2>
+      <p class="muted sm">A booking not checked in by <b>slot start + N minutes</b> is released automatically: its table and chairs go back into the live stock, and staff see it as <i>Released</i> in the Ops app.</p>
+      <div class="rgrid">
+        <div class="field"><label class="lb" for="rGrace">Grace minutes (N)</label><div class="inl"><input type="number" id="rGrace" min="0" max="120" step="1"><span class="muted">minutes</span></div></div>
+      </div>
+      <div class="ex" id="rGraceEx"></div>
+      <label class="chk"><input type="checkbox" id="rAuto"> Release no-shows automatically</label>
+      <p class="muted xs" style="margin-top:0">When this is off, tables stay held until a waiter marks the booking as a no-show.</p>
+    </div>
+    <div class="card">
+      <h2><i class="fas fa-mobile-screen"></i>Guest booking</h2>
+      <label class="chk"><input type="checkbox" id="rGuest"> Guests can book a table in the app</label>
+      <p class="muted xs" style="margin-top:0">When this is off, guests only see the restaurant hours. Staff can always book, and seat walk-ins, from the Ops app.</p>
+      <div class="rgrid">
+        <div class="field"><label class="lb" for="rWindow">Guests can book up to (days ahead)</label><div class="inl"><input type="number" id="rWindow" min="0" max="30" step="1"><span class="muted">days</span></div><p class="muted xs" style="margin-top:4px">0 = today only.</p></div>
+        <div class="field"><label class="lb" for="rParty">Largest party per booking</label><div class="inl"><input type="number" id="rParty" min="1" max="30" step="1"><span class="muted">guests</span></div></div>
+      </div>
+      <div class="warn" id="rPartyWarn"></div>
+      <label class="chk"><input type="checkbox" id="rWalk"> Staff can seat walk-ins</label>
+    </div>
+    <div class="card">
+      <h2><i class="fas fa-bullseye"></i>Seat targets</h2>
+      <p class="muted sm">The seats you plan to have. They drive the progress meters on the Floor plan tab and never limit bookings.</p>
+      <div class="rgrid">
+        <div class="field"><label class="lb" for="rIndoor">Indoor seats target</label><input type="number" id="rIndoor" min="0" max="2000" step="1"></div>
+        <div class="field"><label class="lb" for="rOutdoor">Outdoor seats target</label><input type="number" id="rOutdoor" min="0" max="2000" step="1"></div>
+      </div>
+    </div>
+    <div class="savebar">
+      <button class="btn pri" id="rSave" onclick="saveRules()" disabled><i class="fas fa-floppy-disk"></i>Save rules</button>
+      <button class="btn" id="rUndo" onclick="undoRules()" disabled>Undo changes</button>
+      <span class="muted sm" id="rState"></span>
+    </div>
+  </section>
+</div>
+<div class="modal hidden" id="dlg" role="dialog" aria-modal="true"><div class="dlgbox" id="dlgBox"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+var QS = new URLSearchParams(location.search);
+var EMBED = QS.has('embed');
+if (EMBED) { document.body.classList.add('embed'); document.documentElement.classList.add('embed'); }
+if (!EMBED && !localStorage.getItem('admin_token')) window.location.href = '/admin/login';
+var ADMIN = {};
+try { ADMIN = JSON.parse(localStorage.getItem('admin_user') || '{}') || {}; } catch (e) { ADMIN = {}; }
+var PID = String(QS.get('property') || ADMIN.property_id || localStorage.getItem('property_id') || '1');
+var UID = String(ADMIN.user_id || localStorage.getItem('user_id') || '');
+var OID = ${oid};
+var BASE = '/api/admin/restaurant-module/' + OID;
+
+var MEALS = [
+  { k: 'breakfast', label: 'Breakfast', icon: 'fa-mug-hot', win: ['07:00', '10:00'] },
+  { k: 'lunch', label: 'Lunch', icon: 'fa-sun', win: ['12:30', '14:30'] },
+  { k: 'dinner', label: 'Dinner', icon: 'fa-moon', win: ['18:30', '21:30'] }
+];
+var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+var SEAT_QUICK = [2, 4, 6, 8, 10];
+var SHAPES = [{ k: 'circle', label: 'Round' }, { k: 'rectangle', label: 'Rectangle' }, { k: 'square', label: 'Square' }];
+var DEF_COLORS = { A: '#0ea5e9', B: '#a16207', C: '#16a34a' };
+var ZOOMS = [1, 1.5, 2];
+var GEO = ['position_x', 'position_y', 'width', 'height', 'rotation'];
+var SLOT_KEYS = ['label', 'start_time', 'end_time', 'buffer_minutes', 'days_mask', 'is_active'];
+var RULES = [
+  { k: 'grace_minutes', id: 'rGrace', min: 0, max: 120, name: 'Grace minutes' },
+  { k: 'auto_release', id: 'rAuto', bool: true },
+  { k: 'guest_booking_enabled', id: 'rGuest', bool: true },
+  { k: 'booking_window_days', id: 'rWindow', min: 0, max: 30, name: 'Days ahead' },
+  { k: 'max_party_size', id: 'rParty', min: 1, max: 30, name: 'Largest party' },
+  { k: 'allow_walk_ins', id: 'rWalk', bool: true },
+  { k: 'indoor_seat_target', id: 'rIndoor', min: 0, max: 2000, name: 'Indoor seats target' },
+  { k: 'outdoor_seat_target', id: 'rOutdoor', min: 0, max: 2000, name: 'Outdoor seats target' }
+];
+// Server limits (rstTableFields / rstSlotFields): table numbers 1-20 chars, labels up to 40, no < or >
+var BAD_CHARS = /[<>]/;
+
+var D = { loaded: false, enabled: true, name: '', settings: null, zones: [], tables: [], slots: [], byId: {} };
+// dirty: unsaved geometry per table_id; draft: unsaved details of the selected table
+var FP = { zone: null, sel: null, draft: null, dirty: {}, mode: 'select', zoomIx: 0, busy: false, add: null, addCap: 4, lastAdded: null };
+var ZE = {};
+var SL = { edits: {}, drafts: [], seq: 0, showOff: {}, genOpen: {}, gen: {}, busy: {} };
+var QF = null;
+var curTab = 'floor';
+
+function el(id) { return document.getElementById(id); }
+function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function r2(n) { return Math.round(Number(n) * 100) / 100; }
+function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function numOrNull(v) { if (v === null || v === undefined || v === '') return null; var n = Number(v); return isFinite(n) ? n : null; }
+function natCmp(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }); }
+function numKey(v) { return String(v == null ? '' : v).trim().toLowerCase(); }
+function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+function validColor(v) { v = String(v || '').trim(); return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : ''; }
+function normRot(r) { r = Math.round(Number(r) || 0); return ((r % 360) + 360) % 360; }
+function mins(s) {
+  var p = String(s == null ? '' : s).split(':');
+  if (p.length < 2) return NaN;
+  var h = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  return (h >= 0 && h <= 23 && m >= 0 && m <= 59) ? h * 60 + m : NaN;
+}
+function hm(m) {
+  m = ((Math.round(m) % 1440) + 1440) % 1440;
+  var h = Math.floor(m / 60), mm = m % 60;
+  return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
+}
+function toast(msg, kind) {
+  var t = el('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(toast.tm);
+  toast.tm = setTimeout(function () { t.className = 'toast'; }, kind === 'err' ? 7000 : 3400);
+}
+async function api(method, url, body) {
+  var opt = { method: method, cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-User-ID': UID, 'X-Property-ID': PID } };
+  if (body !== undefined) opt.body = JSON.stringify(body);
+  var r, d = {};
+  try { r = await fetch(url, opt); } catch (e) { return { ok: false, status: 0, data: { error: 'Network error. Check the connection and try again.' } }; }
+  try { d = (await r.json()) || {}; } catch (e) { d = {}; }
+  return { ok: r.ok && d.success !== false, status: r.status, data: d };
+}
+function errText(res, fallback) {
+  var d = res.data || {};
+  if (res.status === 401) return 'You are signed out. Sign in to the dashboard again.';
+  if (res.status === 403) return (typeof d.message === 'string' && d.message) || (typeof d.error === 'string' && d.error) || 'Your account does not have permission for this.';
+  var m = d.message || d.error;
+  if (m && typeof m === 'string' && m.indexOf(' ') > 0) return m;
+  if (m && typeof m === 'string') return (fallback || 'Something went wrong') + ' (' + m.replace(/_/g, ' ') + ')';
+  return (fallback || 'Something went wrong') + (res.status ? ' (HTTP ' + res.status + ')' : '');
+}
+function fld(label, input, forId) { return '<div class="field"><label class="lb"' + (forId ? ' for="' + forId + '"' : '') + '>' + label + '</label>' + input + '</div>'; }
+function idFrom(d, key) { var v = d && (d[key] || (d.table && d.table[key]) || (d.zone && d.zone[key]) || (d.slot && d.slot[key]) || d.id); return v ? Number(v) : null; }
+
+// ---------- data ----------
+function normSettings(s) {
+  function n(v, def) { var x = Number(v); return (v == null || v === '' || !isFinite(x)) ? def : Math.round(x); }
+  return {
+    grace_minutes: n(s.grace_minutes, 15), auto_release: n(s.auto_release, 1) ? 1 : 0,
+    guest_booking_enabled: n(s.guest_booking_enabled, 0) ? 1 : 0, booking_window_days: n(s.booking_window_days, 3),
+    max_party_size: n(s.max_party_size, 10), indoor_seat_target: n(s.indoor_seat_target, 230),
+    outdoor_seat_target: n(s.outdoor_seat_target, 60), allow_walk_ins: n(s.allow_walk_ins, 1) ? 1 : 0
+  };
+}
+function normZone(z) {
+  var code = String(z.code == null ? '' : z.code).trim() || '?';
+  return {
+    zone_id: Number(z.zone_id), code: code, name: String(z.name || ('Zone ' + code)),
+    is_outdoor: Number(z.is_outdoor) ? 1 : 0, color: validColor(z.color) || DEF_COLORS[code.toUpperCase()] || '#64748b',
+    display_order: Number(z.display_order) || 0, guest_bookable: z.guest_bookable == null ? 1 : (Number(z.guest_bookable) ? 1 : 0),
+    is_active: z.is_active == null ? 1 : (Number(z.is_active) ? 1 : 0)
+  };
+}
+function normShape(s) {
+  s = String(s || '').toLowerCase();
+  if (s === 'circle' || s === 'round') return 'circle';
+  if (s === 'square') return 'square';
+  return 'rectangle';
+}
+// Default footprint in % of the 16:10 canvas, same as the server's rstDefaultSize (quick fill uses it):
+// h% = w% x 1.6 keeps round and square tables true
+function defSize(shape, cap) {
+  cap = Math.max(1, Number(cap) || 2);
+  var base = cap <= 2 ? 6 : cap <= 4 ? 7.5 : cap <= 6 ? 9 : cap <= 8 ? 10.5 : 12;
+  function r1(n) { return Math.round(n * 10) / 10; }
+  if (shape === 'rectangle') return { w: r1(base * 1.5), h: r1(base * 1.6 * 0.8) };
+  return { w: base, h: r1(base * 1.6) };
+}
+function autoShape(cap) { return cap <= 2 ? 'circle' : 'rectangle'; }
+function shapeLabel(s) { for (var i = 0; i < SHAPES.length; i++) if (SHAPES[i].k === s) return SHAPES[i].label; return s; }
+function normTable(t) {
+  var shape = normShape(t.shape), cap = Math.max(1, Math.round(Number(t.capacity) || 2)), ds = defSize(shape, cap);
+  var w = numOrNull(t.width), h = numOrNull(t.height), x = numOrNull(t.position_x), y = numOrNull(t.position_y);
+  if (!(w > 0 && w <= 100)) w = ds.w;
+  if (!(h > 0 && h <= 100)) h = ds.h;
+  if (x == null || x < 0) x = 1;
+  if (y == null || y < 0) y = 1;
+  return {
+    table_id: Number(t.table_id), table_number: String(t.table_number == null ? '' : t.table_number).trim(),
+    capacity: cap, shape: shape, zone_id: (t.zone_id == null || t.zone_id === '') ? null : Number(t.zone_id),
+    position_x: r2(clamp(x, 0, 100 - w)), position_y: r2(clamp(y, 0, 100 - h)), width: r2(w), height: r2(h), rotation: normRot(t.rotation)
+  };
+}
+function normSlot(s) {
+  return {
+    slot_id: Number(s.slot_id), meal: String(s.meal || '').toLowerCase(), label: s.label == null ? '' : String(s.label),
+    start_time: String(s.start_time || '').slice(0, 5), end_time: String(s.end_time || '').slice(0, 5),
+    buffer_minutes: (s.buffer_minutes == null || s.buffer_minutes === '') ? 10 : (Math.round(Number(s.buffer_minutes)) || 0),
+    days_mask: (s.days_mask == null || s.days_mask === '') ? 127 : (Number(s.days_mask) & 127),
+    display_order: Number(s.display_order) || 0, is_active: s.is_active == null ? 1 : (Number(s.is_active) ? 1 : 0)
+  };
+}
+function zoneCmp(a, b) { return (a.display_order - b.display_order) || natCmp(a.code, b.code); }
+function slotCmp(a, b) { return (mins(a.start_time) - mins(b.start_time)) || (a.display_order - b.display_order) || (a.slot_id - b.slot_id); }
+
+async function loadAll() {
+  var r = await api('GET', BASE);
+  var d = r.data || {};
+  if (!r.ok || !Array.isArray(d.zones) || !Array.isArray(d.tables)) {
+    var msg = r.status === 404 ? ((typeof d.message === 'string' && d.message) || 'This restaurant was not found for your property.') : errText(r, 'Could not load the restaurant setup');
+    if (!D.loaded) {
+      el('mapMsg').innerHTML = '<span><i class="fas fa-triangle-exclamation"></i> ' + esc(msg) + '</span> <button class="btn" onclick="retryLoad()">Retry</button>';
+      el('mapMsg').classList.remove('hidden');
+      el('loadErr').innerHTML = '<i class="fas fa-triangle-exclamation"></i> ' + esc(msg) + ' <button class="lnk" onclick="retryLoad()">Retry</button>';
+      el('loadErr').classList.remove('hidden');
+    } else toast(msg, 'err');
+    return false;
+  }
+  el('loadErr').classList.add('hidden');
+  var off = d.offering || d.restaurant || {};
+  D.name = String(off.title_en || off.title || off.name || d.offering_title || d.restaurant_name || '');
+  if (D.name) { el('pgTitle').textContent = D.name + ' · booking setup'; document.title = D.name + ' · booking setup'; }
+  D.settings = normSettings(d.settings || {});
+  D.zones = d.zones.map(normZone).filter(function (z) { return z.zone_id; }).sort(zoneCmp);
+  D.tables = d.tables.filter(function (t) { return t && t.table_id && (t.is_active == null || Number(t.is_active)); }).map(normTable);
+  D.byId = {};
+  D.tables.forEach(function (t) { D.byId[t.table_id] = t; });
+  D.slots = (Array.isArray(d.slots) ? d.slots : []).map(normSlot).filter(function (s) { return s.slot_id; });
+  Object.keys(FP.dirty).forEach(function (id) { if (!D.byId[id]) delete FP.dirty[id]; else setDirty(Number(id), {}); });
+  if (FP.sel != null && !D.byId[FP.sel]) { FP.sel = null; FP.draft = null; }
+  if (FP.draft && !D.byId[FP.draft.table_id]) FP.draft = null;
+  Object.keys(ZE).forEach(function (id) { if (!zoneById(Number(id))) delete ZE[id]; });
+  Object.keys(SL.edits).forEach(function (id) { if (!slotById(Number(id))) delete SL.edits[id]; });
+  if (!zoneKeyValid(FP.zone)) FP.zone = D.zones.length ? D.zones[0].zone_id : (zoneTables('none').length ? 'none' : null);
+  D.loaded = true;
+  el('mapMsg').classList.add('hidden');
+  renderAll();
+  D.enabled = d.enabled !== false;
+  if (!D.enabled) {
+    el('loadErr').innerHTML = '<i class="fas fa-circle-info"></i> Table booking is not switched on for this restaurant yet. Check the Rules tab and press Save rules to switch it on.';
+    el('loadErr').classList.remove('hidden');
+    rulesInput();
+  }
+  return true;
+}
+function retryLoad() { el('mapMsg').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading the floor plan…'; loadAll(); }
+function renderAll() {
+  renderPill();
+  renderFloorAll();
+  renderSlots();
+  renderRules();
+}
+function renderPill() {
+  var p = el('gbPill'), on = D.settings && D.settings.guest_booking_enabled;
+  if (!D.settings) return;
+  p.className = 'pill ' + (on ? 'on' : 'off');
+  p.innerHTML = '<i class="fas fa-mobile-screen"></i>Guest booking ' + (on ? 'ON' : 'OFF');
+}
+
+// ---------- zones ----------
+function zoneById(id) { for (var i = 0; i < D.zones.length; i++) if (D.zones[i].zone_id === id) return D.zones[i]; return null; }
+function zoneKeyValid(k) { return k === 'none' ? zoneTables('none').length > 0 : (k != null && !!zoneById(k)); }
+function curZone() { return FP.zone === 'none' ? null : zoneById(FP.zone); }
+function zoneTables(key) {
+  return D.tables.filter(function (t) { return key === 'none' ? (t.zone_id == null || !zoneById(t.zone_id)) : t.zone_id === key; });
+}
+function zoneColor(z) { if (!z) return '#64748b'; var e = ZE[z.zone_id]; return (e && validColor(e.color)) || z.color; }
+function floorType(z) {
+  if (!z) return 'tile';
+  if (z.is_outdoor) return 'grass';
+  if (/parquet|wood/i.test(z.name)) return 'parquet';
+  return 'tile';
+}
+function zoneOptions(cur) {
+  var h = D.zones.map(function (z) { return '<option value="' + z.zone_id + '"' + (z.zone_id === cur ? ' selected' : '') + '>Zone ' + esc(z.code) + ' · ' + esc(z.name) + '</option>'; }).join('');
+  if (cur == null || !zoneById(cur)) h = '<option value="" selected>No zone</option>' + h;
+  return h;
+}
+function pickZone(id) {
+  var key = id === -1 ? 'none' : id;
+  if (key === FP.zone) return;
+  if (!confirmDropDraft()) return;
+  FP.zone = key;
+  FP.sel = null;
+  FP.draft = null;
+  if (FP.add) { FP.add = null; closeDlg(true); }
+  renderFloorAll();
+}
+function zoneChanges(z) {
+  var e = ZE[z.zone_id], ch = {};
+  if (!e) return ch;
+  if (e.name.trim() !== z.name) ch.name = e.name.trim();
+  if (validColor(e.color) && e.color !== z.color) ch.color = e.color;
+  if (e.guest_bookable !== z.guest_bookable) ch.guest_bookable = e.guest_bookable;
+  return ch;
+}
+function zoneEditCount() { return D.zones.filter(function (z) { return Object.keys(zoneChanges(z)).length > 0; }).length; }
+function renderZoneBar() {
+  var z = curZone();
+  if (!z) {
+    el('zoneBar').innerHTML = FP.zone === 'none' ? '<span class="muted sm"><i class="fas fa-circle-info"></i> These tables have no zone yet, so guests cannot book them. Select one and pick its zone in the panel.</span>' : '';
+    return;
+  }
+  var e = ZE[z.zone_id] || { name: z.name, color: z.color, guest_bookable: z.guest_bookable };
+  el('zoneBar').innerHTML = '<span class="zcode" id="zCode" style="--zc:' + zoneColor(z) + '">' + esc(z.code) + '</span>' +
+    '<div class="field zf"><label class="lb" for="zName">Zone name</label><input type="text" id="zName" maxlength="60" autocomplete="off" value="' + esc(e.name) + '" oninput="zoneInput()"></div>' +
+    '<div class="field"><label class="lb" for="zColor">Colour</label><input type="color" id="zColor" value="' + (validColor(e.color) || z.color) + '" oninput="zoneInput()"></div>' +
+    '<label class="chk"><input type="checkbox" id="zBook"' + (e.guest_bookable ? ' checked' : '') + ' onchange="zoneInput()"> Guests can book this zone in the app</label>' +
+    '<span class="pill">' + (z.is_outdoor ? '<i class="fas fa-tree"></i>Outdoor' : '<i class="fas fa-house"></i>Indoor') + '</span>' +
+    '<span class="sp"></span><button class="btn" id="zSave" onclick="saveZone()"' + (Object.keys(zoneChanges(z)).length ? '' : ' disabled') + '><i class="fas fa-floppy-disk"></i>Save zone</button>';
+}
+function zoneInput() {
+  var z = curZone();
+  if (!z) return;
+  ZE[z.zone_id] = { name: el('zName').value, color: validColor(el('zColor').value) || z.color, guest_bookable: el('zBook').checked ? 1 : 0 };
+  if (!Object.keys(zoneChanges(z)).length) delete ZE[z.zone_id];
+  el('zSave').disabled = !ZE[z.zone_id];
+  el('zCode').style.setProperty('--zc', zoneColor(z));
+  renderFloor();
+}
+async function saveZone() {
+  var z = curZone();
+  if (!z) return;
+  var ch = zoneChanges(z);
+  if (!Object.keys(ch).length) return;
+  if ('name' in ch && (!ch.name || BAD_CHARS.test(ch.name))) { toast('Give the zone a name (no < or >)', 'err'); return; }
+  if (ch.guest_bookable === 0 && !confirm('Stop offering Zone ' + z.code + ' to guests in the app? Existing bookings stay; staff can still seat people there.')) return;
+  el('zSave').disabled = true;
+  var r = await api('PUT', BASE + '/zones/' + z.zone_id, ch);
+  if (!r.ok) { if (el('zSave')) el('zSave').disabled = false; toast(errText(r, 'Could not save the zone'), 'err'); return; }
+  delete ZE[z.zone_id];
+  await loadAll();
+  toast('Zone ' + z.code + ' saved', 'ok');
+}
+function openAddZone() {
+  var used = {};
+  D.zones.forEach(function (z) { used[z.code.toUpperCase()] = 1; });
+  var code = '';
+  for (var i = 0; i < 26 && !code; i++) { var ch = String.fromCharCode(65 + i); if (!used[ch]) code = ch; }
+  showDlg('<h3><i class="fas fa-layer-group"></i>New zone</h3>' +
+    '<div class="grid2">' + fld('Code', '<input type="text" id="nzCode" maxlength="4" autocomplete="off" value="' + esc(code) + '">', 'nzCode') +
+    fld('Name', '<input type="text" id="nzName" maxlength="60" autocomplete="off" placeholder="e.g. Terrace">', 'nzName') + '</div>' +
+    fld('Colour', '<input type="color" id="nzColor" value="#7c3aed" style="width:64px;height:38px;border:1px solid #d1d5db;border-radius:8px;padding:2px;background:#fff">', 'nzColor') +
+    '<label class="chk"><input type="checkbox" id="nzOut"> Outdoor (counts towards the outdoor seat target)</label>' +
+    '<div class="err" id="nzErr"></div>' +
+    '<div class="btns"><button class="btn pri" id="nzGo" onclick="createZone()"><i class="fas fa-check"></i>Create zone</button><button class="btn" onclick="closeDlg()">Cancel</button></div>', 'nzName');
+}
+async function createZone() {
+  var code = el('nzCode').value.trim().toUpperCase(), name = el('nzName').value.trim(), err = el('nzErr');
+  err.textContent = '';
+  if (!/^[A-Z0-9]{1,4}$/.test(code)) { err.textContent = 'The code is 1 to 4 letters or digits, such as D.'; return; }
+  if (D.zones.some(function (z) { return z.code.toUpperCase() === code; })) { err.textContent = 'Zone ' + code + ' already exists.'; return; }
+  if (!name || BAD_CHARS.test(name)) { err.textContent = 'Enter a zone name (no < or >).'; return; }
+  var order = 0;
+  D.zones.forEach(function (z) { if (z.display_order > order) order = z.display_order; });
+  el('nzGo').disabled = true;
+  var r = await api('POST', BASE + '/zones', { code: code, name: name, is_outdoor: el('nzOut').checked ? 1 : 0, color: validColor(el('nzColor').value) || '#7c3aed', guest_bookable: 1, display_order: order + 1 });
+  if (!r.ok) { el('nzGo').disabled = false; err.textContent = r.status === 409 ? 'Zone ' + code + ' already exists.' : errText(r, 'Could not create the zone'); return; }
+  closeDlg(true);
+  var nid = idFrom(r.data, 'zone_id');
+  if (nid) FP.zone = nid;
+  await loadAll();
+  if (!nid) { var nz = D.zones.filter(function (z) { return z.code.toUpperCase() === code; })[0]; if (nz) { FP.zone = nz.zone_id; renderFloorAll(); } }
+  toast('Zone ' + code + ' created. Add its tables with Add table or Quick fill.', 'ok');
+}
+
+// ---------- seat summary ----------
+function seatStats() {
+  var per = {}, un = { seats: 0, tables: 0 }, indoor = 0, outdoor = 0, seats = 0;
+  D.zones.forEach(function (z) { per[z.zone_id] = { seats: 0, tables: 0 }; });
+  D.tables.forEach(function (t) {
+    var z = zoneById(t.zone_id), s = z ? per[z.zone_id] : un;
+    s.seats += t.capacity;
+    s.tables++;
+    seats += t.capacity;
+    if (z && z.is_active) { if (z.is_outdoor) outdoor += t.capacity; else indoor += t.capacity; }
+  });
+  return { per: per, un: un, indoor: indoor, outdoor: outdoor, seats: seats, tables: D.tables.length };
+}
+function meterHtml(label, icon, have, target) {
+  var pct = target > 0 ? Math.round(have / target * 100) : 0, diff = have - target;
+  var cls = target > 0 ? (diff === 0 ? ' ok' : diff > 0 ? ' over' : '') : '';
+  var note = target > 0 ? (diff === 0 ? 'Target reached' : diff > 0 ? plural(diff, 'seat') + ' over target' : plural(-diff, 'seat') + ' to go') + ' · ' + pct + '%' : 'No target set';
+  return '<div class="tgt' + cls + '"><div class="tgl"><span><i class="fas ' + icon + '"></i>' + label + '</span><span><b>' + have + '</b> / ' + target + '</span></div>' +
+    '<div class="meter" role="progressbar" aria-label="' + label + ' seats" aria-valuemin="0" aria-valuemax="' + target + '" aria-valuenow="' + have + '"><i style="width:' + clamp(pct, 0, 100) + '%"></i></div><div class="tgn">' + note + '</div></div>';
+}
+function renderSummary() {
+  var st = seatStats(), s = D.settings || normSettings({});
+  var h = '<div class="zsum">' + D.zones.map(function (z) {
+    var p = st.per[z.zone_id];
+    return '<button type="button" class="zs' + (FP.zone === z.zone_id ? ' on' : '') + '" onclick="pickZone(' + z.zone_id + ')" style="--zc:' + zoneColor(z) + '" title="Show Zone ' + esc(z.code) + '">' +
+      '<span class="zcode">' + esc(z.code) + '</span><span class="zst"><span class="zt">' + esc(z.name) + '</span>' +
+      '<span><b>' + p.seats + '</b> seats · ' + plural(p.tables, 'table') + '</span>' +
+      (z.guest_bookable ? '' : '<span class="nb">Staff only</span>') + '</span></button>';
+  }).join('');
+  if (st.un.tables) h += '<button type="button" class="zs' + (FP.zone === 'none' ? ' on' : '') + '" onclick="pickZone(-1)"><span class="zcode">?</span><span class="zst"><span class="zt">No zone</span><span><b>' + st.un.seats + '</b> seats · ' + plural(st.un.tables, 'table') + '</span></span></button>';
+  h += '<button type="button" class="zs add" onclick="openAddZone()" title="Add a zone"><i class="fas fa-plus"></i>&nbsp;Zone</button></div>';
+  h += '<div class="tgts">' + meterHtml('Indoor', 'fa-house', st.indoor, s.indoor_seat_target) + meterHtml('Outdoor', 'fa-tree', st.outdoor, s.outdoor_seat_target) +
+    '<div class="tot"><b>' + st.seats + '</b>seats<span>' + plural(st.tables, 'table') + '</span></div></div>';
+  el('seatSum').innerHTML = h;
+}
+
+// ---------- floor plan: geometry ----------
+function geo(t) {
+  var d = FP.dirty[t.table_id] || {};
+  return {
+    x: 'position_x' in d ? d.position_x : t.position_x, y: 'position_y' in d ? d.position_y : t.position_y,
+    w: 'width' in d ? d.width : t.width, h: 'height' in d ? d.height : t.height, rot: 'rotation' in d ? d.rotation : t.rotation
+  };
+}
+function setDirty(id, patch) {
+  var t = D.byId[id];
+  if (!t) return;
+  var d = FP.dirty[id] || {};
+  for (var k in patch) d[k] = k === 'rotation' ? normRot(patch[k]) : r2(patch[k]);
+  var same = GEO.every(function (k) { return !(k in d) || r2(t[k]) === d[k]; });
+  if (same) delete FP.dirty[id]; else FP.dirty[id] = d;
+}
+function dirtyCount() { return Object.keys(FP.dirty).length; }
+function view(t) {
+  var g = geo(t), dr = (FP.draft && FP.draft.table_id === t.table_id) ? FP.draft : null;
+  return { num: dr ? dr.table_number : t.table_number, cap: dr ? dr.capacity : t.capacity, shape: dr ? dr.shape : t.shape, x: g.x, y: g.y, w: g.w, h: g.h, rot: g.rot };
+}
+// One dot per seat round the edge; translate % is relative to the dot, so dots sit just outside the table
+function chairsHtml(shape, cap) {
+  var n = clamp(Math.round(cap) || 0, 0, 30), out = [], i;
+  if (!n) return '';
+  if (shape === 'circle') {
+    for (i = 0; i < n; i++) {
+      var a = (-90 + 360 * i / n) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+      out.push([50 + 50 * c, 50 + 50 * s, -50 + 78 * c, -50 + 78 * s]);
+    }
+  } else {
+    var side = [0, 0, 0, 0];
+    if (shape === 'square') { for (i = 0; i < n; i++) side[i % 4]++; }
+    else {
+      var rest = n;
+      if (n >= 8) { side[2] = 1; side[3] = 1; rest = n - 2; }
+      side[0] = Math.ceil(rest / 2);
+      side[1] = rest - side[0];
+    }
+    for (i = 0; i < side[0]; i++) out.push([(i + 0.5) / side[0] * 100, 0, -50, -128]);
+    for (i = 0; i < side[1]; i++) out.push([(i + 0.5) / side[1] * 100, 100, -50, 28]);
+    for (i = 0; i < side[2]; i++) out.push([0, (i + 0.5) / side[2] * 100, -128, -50]);
+    for (i = 0; i < side[3]; i++) out.push([100, (i + 0.5) / side[3] * 100, 28, -50]);
+  }
+  return out.map(function (p) { return '<i class="ch" style="left:' + r2(p[0]) + '%;top:' + r2(p[1]) + '%;transform:translate(' + r2(p[2]) + '%,' + r2(p[3]) + '%)"></i>'; }).join('');
+}
+function tableHtml(t) {
+  var v = view(t), z = zoneById(t.zone_id);
+  var changed = FP.dirty[t.table_id] || (FP.draft && FP.draft.table_id === t.table_id && draftChanged());
+  var cls = 'tb s-' + v.shape + (FP.sel === t.table_id ? ' sel' : '') + (changed ? ' moved' : '') + (FP.lastAdded === t.table_id ? ' new' : '');
+  return '<div class="' + cls + '" data-id="' + t.table_id + '" title="' + esc('Table ' + v.num + ' · ' + plural(v.cap, 'seat')) + '" style="left:' + v.x + '%;top:' + v.y + '%;width:' + v.w + '%;height:' + v.h + '%;transform:rotate(' + v.rot + 'deg);--zc:' + zoneColor(z) + '">' +
+    chairsHtml(v.shape, v.cap) + '<div class="tt"><span class="lbl" style="transform:rotate(' + (-v.rot) + 'deg)"><b>' + esc(v.num || '?') + '</b><small>' + plural(v.cap, 'seat') + '</small></span></div></div>';
+}
+function addGeo() {
+  var A = FP.add, ds = defSize(A.shape, A.cap);
+  return { x: r2(clamp(A.cx - ds.w / 2, 0, 100 - ds.w)), y: r2(clamp(A.cy - ds.h / 2, 0, 100 - ds.h)), w: ds.w, h: ds.h };
+}
+function ghostHtml() {
+  var A = FP.add, g = addGeo();
+  return '<div class="tb ghost s-' + A.shape + '" style="left:' + g.x + '%;top:' + g.y + '%;width:' + g.w + '%;height:' + g.h + '%;--zc:' + zoneColor(zoneById(A.zone_id)) + '">' +
+    chairsHtml(A.shape, A.cap) + '<div class="tt"><span class="lbl"><b>' + esc(A.num || 'new') + '</b><small>' + plural(A.cap, 'seat') + '</small></span></div></div>';
+}
+function sizeVars() {
+  var st = el('stage'), w = st.offsetWidth;
+  if (!w) return;
+  st.style.setProperty('--fs', clamp(w * 0.0125, 8, 17).toFixed(1) + 'px');
+  st.style.setProperty('--ch', clamp(w * 0.0095, 5, 13).toFixed(1) + 'px');
+}
+function renderFloor() {
+  var st = el('stage'), z = curZone(), key = FP.zone;
+  st.className = 'stage f-' + floorType(z) + (FP.mode === 'add' ? ' adding' : '');
+  sizeVars();
+  el('wm').textContent = z ? 'Zone ' + z.code + ' · ' + z.name : (key === 'none' ? 'No zone' : '');
+  var list = key == null ? [] : zoneTables(key), h = '';
+  list.forEach(function (t) { h += tableHtml(t); });
+  if (FP.add) h += ghostHtml();
+  el('tbls').innerHTML = h;
+  el('fempty').classList.toggle('hidden', !D.loaded || list.length > 0 || !!FP.add || key === 'none');
+}
+var MODE_HINTS = {
+  select: 'Tap a table to edit it. Drag to move it; arrow keys nudge the selected table (hold Shift for bigger steps). Dots round a table are its chairs.',
+  add: 'Tap the floor where the new table goes. Press Esc or Done when you have finished adding.'
+};
+function renderLayoutBar() {
+  var n = dirtyCount();
+  el('saveBtn').disabled = !n || FP.busy;
+  el('discardBtn').disabled = !n || FP.busy;
+  el('saveBtn').innerHTML = '<i class="fas fa-floppy-disk"></i>Save layout' + (n ? ' (' + n + ')' : '');
+  el('unsavedTxt').innerHTML = n ? '<i class="dot"></i>' + plural(n, 'table') + ' moved or resized, not saved' : '';
+  el('mSelect').classList.toggle('on', FP.mode === 'select');
+  el('mAdd').classList.toggle('on', FP.mode === 'add');
+  el('modeHint').textContent = MODE_HINTS[FP.mode] || '';
+  el('zoomLbl').textContent = Math.round(ZOOMS[FP.zoomIx] * 100) + '%';
+}
+function renderFloorAll() {
+  renderSummary();
+  renderZoneBar();
+  renderFloor();
+  renderLayoutBar();
+  renderSide();
+}
+
+// ---------- floor plan: side panel ----------
+function ensureDraft(t) {
+  if (!FP.draft || FP.draft.table_id !== t.table_id) FP.draft = { table_id: t.table_id, table_number: t.table_number, capacity: t.capacity, shape: t.shape, zone_id: t.zone_id };
+  return FP.draft;
+}
+function draftChanged() {
+  var dr = FP.draft, t = dr && D.byId[dr.table_id];
+  if (!t) return false;
+  return String(dr.table_number).trim() !== t.table_number || dr.capacity !== t.capacity || dr.shape !== t.shape || dr.zone_id !== t.zone_id;
+}
+function confirmDropDraft() {
+  if (!FP.draft || !draftChanged()) return true;
+  var t = D.byId[FP.draft.table_id];
+  if (!confirm('Discard the unsaved changes to table ' + (t ? t.table_number : '') + '?')) return false;
+  FP.draft = null;
+  return true;
+}
+function seatChips(cur, fn, inputId, onInput) {
+  return SEAT_QUICK.map(function (n) { return '<button type="button" class="chip' + (cur === n ? ' on' : '') + '" data-n="' + n + '" onclick="' + fn + '(' + n + ')">' + n + '</button>'; }).join('') +
+    '<input type="number" id="' + inputId + '" class="capin' + (SEAT_QUICK.indexOf(cur) < 0 ? ' on' : '') + '" min="1" max="30" step="1" value="' + cur + '" oninput="' + onInput + '()" aria-label="Other number of seats" title="Other number of seats">';
+}
+function syncSeatChips(wrapId, cur) {
+  var w = el(wrapId);
+  if (!w) return;
+  w.querySelectorAll('.chip').forEach(function (b) { b.classList.toggle('on', Number(b.dataset.n) === cur); });
+  var i = w.querySelector('.capin');
+  if (i) { i.classList.toggle('on', SEAT_QUICK.indexOf(cur) < 0); if (document.activeElement !== i) i.value = cur; }
+}
+function shapeChips(cur, fn) {
+  return SHAPES.map(function (s, i) { return '<button type="button" class="chip' + (cur === s.k ? ' on' : '') + '" onclick="' + fn + '(' + i + ')"><span class="mini ' + s.k.charAt(0) + '"></span>' + s.label + '</button>'; }).join('');
+}
+function rangeField(label, id, val, min, max) {
+  return '<div class="field rng"><label class="lb" for="' + id + '"><span>' + label + '</span><span id="' + id + 'V">' + val + '%</span></label><input type="range" id="' + id + '" min="' + min + '" max="' + max + '" step="0.5" value="' + val + '" oninput="resizeSel()"></div>';
+}
+function renderSide() {
+  var h;
+  if (FP.mode === 'add') h = addPanel();
+  else if (FP.sel != null && D.byId[FP.sel]) h = editorPanel(D.byId[FP.sel]);
+  else h = idlePanel();
+  el('side').innerHTML = h;
+}
+function idlePanel() {
+  if (!D.loaded) return '<div class="card muted sm">Loading…</div>';
+  var z = curZone(), list = FP.zone == null ? [] : zoneTables(FP.zone).slice().sort(function (a, b) { return natCmp(a.table_number, b.table_number); });
+  var h = '<div class="card"><h3>' + (z ? 'Zone ' + esc(z.code) + ' · ' + esc(z.name) : (FP.zone === 'none' ? 'Tables without a zone' : 'No zones yet')) + '</h3>';
+  if (!z && FP.zone !== 'none') return h + '<p class="muted sm">Create a zone first with the <b>+ Zone</b> button.</p></div>';
+  h += '<p class="muted sm">Tap a table on the floor, or pick one here, to change its number, seats, shape or zone.</p>';
+  if (list.length) h += '<span class="lb" style="margin-top:12px">Tables here (' + list.length + ')</span><div class="chips">' + list.map(function (t) {
+    return '<button type="button" class="chip" onclick="selectTable(' + t.table_id + ')">' + esc(t.table_number) + '&nbsp;<span style="opacity:.6">· ' + t.capacity + '</span></button>';
+  }).join('') + '</div>';
+  h += '<ul class="tips"><li><b>Add table:</b> press <i>Add table</i>, then tap the floor.</li>' +
+    '<li><b>Quick fill:</b> create many identical tables at once, then drag them into place.</li>' +
+    '<li>Moves and sizes wait for <b>Save layout</b>. Table details save with <b>Save table</b>.</li></ul></div>';
+  return h;
+}
+function editorPanel(t) {
+  var dr = ensureDraft(t), g = geo(t), z = zoneById(t.zone_id), round = dr.shape !== 'rectangle';
+  return '<div class="card">' +
+    '<div class="edhead"><span class="badge" style="--zc:' + zoneColor(z) + '">' + esc(dr.table_number || '?') + '</span><div><b>Table ' + esc(t.table_number) + '</b>' +
+      '<div class="muted sm">' + (z ? 'Zone ' + esc(z.code) + ' · ' + esc(z.name) : 'No zone') + ' · ' + plural(t.capacity, 'seat') + '</div></div></div>' +
+    '<div class="grid2">' + fld('Table number', '<input type="text" id="edNum" maxlength="20" autocomplete="off" value="' + esc(dr.table_number) + '" oninput="draftInput()">', 'edNum') +
+      fld('Zone', '<select id="edZone" onchange="draftInput()">' + zoneOptions(dr.zone_id) + '</select>', 'edZone') + '</div>' +
+    '<span class="lb">Seats</span><div class="chips" id="edSeats">' + seatChips(dr.capacity, 'setSeats', 'edCap', 'draftCap') + '</div>' +
+    '<span class="lb" style="margin-top:12px">Shape</span><div class="chips">' + shapeChips(dr.shape, 'setShape') + '</div>' +
+    '<span class="lb" style="margin-top:12px">Rotation · <span id="edRot">' + g.rot + '°</span></span><div class="btns" style="margin-top:0">' +
+      '<button type="button" class="btn" onclick="rotateSel(-15)" title="Rotate left 15°"><i class="fas fa-rotate-left"></i>15°</button>' +
+      '<button type="button" class="btn" onclick="rotateSel(15)" title="Rotate right 15°"><i class="fas fa-rotate-right"></i>15°</button>' +
+      '<button type="button" class="btn" onclick="rotateSel(0)">Straight</button></div>' +
+    '<div style="margin-top:12px">' + (round ? rangeField('Size', 'edW', g.w, 3, 30) : rangeField('Width', 'edW', g.w, 3, 40) + rangeField('Height', 'edH', g.h, 4, 60)) + '</div>' +
+    '<div class="err" id="edErr"></div>' +
+    '<div class="btns"><button class="btn pri" id="edSave" onclick="saveTable()"' + (draftChanged() || FP.dirty[t.table_id] ? '' : ' disabled') + '><i class="fas fa-floppy-disk"></i>Save table</button>' +
+      '<button class="btn danger" onclick="deleteTable()"><i class="fas fa-trash"></i>Delete</button>' +
+      '<button class="btn" onclick="selectTable(null)">Close</button></div>' +
+    '<p class="muted xs">Seat totals and live stock update as soon as the table is saved.</p></div>';
+}
+function addPanel() {
+  var last = FP.lastAdded && D.byId[FP.lastAdded];
+  return '<div class="card"><h3><i class="fas fa-plus"></i>Add tables</h3>' +
+    '<p class="muted sm">Tap the floor where the new table goes. You choose its number and seats, and can drag it into its exact place afterwards.</p>' +
+    (last ? '<p class="sm" style="margin-top:8px">Last added: <b>' + esc(last.table_number) + '</b> · ' + plural(last.capacity, 'seat') + '</p>' : '') +
+    '<div class="btns"><button class="btn pri" onclick="modeSelect()"><i class="fas fa-check"></i>Done</button></div></div>';
+}
+function updEdSave() {
+  var b = el('edSave'), id = FP.sel;
+  if (b) b.disabled = FP.busy || !(draftChanged() || (id != null && FP.dirty[id]));
+}
+function syncSizeInputs() {
+  var t = D.byId[FP.sel];
+  if (!t) return;
+  var g = geo(t);
+  if (el('edW') && document.activeElement !== el('edW')) { el('edW').value = g.w; el('edWV').textContent = g.w + '%'; }
+  if (el('edH') && document.activeElement !== el('edH')) { el('edH').value = g.h; el('edHV').textContent = g.h + '%'; }
+  if (el('edRot')) el('edRot').textContent = g.rot + '°';
+}
+function selectTable(id) {
+  if (id === FP.sel) return;
+  if (!confirmDropDraft()) return;
+  FP.sel = id != null && D.byId[id] ? id : null;
+  FP.draft = null;
+  FP.lastAdded = null;
+  renderFloor();
+  renderSide();
+}
+function draftInput() {
+  var t = D.byId[FP.sel];
+  if (!t) return;
+  var dr = ensureDraft(t), zv = el('edZone').value;
+  dr.table_number = el('edNum').value;
+  dr.zone_id = zv === '' ? null : Number(zv);
+  renderFloor();
+  updEdSave();
+}
+// Re-size to the new default footprint only when the table still had the old default (or the shape changed)
+function autoResize(t, before, after) {
+  var g = geo(t), d0 = defSize(before.shape, before.cap), d1 = defSize(after.shape, after.cap);
+  var wasDefault = Math.abs(g.w - d0.w) < 0.6 && Math.abs(g.h - d0.h) < 0.6;
+  if (before.shape === after.shape && !wasDefault) return;
+  var cx = g.x + g.w / 2, cy = g.y + g.h / 2;
+  setDirty(t.table_id, { width: d1.w, height: d1.h, position_x: clamp(cx - d1.w / 2, 0, 100 - d1.w), position_y: clamp(cy - d1.h / 2, 0, 100 - d1.h) });
+}
+function applySeats(n) {
+  var t = D.byId[FP.sel];
+  if (!t) return;
+  var dr = ensureDraft(t), before = { shape: dr.shape, cap: dr.capacity };
+  dr.capacity = n;
+  autoResize(t, before, { shape: dr.shape, cap: n });
+  renderFloor();
+  renderLayoutBar();
+  syncSeatChips('edSeats', n);
+  syncSizeInputs();
+  updEdSave();
+}
+function setSeats(n) { applySeats(n); }
+function draftCap() {
+  var n = parseInt(el('edCap').value, 10);
+  if (n >= 1 && n <= 30) applySeats(n);
+}
+function setShape(i) {
+  var t = D.byId[FP.sel], s = SHAPES[i];
+  if (!t || !s) return;
+  var dr = ensureDraft(t), before = { shape: dr.shape, cap: dr.capacity };
+  if (dr.shape === s.k) return;
+  dr.shape = s.k;
+  autoResize(t, before, { shape: s.k, cap: dr.capacity });
+  renderFloor();
+  renderLayoutBar();
+  renderSide();
+}
+function rotateSel(d) {
+  var t = D.byId[FP.sel];
+  if (!t) return;
+  var g = geo(t);
+  setDirty(t.table_id, { rotation: d === 0 ? 0 : g.rot + d });
+  renderFloor();
+  renderLayoutBar();
+  syncSizeInputs();
+  updEdSave();
+}
+function resizeSel() {
+  var t = D.byId[FP.sel];
+  if (!t) return;
+  var dr = ensureDraft(t), g = geo(t), w = parseFloat(el('edW').value), h;
+  if (!(w > 0)) return;
+  if (dr.shape === 'rectangle') { h = parseFloat(el('edH').value); if (!(h > 0)) return; }
+  else h = r2(w * 1.6);
+  w = Math.min(w, 100); h = Math.min(h, 100);
+  var cx = g.x + g.w / 2, cy = g.y + g.h / 2;
+  setDirty(t.table_id, { width: w, height: h, position_x: clamp(cx - w / 2, 0, 100 - w), position_y: clamp(cy - h / 2, 0, 100 - h) });
+  el('edWV').textContent = r2(w) + '%';
+  if (el('edHV')) el('edHV').textContent = r2(h) + '%';
+  renderFloor();
+  renderLayoutBar();
+  updEdSave();
+}
+function numberClash(num, exceptId) {
+  var k = numKey(num);
+  return D.tables.filter(function (o) { return o.table_id !== exceptId && numKey(o.table_number) === k; })[0] || null;
+}
+function numberProblem(num) {
+  if (!num) return 'Enter a table number.';
+  if (num.length > 20 || BAD_CHARS.test(num) || num.indexOf('__') === 0) return 'Table numbers are 1 to 20 characters, without < or > and not starting with __.';
+  return '';
+}
+function clashText(num, o) {
+  var z = o && zoneById(o.zone_id);
+  return 'Number ' + num + ' is already used by another table' + (z ? ' in Zone ' + z.code : '') + '.';
+}
+function conflictHtml(r, fallback, cap) {
+  var d = r.data || {};
+  if (r.status === 409 && /duplicate/i.test(String(d.error || ''))) return esc((typeof d.message === 'string' && d.message) || 'That table number is already used in this restaurant.');
+  var list = Array.isArray(d.conflicts) ? d.conflicts : (Array.isArray(d.bookings) ? d.bookings : []);
+  var msg = (typeof d.message === 'string' && d.message) ? d.message
+    : (r.status === 409 && list.length && cap ? 'Some upcoming bookings on this table have more guests than ' + cap + ' seats. Move those bookings first, or keep more seats.' : errText(r, fallback));
+  var h = esc(msg);
+  if (list.length) {
+    h += '<ul>' + list.slice(0, 8).map(function (b) {
+      var bits = [b.booking_date, b.start_time, b.booking_code || b.booking_reference, b.party_size ? plural(Number(b.party_size), 'guest') : '', b.room_number ? 'room ' + b.room_number : '', b.guest_name];
+      return '<li>' + esc(bits.filter(function (x) { return x != null && x !== ''; }).join(' · ')) + '</li>';
+    }).join('') + (list.length > 8 ? '<li>and ' + (list.length - 8) + ' more</li>' : '') + '</ul>';
+  }
+  return h;
+}
+async function saveTable() {
+  var t = D.byId[FP.sel], dr = FP.draft;
+  if (!t || !dr || FP.busy) return;
+  var err = el('edErr');
+  err.textContent = '';
+  var num = String(dr.table_number || '').trim(), np = numberProblem(num);
+  if (np) { err.textContent = np; return; }
+  var clash = numberClash(num, t.table_id);
+  if (clash) { err.textContent = clashText(num, clash); return; }
+  if (!(Number.isInteger(dr.capacity) && dr.capacity >= 1 && dr.capacity <= 30)) { err.textContent = 'Seats must be a whole number from 1 to 30.'; return; }
+  var body = {};
+  if (num !== t.table_number) body.table_number = num;
+  if (dr.capacity !== t.capacity) body.capacity = dr.capacity;
+  if (dr.shape !== t.shape) body.shape = dr.shape;
+  if (dr.zone_id !== t.zone_id && dr.zone_id != null) body.zone_id = dr.zone_id;
+  var dd = FP.dirty[t.table_id];
+  if (dd) for (var k in dd) body[k] = dd[k];
+  if (!Object.keys(body).length) { toast('Nothing to save'); return; }
+  FP.busy = true;
+  el('edSave').disabled = true;
+  var r = await api('PUT', BASE + '/tables/' + t.table_id, body);
+  FP.busy = false;
+  if (!r.ok) {
+    updEdSave();
+    renderLayoutBar();
+    var h = conflictHtml(r, 'Could not save the table', body.capacity);
+    if (el('edErr')) el('edErr').innerHTML = h; else toast(errText(r, 'Could not save the table'), 'err');
+    return;
+  }
+  delete FP.dirty[t.table_id];
+  FP.draft = null;
+  if (body.zone_id != null) FP.zone = body.zone_id;
+  await loadAll();
+  toast('Table ' + num + ' saved' + (body.capacity ? ' · ' + plural(body.capacity, 'seat') : ''), 'ok');
+}
+async function deleteTable() {
+  var t = D.byId[FP.sel];
+  if (!t || FP.busy) return;
+  if (!confirm('Delete table ' + t.table_number + ' (' + plural(t.capacity, 'seat') + ')? It disappears from the floor plan and the live stock. Past bookings are kept.')) return;
+  FP.busy = true;
+  var r = await api('DELETE', BASE + '/tables/' + t.table_id);
+  if (r.status === 409 && r.data && r.data.error === 'has_bookings') {
+    var n = Number(r.data.count) || 0;
+    if (!confirm('Table ' + t.table_number + ' has ' + plural(n, 'upcoming booking') + '. Delete it anyway? Those bookings are kept, but the table is no longer on the floor plan, so staff must re-seat those guests.')) { FP.busy = false; return; }
+    r = await api('DELETE', BASE + '/tables/' + t.table_id + '?force=1');
+  }
+  FP.busy = false;
+  if (!r.ok) { toast(errText(r, 'Could not delete the table'), 'err'); return; }
+  delete FP.dirty[t.table_id];
+  FP.sel = null;
+  FP.draft = null;
+  await loadAll();
+  toast('Table ' + t.table_number + ' deleted', 'ok');
+}
+
+// ---------- floor plan: modes, drag, keyboard ----------
+function modeSelect() {
+  FP.mode = 'select';
+  if (FP.add) { FP.add = null; closeDlg(true); }
+  FP.lastAdded = null;
+  renderFloor();
+  renderLayoutBar();
+  renderSide();
+}
+function toggleAdd() {
+  if (FP.mode === 'add') { modeSelect(); return; }
+  if (!curZone()) { toast(D.zones.length ? 'Pick a zone first' : 'Create a zone first with + Zone', 'err'); return; }
+  if (!confirmDropDraft()) return;
+  FP.mode = 'add';
+  FP.sel = null;
+  FP.draft = null;
+  renderFloor();
+  renderLayoutBar();
+  renderSide();
+}
+function pctAt(ev) {
+  var r = el('stage').getBoundingClientRect();
+  return { x: clamp((ev.clientX - r.left) / r.width * 100, 0, 100), y: clamp((ev.clientY - r.top) / r.height * 100, 0, 100) };
+}
+var drag = null, lastDragEnd = 0;
+el('tbls').addEventListener('pointerdown', function (ev) {
+  if (ev.button !== 0) return;
+  var node = ev.target.closest('.tb');
+  if (!node || node.classList.contains('ghost') || FP.mode !== 'select') return;
+  var id = Number(node.dataset.id), t = D.byId[id];
+  if (!t) return;
+  var g = geo(t);
+  drag = { id: id, node: node, sx: ev.clientX, sy: ev.clientY, rect: el('stage').getBoundingClientRect(), moved: false, g: g, x: g.x, y: g.y };
+  try { node.setPointerCapture(ev.pointerId); } catch (e) {}
+  ev.preventDefault();
+});
+el('tbls').addEventListener('pointermove', function (ev) {
+  if (!drag) return;
+  var mx = ev.clientX - drag.sx, my = ev.clientY - drag.sy;
+  if (!drag.moved && Math.abs(mx) + Math.abs(my) < 5) return;
+  drag.moved = true;
+  drag.x = r2(clamp(drag.g.x + mx / drag.rect.width * 100, 0, 100 - drag.g.w));
+  drag.y = r2(clamp(drag.g.y + my / drag.rect.height * 100, 0, 100 - drag.g.h));
+  drag.node.style.left = drag.x + '%';
+  drag.node.style.top = drag.y + '%';
+  drag.node.classList.add('dragging');
+});
+function endDrag(ev) {
+  if (!drag) return;
+  var d = drag;
+  drag = null;
+  lastDragEnd = Date.now();
+  if (!d.moved) { if (ev.type === 'pointerup') selectTable(d.id); return; }
+  setDirty(d.id, { position_x: d.x, position_y: d.y });
+  if (FP.sel !== d.id) { selectTable(d.id); if (FP.sel !== d.id) renderFloor(); }
+  else { renderFloor(); updEdSave(); }
+  renderLayoutBar();
+}
+el('tbls').addEventListener('pointerup', endDrag);
+el('tbls').addEventListener('pointercancel', endDrag);
+el('stage').addEventListener('click', function (ev) {
+  var onTb = ev.target.closest('.tb');
+  if (onTb && Date.now() - lastDragEnd < 350) return;
+  if (FP.mode === 'add') { openAdd(pctAt(ev)); return; }
+  if (FP.mode === 'select' && !onTb && FP.sel != null) selectTable(null);
+});
+function applyZoom() {
+  var wrap = el('mapwrap'), st = el('stage');
+  var cx = (wrap.scrollLeft + wrap.clientWidth / 2) / (st.offsetWidth || 1);
+  var cy = (wrap.scrollTop + wrap.clientHeight / 2) / (st.offsetHeight || 1);
+  st.style.width = (ZOOMS[FP.zoomIx] * 100) + '%';
+  st.style.minWidth = Math.round(640 * ZOOMS[FP.zoomIx]) + 'px';
+  sizeVars();
+  wrap.scrollLeft = cx * st.offsetWidth - wrap.clientWidth / 2;
+  wrap.scrollTop = cy * st.offsetHeight - wrap.clientHeight / 2;
+  renderLayoutBar();
+}
+function zoomBy(d) { FP.zoomIx = clamp(FP.zoomIx + d, 0, ZOOMS.length - 1); applyZoom(); }
+window.addEventListener('resize', function () { if (curTab === 'floor') sizeVars(); });
+document.addEventListener('keydown', function (e) {
+  var t = e.target, tag = t && t.tagName;
+  if (!el('dlg').classList.contains('hidden')) {
+    if (e.key === 'Escape') closeDlg();
+    else if (e.key === 'Enter' && tag === 'INPUT') { var b = el('dlgBox').querySelector('.btn.pri'); if (b && !b.disabled) { e.preventDefault(); b.click(); } }
+    return;
+  }
+  if (curTab !== 'floor') return;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (t && t.isContentEditable)) return;
+  if (e.key === 'Escape') { if (FP.mode !== 'select') modeSelect(); else if (FP.sel != null) selectTable(null); return; }
+  var st = e.shiftKey ? 2 : 0.5, dx = 0, dy = 0;
+  if (e.key === 'ArrowLeft') dx = -st; else if (e.key === 'ArrowRight') dx = st;
+  else if (e.key === 'ArrowUp') dy = -st; else if (e.key === 'ArrowDown') dy = st;
+  else return;
+  var tb = D.byId[FP.sel];
+  if (FP.mode !== 'select' || !tb) return;
+  e.preventDefault();
+  var g = geo(tb);
+  setDirty(tb.table_id, { position_x: clamp(g.x + dx, 0, 100 - g.w), position_y: clamp(g.y + dy, 0, 100 - g.h) });
+  renderFloor();
+  renderLayoutBar();
+  updEdSave();
+});
+
+// ---------- floor plan: layout save ----------
+async function saveLayout() {
+  var ids = Object.keys(FP.dirty);
+  if (!ids.length || FP.busy) return;
+  var updates = ids.map(function (id) { var u = { table_id: Number(id) }, d = FP.dirty[id]; for (var k in d) u[k] = d[k]; return u; });
+  FP.busy = true;
+  renderLayoutBar();
+  var r = await api('POST', BASE + '/tables/bulk', { updates: updates });
+  FP.busy = false;
+  if (!r.ok) {
+    renderLayoutBar();
+    var bad = r.data || {}, bid = bad.table_id || (updates[bad.index] || {}).table_id, bt = bid && D.byId[bid];
+    toast(errText(r, 'Could not save the layout') + (bt ? ' (table ' + bt.table_number + ')' : ''), 'err');
+    return;
+  }
+  FP.dirty = {};
+  await loadAll();
+  toast('Layout saved: ' + plural(updates.length, 'table') + ' updated', 'ok');
+}
+function discardLayout() {
+  var n = dirtyCount();
+  if (!n || !confirm('Discard ' + plural(n, 'unsaved move') + ' on the floor plan?')) return;
+  FP.dirty = {};
+  renderFloor();
+  renderLayoutBar();
+  renderSide();
+}
+
+// ---------- dialogs: add table, quick fill ----------
+function showDlg(html, focusId) {
+  el('dlgBox').innerHTML = html;
+  el('dlg').classList.remove('hidden');
+  setTimeout(function () { var f = focusId && el(focusId); if (f) { f.focus(); if (f.select) f.select(); } }, 40);
+}
+function closeDlg(silent) {
+  el('dlg').classList.add('hidden');
+  el('dlgBox').innerHTML = '';
+  QF = null;
+  if (FP.add) { FP.add = null; if (!silent) renderFloor(); }
+}
+el('dlg').addEventListener('click', function (ev) { if (ev.target === el('dlg')) closeDlg(); });
+function nextNumber(prefix) {
+  var p = String(prefix || '').toLowerCase(), max = 0;
+  D.tables.forEach(function (t) {
+    var k = numKey(t.table_number);
+    if (k.indexOf(p) !== 0) return;
+    var rest = k.slice(p.length);
+    if (/^[0-9]+$/.test(rest)) max = Math.max(max, parseInt(rest, 10));
+  });
+  return max + 1;
+}
+function openAdd(p) {
+  var z = curZone();
+  if (!z) { toast('Pick a zone first', 'err'); return; }
+  if (FP.add) { FP.add.cx = p.x; FP.add.cy = p.y; renderFloor(); return; }
+  var cap = FP.addCap;
+  FP.add = { cx: p.x, cy: p.y, cap: cap, shape: autoShape(cap), shapeAuto: true, num: z.code + nextNumber(z.code), zone_id: z.zone_id };
+  renderFloor();
+  showDlg(addDlgHtml(), 'aNum');
+}
+function addDlgHtml() {
+  var A = FP.add, z = zoneById(A.zone_id);
+  return '<h3><i class="fas fa-plus"></i>New table · Zone ' + esc(z ? z.code : '') + '</h3>' +
+    fld('Table number', '<input type="text" id="aNum" maxlength="20" autocomplete="off" value="' + esc(A.num) + '" oninput="addInput()">', 'aNum') +
+    '<span class="lb">Seats</span><div class="chips" id="aSeats">' + seatChips(A.cap, 'addSeats', 'aCap', 'addCapInput') + '</div>' +
+    '<span class="lb" style="margin-top:12px">Shape</span><div class="chips">' + shapeChips(A.shape, 'addShape') + '</div>' +
+    '<p class="muted xs">Tap the floor again to move it. You can fine-tune the position afterwards by dragging.</p>' +
+    '<div class="err" id="aErr"></div>' +
+    '<div class="btns"><button class="btn pri" id="aGo" onclick="createTable()"><i class="fas fa-check"></i>Create table</button><button class="btn" onclick="closeDlg()">Cancel</button></div>';
+}
+function addInput() { if (FP.add && el('aNum')) { FP.add.num = el('aNum').value; renderFloor(); } }
+function addSeats(n) {
+  var A = FP.add;
+  if (!A) return;
+  addInput();
+  A.cap = n;
+  if (A.shapeAuto) A.shape = autoShape(n);
+  el('dlgBox').innerHTML = addDlgHtml();
+  renderFloor();
+}
+function addCapInput() {
+  var A = FP.add, n = parseInt(el('aCap').value, 10);
+  if (!A || !(n >= 1 && n <= 30)) return;
+  A.cap = n;
+  syncSeatChips('aSeats', n);
+  renderFloor();
+}
+function addShape(i) {
+  var A = FP.add;
+  if (!A || !SHAPES[i]) return;
+  addInput();
+  A.shape = SHAPES[i].k;
+  A.shapeAuto = false;
+  el('dlgBox').innerHTML = addDlgHtml();
+  renderFloor();
+}
+async function createTable() {
+  var A = FP.add;
+  if (!A || FP.busy) return;
+  addInput();
+  var err = el('aErr'), num = String(A.num || '').trim(), np = numberProblem(num);
+  err.textContent = '';
+  if (np) { err.textContent = np; return; }
+  var clash = numberClash(num, null);
+  if (clash) { err.textContent = clashText(num, clash); return; }
+  if (!(Number.isInteger(A.cap) && A.cap >= 1 && A.cap <= 30)) { err.textContent = 'Seats must be a whole number from 1 to 30.'; return; }
+  var g = addGeo();
+  FP.busy = true;
+  el('aGo').disabled = true;
+  var r = await api('POST', BASE + '/tables', { zone_id: A.zone_id, table_number: num, capacity: A.cap, shape: A.shape, position_x: g.x, position_y: g.y, width: g.w, height: g.h, rotation: 0 });
+  FP.busy = false;
+  if (!r.ok) {
+    if (el('aGo')) el('aGo').disabled = false;
+    if (el('aErr')) el('aErr').innerHTML = conflictHtml(r, 'Could not create the table'); else toast(errText(r, 'Could not create the table'), 'err');
+    return;
+  }
+  FP.addCap = A.cap;
+  closeDlg(true);
+  var nid = idFrom(r.data, 'table_id');
+  await loadAll();
+  var nt = (nid && D.byId[nid]) || D.tables.filter(function (t) { return numKey(t.table_number) === numKey(num); })[0];
+  FP.lastAdded = nt ? nt.table_id : null;
+  renderFloor();
+  renderSide();
+  toast('Table ' + num + ' added · ' + plural(A.cap, 'seat') + '. Tap the floor to add another, or press Done.', 'ok');
+}
+function openQuickFill() {
+  var z = curZone();
+  if (!z) { toast(D.zones.length ? 'Pick a zone first' : 'Create a zone first with + Zone', 'err'); return; }
+  if (FP.add) { FP.add = null; renderFloor(); }
+  QF = { zone_id: z.zone_id, count: 10, cap: 4, shape: 'auto', prefix: z.code, start: nextNumber(z.code) };
+  showDlg(qfHtml(), 'qCount');
+  qfPreview();
+}
+function qfHtml() {
+  var z = zoneById(QF.zone_id);
+  return '<h3><i class="fas fa-wand-magic-sparkles"></i>Quick fill · Zone ' + esc(z.code) + ' · ' + esc(z.name) + '</h3>' +
+    '<p class="muted sm" style="margin-bottom:10px">Creates identical tables in a neat grid on this zone’s floor. Drag them into their real places afterwards.</p>' +
+    '<div class="grid2">' + fld('How many tables', '<input type="number" id="qCount" min="1" max="200" step="1" value="' + QF.count + '" oninput="qfInput()">', 'qCount') +
+      fld('Seats per table', '<input type="number" id="qCap" min="1" max="30" step="1" value="' + QF.cap + '" oninput="qfInput()">', 'qCap') + '</div>' +
+    '<div class="chips" id="qSeats" style="margin:-2px 0 10px">' + SEAT_QUICK.map(function (n) { return '<button type="button" class="chip' + (QF.cap === n ? ' on' : '') + '" data-n="' + n + '" onclick="qfSeats(' + n + ')">' + n + ' seats</button>'; }).join('') + '</div>' +
+    fld('Shape', '<select id="qShape" onchange="qfInput()"><option value="auto">Automatic: round for 2 seats, rectangle for more</option>' +
+      SHAPES.map(function (s) { return '<option value="' + s.k + '"' + (QF.shape === s.k ? ' selected' : '') + '>' + s.label + '</option>'; }).join('') + '</select>', 'qShape') +
+    '<div class="grid2">' + fld('Number prefix', '<input type="text" id="qPrefix" maxlength="10" autocomplete="off" value="' + esc(QF.prefix) + '" oninput="qfInput()">', 'qPrefix') +
+      fld('First number', '<input type="number" id="qStart" min="0" max="9999" step="1" value="' + QF.start + '" oninput="qfInput()">', 'qStart') + '</div>' +
+    '<div id="qPrev"></div><div class="err" id="qErr"></div>' +
+    '<div class="btns"><button class="btn pri" id="qGo" onclick="runQuickFill()"><i class="fas fa-check"></i>Create tables</button><button class="btn" onclick="closeDlg()">Cancel</button></div>';
+}
+function qfInput() {
+  if (!QF) return;
+  QF.count = el('qCount').value;
+  QF.cap = parseInt(el('qCap').value, 10);
+  QF.shape = el('qShape').value;
+  QF.prefix = el('qPrefix').value;
+  QF.start = el('qStart').value;
+  syncSeatChips('qSeats', QF.cap);
+  qfPreview();
+}
+function qfSeats(n) { if (!QF) return; el('qCap').value = n; qfInput(); }
+function qfPlan() {
+  var count = Number(QF.count), cap = Number(QF.cap), start = Number(QF.start), prefix = String(QF.prefix || '').trim();
+  if (!(Number.isInteger(count) && count >= 1 && count <= 200)) return { err: 'How many tables: a whole number from 1 to 200.' };
+  if (!(Number.isInteger(cap) && cap >= 1 && cap <= 30)) return { err: 'Seats per table: a whole number from 1 to 30.' };
+  if (!/^[A-Za-z0-9 _-]{0,10}$/.test(prefix)) return { err: 'Prefix: up to 10 letters, digits, spaces, _ or -.' };
+  if (!(Number.isInteger(start) && start >= 0 && start <= 9999)) return { err: 'First number: a whole number from 0 to 9999.' };
+  var taken = {}, nums = [], skipped = [], n = start;
+  D.tables.forEach(function (t) { taken[numKey(t.table_number)] = 1; });
+  while (nums.length < count && n < start + 2000) {
+    var num = prefix + n;
+    if (taken[numKey(num)]) skipped.push(num); else nums.push(num);
+    n++;
+  }
+  return { count: count, cap: cap, start: start, prefix: prefix, nums: nums, skipped: skipped, seats: count * cap, shape: QF.shape === 'auto' ? autoShape(cap) : QF.shape };
+}
+function qfPreview() {
+  var p = qfPlan(), z = zoneById(QF.zone_id);
+  if (p.err || !z) { el('qPrev').innerHTML = ''; el('qErr').textContent = p.err || ''; el('qGo').disabled = true; return; }
+  el('qErr').textContent = '';
+  var st = seatStats(), zs = st.per[z.zone_id] || { seats: 0 }, side = z.is_outdoor ? st.outdoor : st.indoor;
+  var tgt = z.is_outdoor ? D.settings.outdoor_seat_target : D.settings.indoor_seat_target;
+  el('qPrev').innerHTML = '<div class="pvlist">' + p.nums.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + p.skipped.map(function (x) { return '<span class="x" title="Already used">' + esc(x) + '</span>'; }).join('') + '</div>' +
+    '<p class="sm"><b>' + plural(p.count, 'table') + ' · ' + plural(p.seats, 'seat') + '</b> · ' + shapeLabel(p.shape) + (p.skipped.length ? ' · skips ' + p.skipped.length + ' number' + (p.skipped.length === 1 ? '' : 's') + ' already in use' : '') + '</p>' +
+    '<p class="muted sm">Zone ' + esc(z.code) + ': ' + zs.seats + ' → <b>' + (zs.seats + p.seats) + '</b> seats · ' + (z.is_outdoor ? 'Outdoor' : 'Indoor') + ': ' + side + ' → <b>' + (side + p.seats) + '</b> of ' + tgt + '</p>';
+  el('qGo').disabled = FP.busy;
+}
+async function runQuickFill() {
+  if (!QF || FP.busy) return;
+  var p = qfPlan(), z = zoneById(QF.zone_id);
+  if (p.err || !z) { el('qErr').textContent = p.err || 'Pick a zone first.'; return; }
+  FP.busy = true;
+  el('qGo').disabled = true;
+  var r = await api('POST', BASE + '/tables/generate', { zone_id: z.zone_id, count: p.count, capacity: p.cap, prefix: p.prefix, start_number: p.start, shape: p.shape });
+  FP.busy = false;
+  if (!r.ok) { if (el('qGo')) el('qGo').disabled = false; if (el('qErr')) el('qErr').innerHTML = conflictHtml(r, 'Could not create the tables'); return; }
+  closeDlg(true);
+  var made = Array.isArray(r.data.created) ? r.data.created.length : (Number(r.data.created) || p.count);
+  await loadAll();
+  toast(plural(made, 'table') + ' added to Zone ' + z.code + '. Drag them into place, then press Save layout.', 'ok');
+}
+
+// ---------- time slots ----------
+function mealDef(k) { for (var i = 0; i < MEALS.length; i++) if (MEALS[i].k === k) return MEALS[i]; return null; }
+function mealLabel(k) { var m = mealDef(k); return m ? m.label : k; }
+function slotById(id) { for (var i = 0; i < D.slots.length; i++) if (D.slots[i].slot_id === id) return D.slots[i]; return null; }
+function draftById(id) { for (var i = 0; i < SL.drafts.length; i++) if (SL.drafts[i].id === String(id)) return SL.drafts[i]; return null; }
+function sv(id) {
+  var d = draftById(id);
+  if (d) return d;
+  var s = slotById(Number(id));
+  if (!s) return null;
+  var e = SL.edits[s.slot_id], o = { id: String(s.slot_id) }, k;
+  for (k in s) o[k] = s[k];
+  if (e) for (k in e) o[k] = e[k];
+  return o;
+}
+function allViews() {
+  return D.slots.map(function (s) { return sv(s.slot_id); }).concat(SL.drafts);
+}
+function slotChanges(id) {
+  var s = slotById(Number(id)), e = SL.edits[id] || {}, ch = {};
+  if (!s) return ch;
+  SLOT_KEYS.forEach(function (k) { if (k in e && e[k] !== s[k]) ch[k] = e[k]; });
+  return ch;
+}
+function slotIssues(v) {
+  var out = [], a = mins(v.start_time), b = mins(v.end_time), buf = Number(v.buffer_minutes);
+  if (!String(v.label || '').trim()) out.push('Give the slot a label.');
+  else if (BAD_CHARS.test(v.label)) out.push('The label cannot contain < or >.');
+  if (isNaN(a) || isNaN(b)) out.push('Enter a start and an end time.');
+  else if (b <= a) out.push('The slot must end after it starts.');
+  if (v.buffer_minutes === '' || !(Number.isInteger(buf) && buf >= 0 && buf <= 120)) out.push('Clearance must be a whole number from 0 to 120 minutes.');
+  if (!(v.days_mask & 127)) out.push('Pick at least one day.');
+  return out;
+}
+// Same rule the server uses for a table: A.start < B.end + B.buffer and B.start < A.end + A.buffer
+function overlaps(a, b) {
+  if (!a.is_active || !b.is_active || !(a.days_mask & b.days_mask & 127)) return false;
+  var as = mins(a.start_time), ae = mins(a.end_time), bs = mins(b.start_time), be = mins(b.end_time);
+  if (isNaN(as) || isNaN(ae) || isNaN(bs) || isNaN(be)) return false;
+  return as < be + (Number(b.buffer_minutes) || 0) && bs < ae + (Number(a.buffer_minutes) || 0);
+}
+function slotRow(v) {
+  var id = v.id, draft = !!v.draft;
+  var days = DAYS.map(function (d, i) {
+    return '<button type="button" class="day' + (((v.days_mask >> i) & 1) ? ' on' : '') + '" data-act="day" data-id="' + id + '" data-bit="' + i + '" title="' + d + '" aria-label="' + d + '">' + d.slice(0, 2) + '</button>';
+  }).join('');
+  return '<tr id="sr-' + id + '" class="' + (v.is_active ? '' : 'off') + (draft ? ' draft' : '') + '">' +
+    '<td><input type="text" data-sid="' + id + '" data-k="label" maxlength="40" value="' + esc(v.label) + '" aria-label="Label"></td>' +
+    '<td><input type="time" data-sid="' + id + '" data-k="start_time" value="' + esc(v.start_time) + '" aria-label="Starts"></td>' +
+    '<td><input type="time" data-sid="' + id + '" data-k="end_time" value="' + esc(v.end_time) + '" aria-label="Ends"></td>' +
+    '<td><div class="bufw"><input type="number" data-sid="' + id + '" data-k="buffer_minutes" min="0" max="120" step="5" value="' + esc(v.buffer_minutes) + '" aria-label="Clearance minutes"><span class="muted">min</span></div></td>' +
+    '<td><div class="days">' + days + '</div></td>' +
+    '<td><label class="chk"><input type="checkbox" data-sid="' + id + '" data-k="is_active"' + (v.is_active ? ' checked' : '') + ' aria-label="Active"></label></td>' +
+    '<td class="held" id="sh-' + id + '"></td>' +
+    '<td class="acts"><button type="button" class="btn pri" data-act="slot-save" data-id="' + id + '" id="ss-' + id + '"><i class="fas fa-floppy-disk"></i>' + (draft ? 'Create' : 'Save') + '</button>' +
+      (draft ? '<button type="button" class="btn" data-act="slot-discard" data-id="' + id + '">Remove</button>'
+        : '<button type="button" class="btn danger icon" data-act="slot-del" data-id="' + id + '" title="Delete this slot" aria-label="Delete this slot"><i class="fas fa-trash"></i></button>') + '</td></tr>' +
+    '<tr class="swarn hidden" id="sw-' + id + '"><td colspan="8"></td></tr>';
+}
+function mealCard(m) {
+  var rows = D.slots.filter(function (s) { return s.meal === m.k; }).map(function (s) { return sv(s.slot_id); });
+  var on = rows.filter(function (v) { return slotById(Number(v.id)).is_active; }).sort(slotCmp);
+  var off = rows.filter(function (v) { return !slotById(Number(v.id)).is_active; }).sort(slotCmp);
+  var drafts = SL.drafts.filter(function (d) { return d.meal === m.k; });
+  var list = on.concat(SL.showOff[m.k] ? off : []).concat(drafts);
+  var h = '<div class="card meal" id="meal-' + m.k + '" style="margin-top:14px"><div class="mealhead"><h2><i class="fas ' + m.icon + '"></i>' + m.label + '</h2>' +
+    '<span class="pill" id="mc-' + m.k + '"></span><span class="muted sm" id="ms-' + m.k + '"></span><span class="sp"></span>' +
+    '<button type="button" class="btn' + (SL.genOpen[m.k] ? ' on' : '') + '" data-act="gen" data-meal="' + m.k + '"><i class="fas fa-wand-magic-sparkles"></i>Generator</button>' +
+    '<button type="button" class="btn" data-act="add-slot" data-meal="' + m.k + '"><i class="fas fa-plus"></i>Add slot</button></div>';
+  if (SL.genOpen[m.k]) h += genPanel(m);
+  if (!list.length) h += '<p class="muted sm">No active ' + m.label.toLowerCase() + ' slots. Press Add slot, or use the Generator to create a whole service at once.</p>';
+  else h += '<div class="tscroll"><table class="tbl slt"><thead><tr><th>Label</th><th>Starts</th><th>Ends</th><th>Clearance</th><th>Days</th><th>Active</th><th>Table held</th><th></th></tr></thead><tbody>' +
+    list.map(slotRow).join('') + '</tbody></table></div>';
+  if (off.length) h += '<button type="button" class="lnk sm" data-act="show-off" data-meal="' + m.k + '">' + (SL.showOff[m.k] ? 'Hide ' : 'Show ') + plural(off.length, 'inactive slot') + '</button>';
+  return h + '</div>';
+}
+function renderSlots() {
+  if (!D.loaded) return;
+  var other = D.slots.filter(function (s) { return !mealDef(s.meal); });
+  el('mealCards').innerHTML = MEALS.map(mealCard).join('') +
+    (other.length ? '<div class="card" style="margin-top:14px"><p class="muted sm">' + plural(other.length, 'slot') + ' with an unknown meal type are not shown.</p></div>' : '');
+  MEALS.forEach(function (m) { if (SL.genOpen[m.k]) renderGenPreview(m.k); });
+  refreshSlotDerived();
+}
+function refreshSlotDerived() {
+  var all = allViews();
+  all.forEach(function (v) {
+    var held = el('sh-' + v.id), warn = el('sw-' + v.id), row = el('sr-' + v.id), btn = el('ss-' + v.id);
+    if (!row) return;
+    var a = mins(v.start_time), b = mins(v.end_time), buf = Number(v.buffer_minutes) || 0;
+    if (held) held.innerHTML = (isNaN(a) || isNaN(b) || b <= a) ? '<span class="muted">—</span>'
+      : '<b>' + hm(a) + ' → ' + hm(b + buf) + '</b><br><span class="muted">' + (b - a) + ' min + ' + buf + ' clearance</span>';
+    var errs = slotIssues(v), msgs = errs.map(function (x) { return '<span class="e"><i class="fas fa-circle-exclamation"></i>' + esc(x) + '</span>'; });
+    all.forEach(function (o) {
+      if (o.id === v.id || !overlaps(v, o)) return;
+      msgs.push('<span class="w"><i class="fas fa-triangle-exclamation"></i>Overlaps ' + esc(o.label || 'another slot') + ' (' + esc(o.start_time) + '–' + esc(o.end_time) +
+        (Number(o.buffer_minutes) ? ' + ' + Number(o.buffer_minutes) + ' min clearance' : '') + (o.meal !== v.meal ? ', ' + esc(mealLabel(o.meal)) : '') +
+        (o.draft ? ', not created yet' : '') + '). A table booked in one of them cannot be booked in the other.</span>');
+    });
+    if (warn) { warn.cells[0].innerHTML = msgs.join(''); warn.classList.toggle('hidden', !msgs.length); }
+    row.classList.toggle('hw', msgs.length > 0);
+    row.classList.toggle('bad', errs.length > 0);
+    if (btn) btn.disabled = !!SL.busy[v.id] || errs.length > 0 || (!v.draft && !Object.keys(slotChanges(v.id)).length);
+  });
+  MEALS.forEach(function (m) {
+    var act = all.filter(function (v) { return v.meal === m.k && v.is_active && !v.draft; }).sort(slotCmp);
+    var pc = el('mc-' + m.k), ms = el('ms-' + m.k);
+    if (pc) pc.textContent = plural(act.length, 'slot');
+    if (!ms) return;
+    if (!act.length) { ms.textContent = ''; return; }
+    var first = mins(act[0].start_time), last = -1;
+    act.forEach(function (v) { var e = mins(v.end_time) + (Number(v.buffer_minutes) || 0); if (e > last) last = e; });
+    ms.textContent = isNaN(first) ? '' : 'Service ' + hm(first) + ' – ' + hm(last) + ' incl. clearance';
+  });
+}
+function setSlotField(id, k, val) {
+  var d = draftById(id);
+  if (d) { d[k] = val; return; }
+  var s = slotById(Number(id));
+  if (!s) return;
+  var e = SL.edits[s.slot_id] || {};
+  e[k] = val;
+  if (e[k] === s[k]) delete e[k];
+  if (Object.keys(e).length) SL.edits[s.slot_id] = e; else delete SL.edits[s.slot_id];
+}
+function slotFieldEvent(ev) {
+  var t = ev.target, ds = (t && t.dataset) || {};
+  if (ds.sid && ds.k) {
+    var k = ds.k, val;
+    if (k === 'is_active') val = t.checked ? 1 : 0;
+    else if (k === 'buffer_minutes') { var n = parseInt(t.value, 10); val = isNaN(n) ? '' : n; }
+    else if (k === 'label') val = t.value;
+    else val = String(t.value || '').slice(0, 5);
+    setSlotField(ds.sid, k, val);
+    if (k === 'is_active') { var row = el('sr-' + ds.sid); if (row) row.classList.toggle('off', !val); }
+    refreshSlotDerived();
+  } else if (ds.gen && ds.gk) {
+    var g = SL.gen[ds.gen];
+    if (!g) return;
+    g[ds.gk] = t.type === 'checkbox' ? t.checked : t.value;
+    renderGenPreview(ds.gen);
+  }
+}
+el('mealCards').addEventListener('input', slotFieldEvent);
+el('mealCards').addEventListener('change', slotFieldEvent);
+el('mealCards').addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-act]');
+  if (!b) return;
+  var act = b.dataset.act, id = b.dataset.id, meal = b.dataset.meal;
+  if (act === 'day') {
+    var v = sv(id), bit = 1 << Number(b.dataset.bit);
+    if (!v) return;
+    setSlotField(id, 'days_mask', (v.days_mask ^ bit) & 127);
+    b.classList.toggle('on', !!(sv(id).days_mask & bit));
+    refreshSlotDerived();
+  } else if (act === 'slot-save') saveSlot(id);
+  else if (act === 'slot-del') deleteSlot(id);
+  else if (act === 'slot-discard') { SL.drafts = SL.drafts.filter(function (d) { return d.id !== id; }); renderSlots(); }
+  else if (act === 'add-slot') addSlot(meal);
+  else if (act === 'gen') { SL.genOpen[meal] = !SL.genOpen[meal]; if (!SL.genOpen[meal]) delete SL.gen[meal]; renderSlots(); }
+  else if (act === 'gen-apply') applyGen(meal);
+  else if (act === 'show-off') { SL.showOff[meal] = !SL.showOff[meal]; renderSlots(); }
+});
+function typicalLen(list) {
+  for (var i = 0; i < list.length; i++) { var l = mins(list[i].end_time) - mins(list[i].start_time); if (l > 0) return l; }
+  return 50;
+}
+function addSlot(meal) {
+  var m = mealDef(meal);
+  if (!m) return;
+  var act = allViews().filter(function (v) { return v.meal === meal && v.is_active; }).sort(slotCmp), lastEnd = -1;
+  act.forEach(function (v) { var e = mins(v.end_time) + (Number(v.buffer_minutes) || 0); if (!isNaN(e) && e > lastEnd) lastEnd = e; });
+  var start = lastEnd >= 0 ? lastEnd : mins(m.win[0]), len = typicalLen(act);
+  var buf = act.length ? (Number(act[act.length - 1].buffer_minutes) || 0) : 10;
+  SL.drafts.push({ id: 'n' + (++SL.seq), draft: true, meal: meal, label: m.label + ' Slot ' + (act.length + 1), start_time: hm(start), end_time: hm(start + len), buffer_minutes: buf, days_mask: 127, is_active: 1, display_order: 999, slot_id: 0 });
+  renderSlots();
+  var nd = SL.drafts[SL.drafts.length - 1], inp = document.querySelector('[data-sid="' + nd.id + '"][data-k="label"]');
+  if (inp) inp.focus();
+}
+async function saveSlot(id) {
+  var v = sv(id);
+  if (!v || SL.busy[id]) return;
+  var errs = slotIssues(v);
+  if (errs.length) { toast(errs[0], 'err'); return; }
+  var draft = !!v.draft, body, deactivate = false;
+  if (draft) {
+    body = { meal: v.meal, label: String(v.label).trim(), start_time: v.start_time, end_time: v.end_time, buffer_minutes: Number(v.buffer_minutes), days_mask: v.days_mask & 127, is_active: v.is_active ? 1 : 0 };
+  } else {
+    body = slotChanges(id);
+    if ('label' in body) body.label = String(body.label).trim();
+    // Switching a slot off goes through DELETE so upcoming bookings are checked first
+    if (body.is_active === 0) { deactivate = true; delete body.is_active; }
+    if (!Object.keys(body).length && !deactivate) { toast('Nothing to save'); return; }
+  }
+  var ov = allViews().filter(function (o) { return o.id !== v.id && overlaps(v, o); });
+  if (ov.length && !confirm(String(v.label).trim() + ' overlaps ' + ov.map(function (o) { return o.label; }).join(', ') + ' (including clearance), so a table booked in one of them cannot be booked in the other. Save anyway?')) return;
+  SL.busy[id] = true;
+  refreshSlotDerived();
+  var r = { ok: true, data: {} };
+  if (draft) r = await api('POST', BASE + '/slots', body);
+  else if (Object.keys(body).length) r = await api('PUT', BASE + '/slots/' + id, body);
+  if (r.ok && deactivate) {
+    r = await deactivateSlot(id, v);
+    if (r === null) { delete SL.busy[id]; if (Object.keys(body).length) { SL.edits[id] = { is_active: 0 }; await loadAll(); } else refreshSlotDerived(); return; }
+  }
+  delete SL.busy[id];
+  if (!r.ok) { refreshSlotDerived(); toast(errText(r, 'Could not save the slot'), 'err'); return; }
+  if (draft) SL.drafts = SL.drafts.filter(function (d) { return d.id !== id; });
+  else delete SL.edits[id];
+  await loadAll();
+  toast(String(v.label).trim() + (draft ? ' created' : deactivate ? ' switched off' : ' saved'), 'ok');
+}
+// Returns the API result, or null when the admin backs out of the has_bookings warning
+async function deactivateSlot(id, v) {
+  var r = await api('DELETE', BASE + '/slots/' + id);
+  if (r.status === 409 && r.data && r.data.error === 'has_bookings') {
+    var n = Number(r.data.count) || 0;
+    if (!confirm(String(v.label).trim() + ' has ' + plural(n, 'upcoming booking') + '. Switch it off anyway? Those bookings are kept and still expected; guests just cannot book this slot any more.')) return null;
+    r = await api('DELETE', BASE + '/slots/' + id + '?force=1');
+  }
+  return r;
+}
+async function deleteSlot(id) {
+  var v = sv(id);
+  if (!v || SL.busy[id]) return;
+  if (!confirm('Delete ' + (String(v.label).trim() || 'this slot') + ' (' + v.start_time + '–' + v.end_time + ')? Guests and staff can no longer book it. Existing bookings are kept.')) return;
+  SL.busy[id] = true;
+  refreshSlotDerived();
+  var r = await deactivateSlot(id, v);
+  delete SL.busy[id];
+  if (r === null) { refreshSlotDerived(); return; }
+  if (!r.ok) { refreshSlotDerived(); toast(errText(r, 'Could not delete the slot'), 'err'); return; }
+  delete SL.edits[id];
+  await loadAll();
+  toast((String(v.label).trim() || 'Slot') + ' deleted', 'ok');
+}
+function genDefaults(m) {
+  var act = D.slots.filter(function (s) { return s.meal === m.k && s.is_active; }).sort(slotCmp);
+  if (!act.length) return { ws: m.win[0], we: m.win[1], len: 50, buf: 10, prefix: m.label, replace: false };
+  var last = -1;
+  act.forEach(function (s) { var e = mins(s.end_time) + (Number(s.buffer_minutes) || 0); if (e > last) last = e; });
+  return { ws: act[0].start_time, we: hm(last), len: typicalLen(act), buf: Number(act[0].buffer_minutes) || 0, prefix: m.label, replace: true };
+}
+function genPlan(g) {
+  var a = mins(g.ws), b = mins(g.we), len = Number(g.len), buf = Number(g.buf);
+  if (isNaN(a) || isNaN(b)) return { err: 'Enter when the service opens and closes.' };
+  if (b <= a) return { err: 'The service must close after it opens.' };
+  if (!(Number.isInteger(len) && len >= 10 && len <= 480)) return { err: 'Slot length: a whole number from 10 to 480 minutes.' };
+  if (!(Number.isInteger(buf) && buf >= 0 && buf <= 120)) return { err: 'Clearance: a whole number from 0 to 120 minutes.' };
+  if (BAD_CHARS.test(String(g.prefix || ''))) return { err: 'The label cannot contain < or >.' };
+  var out = [], t = a;
+  while (t + len <= b && out.length < 48) { out.push({ start: t, end: t + len }); t += len + buf; }
+  if (!out.length) return { err: 'The service window is shorter than one slot.' };
+  return { list: out, len: len, buf: buf, a: a, b: b };
+}
+function gfld(meal, key, label, type, val, extra) {
+  return '<div class="field"><label class="lb">' + label + '</label><input type="' + type + '" data-gen="' + meal + '" data-gk="' + key + '" value="' + esc(val) + '" ' + (extra || '') + '></div>';
+}
+function genPanel(m) {
+  var g = SL.gen[m.k] || (SL.gen[m.k] = genDefaults(m));
+  var cur = D.slots.filter(function (s) { return s.meal === m.k && s.is_active; }).length;
+  return '<div class="gen"><h3><i class="fas fa-wand-magic-sparkles"></i>Generate ' + m.label.toLowerCase() + ' slots</h3>' +
+    '<div class="gengrid">' + gfld(m.k, 'ws', 'Service opens', 'time', g.ws) + gfld(m.k, 'we', 'Service closes', 'time', g.we) +
+      gfld(m.k, 'len', 'Slot length (min)', 'number', g.len, 'min="10" max="480" step="5"') + gfld(m.k, 'buf', 'Clearance after each (min)', 'number', g.buf, 'min="0" max="120" step="5"') +
+      gfld(m.k, 'prefix', 'Label (+ Slot 1, Slot 2…)', 'text', g.prefix, 'maxlength="30"') + '</div>' +
+    (cur ? '<label class="chk"><input type="checkbox" data-gen="' + m.k + '" data-gk="replace"' + (g.replace ? ' checked' : '') + '> Replace the ' + plural(cur, 'current ' + m.label.toLowerCase() + ' slot') + ' (their bookings are kept)</label>' : '') +
+    '<div id="gp-' + m.k + '"></div>' +
+    '<div class="btns"><button type="button" class="btn pri" data-act="gen-apply" data-meal="' + m.k + '" id="ga-' + m.k + '"><i class="fas fa-check"></i>Create these slots</button><button type="button" class="btn" data-act="gen" data-meal="' + m.k + '">Close</button></div></div>';
+}
+function renderGenPreview(meal) {
+  var box = el('gp-' + meal), g = SL.gen[meal], btn = el('ga-' + meal);
+  if (!box || !g) return;
+  var p = genPlan(g);
+  if (p.err) { box.innerHTML = '<div class="err">' + esc(p.err) + '</div>'; if (btn) btn.disabled = true; return; }
+  var cur = D.slots.filter(function (s) { return s.meal === meal && s.is_active; });
+  // The server names generated slots "<label> Slot 1", "<label> Slot 2"… from 1 every time
+  var replace = !!g.replace && cur.length > 0, prefix = String(g.prefix || '').trim() || mealLabel(meal), h = '<div class="pvlist">';
+  p.list.forEach(function (s, i) { h += '<span><b>' + esc(prefix + ' Slot ' + (i + 1)) + '</b> · ' + hm(s.start) + '–' + hm(s.end) + ' · held until ' + hm(s.end + p.buf) + '</span>'; });
+  h += '</div>';
+  var lastEnd = p.list[p.list.length - 1].end, spare = p.b - (lastEnd + p.buf);
+  h += '<p class="sm"><b>' + plural(p.list.length, 'slot') + '</b> of ' + p.len + ' min with ' + p.buf + ' min clearance' +
+    (spare > 0 ? ' · the last ' + spare + ' min before ' + hm(p.b) + ' stay unused' : '') + '.</p>';
+  var others = allViews().filter(function (v) { return v.is_active && !(replace && v.meal === meal && !v.draft); }), hits = [];
+  p.list.forEach(function (s) {
+    var gv = { start_time: hm(s.start), end_time: hm(s.end), buffer_minutes: p.buf, days_mask: 127, is_active: 1 };
+    others.forEach(function (o) { if (overlaps(gv, o) && hits.indexOf(o.label) < 0) hits.push(o.label); });
+  });
+  if (hits.length) h += '<div class="warn">These new slots overlap ' + hits.map(esc).join(', ') + '. ' + (replace ? '' : 'Tick "Replace" to swap the current slots out, or change the times.') + '</div>';
+  else if (!replace && cur.length) h += '<p class="muted sm">The current slots stay, and the new labels start again at Slot 1. Rename them afterwards if that is confusing.</p>';
+  box.innerHTML = h;
+  if (btn) btn.disabled = false;
+}
+async function applyGen(meal) {
+  var g = SL.gen[meal], m = mealDef(meal);
+  if (!g || !m) return;
+  var p = genPlan(g);
+  if (p.err) { toast(p.err, 'err'); return; }
+  var cur = D.slots.filter(function (s) { return s.meal === meal && s.is_active; }).length, replace = !!g.replace && cur > 0;
+  if (!confirm('Create ' + plural(p.list.length, m.label.toLowerCase() + ' slot') + (replace ? ' and switch off the ' + cur + ' current one' + (cur === 1 ? '' : 's') : '') + '? Existing bookings are kept.')) return;
+  var body = { meal: meal, window_start: g.ws, window_end: g.we, slot_minutes: p.len, buffer_minutes: p.buf, label_prefix: String(g.prefix || '').trim() || m.label, replace: replace };
+  var btn = el('ga-' + meal);
+  if (btn) btn.disabled = true;
+  var r = await api('POST', BASE + '/slots/generate', body);
+  if (r.status === 409 && r.data && r.data.error === 'has_bookings') {
+    if (!confirm('Some of the current ' + m.label.toLowerCase() + ' slots have ' + plural(Number(r.data.count) || 0, 'upcoming booking') + '. Replace them anyway? Those bookings are kept.')) { if (el('ga-' + meal)) el('ga-' + meal).disabled = false; return; }
+    r = await api('POST', BASE + '/slots/generate?force=1', body);
+  }
+  if (!r.ok) { if (el('ga-' + meal)) el('ga-' + meal).disabled = false; toast(errText(r, 'Could not create the slots'), 'err'); return; }
+  SL.genOpen[meal] = false;
+  delete SL.gen[meal];
+  if (replace) D.slots.forEach(function (s) { if (s.meal === meal) delete SL.edits[s.slot_id]; });
+  await loadAll();
+  toast(plural(p.list.length, m.label.toLowerCase() + ' slot') + ' created', 'ok');
+}
+
+// ---------- rules ----------
+function readRules() {
+  var o = {};
+  RULES.forEach(function (f) {
+    var i = el(f.id);
+    if (f.bool) o[f.k] = i.checked ? 1 : 0;
+    else { var v = String(i.value).trim(); o[f.k] = v === '' ? NaN : Number(v); }
+  });
+  return o;
+}
+function rulesChanges() {
+  if (!D.settings) return {};
+  var v = readRules(), ch = {};
+  RULES.forEach(function (f) { if (v[f.k] !== D.settings[f.k]) ch[f.k] = v[f.k]; });
+  return ch;
+}
+function rulesProblem(ch) {
+  for (var i = 0; i < RULES.length; i++) {
+    var f = RULES[i];
+    if (f.bool || !(f.k in ch)) continue;
+    var n = ch[f.k];
+    if (!(Number.isInteger(n) && n >= f.min && n <= f.max)) return f.name + ' must be a whole number from ' + f.min + ' to ' + f.max + '.';
+  }
+  return '';
+}
+function renderRules() {
+  if (!D.settings) return;
+  if (!Object.keys(rulesChanges()).length || !el('rGrace').value) {
+    RULES.forEach(function (f) { var i = el(f.id); if (f.bool) i.checked = !!D.settings[f.k]; else i.value = D.settings[f.k]; });
+  }
+  rulesInput();
+}
+function largestTable() { var m = 0; D.tables.forEach(function (t) { if (t.capacity > m) m = t.capacity; }); return m; }
+function rulesInput() {
+  if (!D.settings) return;
+  var v = readRules(), ch = rulesChanges(), n = Object.keys(ch).length, prob = rulesProblem(D.enabled ? ch : v);
+  el('rSave').disabled = (!n && D.enabled) || !!prob;
+  el('rUndo').disabled = !n;
+  el('rState').innerHTML = prob ? '<span class="e">' + esc(prob) + '</span>' : (n ? '<span class="unsaved"><i class="dot"></i>' + plural(n, 'unsaved change') + '</span>' : '');
+  var g = v.grace_minutes;
+  var first = D.slots.filter(function (s) { return s.is_active; }).sort(slotCmp)[0], st = first ? mins(first.start_time) : 7 * 60;
+  el('rGraceEx').innerHTML = (Number.isInteger(g) && g >= 0) ? (v.auto_release
+    ? 'Example: a booking for the ' + hm(st) + (first ? ' ' + esc(first.label) : '') + ' sitting that has not arrived by <b>' + hm(st + g) + '</b> is released, and the table can be given to someone else.'
+    : 'Automatic release is off: after ' + hm(st + g) + ' a waiter has to mark a missing ' + hm(st) + ' booking as a no-show to free its table.') : '';
+  var big = largestTable(), mp = v.max_party_size;
+  el('rPartyWarn').textContent = big && Number.isInteger(mp) && mp > big
+    ? 'The largest table seats ' + big + ', so parties of ' + (big + 1) + (mp > big + 1 ? '–' + mp : '') + ' cannot be booked. Add a bigger table, or lower this limit.' : '';
+}
+RULES.forEach(function (f) { el(f.id).addEventListener(f.bool ? 'change' : 'input', rulesInput); });
+function undoRules() {
+  if (!D.settings) return;
+  RULES.forEach(function (f) { var i = el(f.id); if (f.bool) i.checked = !!D.settings[f.k]; else i.value = D.settings[f.k]; });
+  rulesInput();
+}
+async function saveRules() {
+  // The first save creates the settings row, which is what switches the module on
+  var ch = D.enabled ? rulesChanges() : readRules(), prob = rulesProblem(ch);
+  if (!Object.keys(ch).length) return;
+  if (prob) { toast(prob, 'err'); return; }
+  if (ch.guest_booking_enabled === 1) {
+    var act = D.slots.filter(function (s) { return s.is_active; }).length, bookable = D.zones.filter(function (z) { return z.guest_bookable; }).map(function (z) { return z.code; });
+    var msg = 'Turn ON guest booking? Guests can then book tables in the app straight away' + (bookable.length ? ' (zones ' + bookable.join(', ') + ')' : '') + '.';
+    if (!act) msg += ' Note: there are no active time slots yet, so guests will see nothing to book.';
+    if (!D.tables.length) msg += ' Note: there are no tables yet.';
+    if (!confirm(msg)) return;
+  }
+  if (ch.auto_release === 0 && !confirm('Turn OFF automatic release? No-show tables then stay held until a waiter releases them.')) return;
+  el('rSave').disabled = true;
+  var r = await api('PUT', BASE + '/settings', ch);
+  if (!r.ok) { rulesInput(); toast(errText(r, 'Could not save the rules'), 'err'); return; }
+  for (var k in ch) D.settings[k] = ch[k];
+  renderRules();
+  renderPill();
+  renderSummary();
+  toast('Rules saved' + ('guest_booking_enabled' in ch ? ' · guest booking ' + (ch.guest_booking_enabled ? 'ON' : 'OFF') : ''), 'ok');
+  loadAll();
+}
+
+// ---------- tabs & start-up ----------
+function unsavedCount() {
+  return dirtyCount() + Object.keys(SL.edits).length + SL.drafts.length + Object.keys(rulesChanges()).length + zoneEditCount() + (FP.draft && draftChanged() ? 1 : 0);
+}
+window.addEventListener('beforeunload', function (e) {
+  if (unsavedCount()) { e.preventDefault(); e.returnValue = ''; }
+});
+function showTab(t, fromHash) {
+  if (['floor', 'slots', 'rules'].indexOf(t) < 0) t = 'floor';
+  curTab = t;
+  document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === t); });
+  document.querySelectorAll('.pane').forEach(function (p) { p.classList.toggle('hidden', p.id !== 'pane-' + t); });
+  if (!fromHash) { try { history.replaceState(null, '', location.pathname + location.search + '#' + t); } catch (e) {} }
+  if (t === 'floor') sizeVars();
+}
+window.addEventListener('hashchange', function () { showTab(location.hash.slice(1), true); });
+showTab(location.hash.slice(1), true);
+renderLayoutBar();
+renderSide();
+loadAll();
+</script>
+</body>
+</html>`)
+})
+
 // ADMIN: Beach setup — layout builder on the guest photo, zones & booking limits, time slots
 app.get('/admin/beach-setup', (c) => {
   return c.html(`<!DOCTYPE html>
@@ -57404,6 +59152,22 @@ app.get('/admin/dashboard', (c) => {
 
     <!-- Restaurants Management Tab -->
     <div id="restaurantsTab" class="tab-content hidden">
+        <!-- Main restaurant booking (El Kasr): floor plan per zone, time slots, no-show rules (embedded page) -->
+        <div id="restaurantSetupCard" class="bg-white border-2 border-orange-200 rounded-lg p-4 mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-chair mr-2 text-orange-600"></i>Main restaurant booking — El Kasr
+                    </h3>
+                    <p class="text-sm text-gray-600">Tables and seats per zone, meal time slots with clearance, and the no-show grace rules staff and guests book against.</p>
+                </div>
+                <a href="/admin/restaurant-setup/3" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:underline whitespace-nowrap">
+                    <i class="fas fa-up-right-from-square mr-1"></i>Open full screen
+                </a>
+            </div>
+            <iframe id="restaurantSetupFrame" data-src="/admin/restaurant-setup/3?embed=1" title="Main restaurant booking setup"
+                    style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
+        </div>
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -69274,7 +71038,17 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       // ========================================
       let selectedRestaurantId = null;
       
+      // Main restaurant booking setup (El Kasr) is an embedded page, loaded on first open
+      function loadRestaurantSetupFrame() {
+        const f = document.getElementById('restaurantSetupFrame');
+        if (!f || f.src) return f;
+        f.dataset.src = '/admin/restaurant-setup/3?embed=1&property=' + encodeURIComponent(propertyId);
+        lazyFrame('restaurantSetupFrame');
+        return f;
+      }
+
       async function loadRestaurantsTab() {
+        loadRestaurantSetupFrame();
         try {
           const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
