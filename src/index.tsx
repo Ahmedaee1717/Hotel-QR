@@ -13961,12 +13961,22 @@ async function beachSunFill(DB: any, property_id: any, dates: string[], settings
       out[r.date] = { sunrise: r.sunrise, sunset: r.sunset, source: 'cache' }
     }
   }
-  const misses = dates.filter((d) => !out[d])
+  let misses = dates.filter((d) => !out[d])
   if (!misses.length) return out
   const latN = Number(settings && settings.beach_lat)
   const lngN = Number(settings && settings.beach_lng)
   const lat = settings && settings.beach_lat != null && isFinite(latN) ? latN : BEACH_DEFAULT_LAT
   const lng = settings && settings.beach_lng != null && isFinite(lngN) ? lngN : BEACH_DEFAULT_LNG
+  // Public callers reach this, so only configured properties and near dates hit the API or the cache.
+  const today = cairoToday()
+  const lo = addDaysYmd(today, -2)
+  const hi = addDaysYmd(today, 60)
+  misses = misses.filter((d) => {
+    if (settings && d >= lo && d <= hi) return true
+    out[d] = { ...beachSunCalc(d, lat, lng), source: 'calc' }
+    return false
+  })
+  if (!misses.length) return out
   const fetched = await Promise.all(misses.map((d) => fetchBeachSunApi(d, lat, lng)))
   const writes: any[] = []
   misses.forEach((d, i) => {
@@ -14083,6 +14093,7 @@ function beachSpotFields(body: any): { fields?: Record<string, any>, error?: str
   if (has('spot_number')) {
     const v = String(body.spot_number == null ? '' : body.spot_number).trim()
     if (!v || v.length > 20) return { error: 'spot_number must be 1-20 characters' }
+    if (/[<>]/.test(v)) return { error: 'spot_number cannot contain < or >' }
     f.spot_number = v
   }
   if (has('spot_type')) {
@@ -14210,16 +14221,21 @@ app.get('/api/beach/slots/:property_id', async (c) => {
   const { property_id } = c.req.param()
   const from = c.req.query('from')
   const date = c.req.query('date')
+  if (!/^\d+$/.test(String(property_id))) return c.json({ error: 'Invalid property_id' }, 400)
+  const today = cairoToday()
+  const inWindow = (d: string) => d >= addDaysYmd(today, -7) && d <= addDaysYmd(today, 366)
   try {
     if (from !== undefined) {
       if (!isBeachYmd(from)) return c.json({ error: 'from must be YYYY-MM-DD' }, 400)
+      if (!inWindow(from)) return c.json({ error: 'from is out of range' }, 400)
       const n = Math.min(14, Math.max(1, parseInt(c.req.query('days') || '7', 10) || 7))
       const dates = Array.from({ length: n }, (_, i) => addDaysYmd(from, i))
       const days = await resolveBeachSlotsForDates(c.env, property_id, dates)
       return c.json({ success: true, days })
     }
     if (date !== undefined && date !== '' && !isBeachYmd(date)) return c.json({ error: 'date must be YYYY-MM-DD' }, 400)
-    const day = await resolveBeachSlots(c.env, property_id, date || cairoToday())
+    if (date && !inWindow(date)) return c.json({ error: 'date is out of range' }, 400)
+    const day = await resolveBeachSlots(c.env, property_id, date || today)
     return c.json({ success: true, ...day })
   } catch (error) {
     console.error('Get beach slots error:', error)
@@ -14406,7 +14422,8 @@ app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async
       button_color_from: '#ffffff',
       button_color_to: '#ffffff',
       button_text_color: '#3b82f6',
-      traffic_light_text_color: '#ffffff'
+      traffic_light_text_color: '#ffffff',
+      important_information: null
     }
     const FLAG_COLS = ['beach_booking_enabled', 'free_for_hotel_guests', 'booking_button_override_enabled',
       'full_day_enabled', 'allow_same_day_booking', 'require_room_number']
@@ -14687,11 +14704,17 @@ app.post('/api/admin/beach/spots', requirePermission('beach_zones_manage'), asyn
 
     let zoneIdToUse = zoneRow ? zoneRow.zone_id : null
     if (!zoneIdToUse) {
-      const zoneResult = await DB.prepare(`
-        INSERT INTO beach_zones (property_id, zone_name, zone_type)
-        VALUES (?, 'Main Beach', 'standard')
-      `).bind(property_id).run()
-      zoneIdToUse = zoneResult.meta.last_row_id
+      // Parallel creates must share one default zone, so insert only if none exists and re-read.
+      const zr = await DB.batch([
+        DB.prepare(`
+          INSERT INTO beach_zones (property_id, zone_name, zone_type)
+          SELECT ?, 'Main Beach', 'standard'
+          WHERE NOT EXISTS (SELECT 1 FROM beach_zones WHERE property_id = ?)
+        `).bind(property_id, property_id),
+        DB.prepare('SELECT zone_id FROM beach_zones WHERE property_id = ? ORDER BY is_active DESC, display_order, zone_id LIMIT 1').bind(property_id)
+      ])
+      zoneIdToUse = ((zr[1].results || [])[0] || {}).zone_id || null
+      if (!zoneIdToUse) return c.json({ error: 'Could not create a default zone' }, 500)
     }
 
     const tier = f.tier || 'standard'
@@ -14908,6 +14931,7 @@ function beachZoneFields(body: any): { fields?: Record<string, any>, error?: str
   if (has('zone_name') || has('name')) {
     const v = String((has('zone_name') ? body.zone_name : body.name) ?? '').trim()
     if (!v || v.length > 60) return { error: 'Zone name must be 1-60 characters' }
+    if (/[<>]/.test(v)) return { error: 'Zone name cannot contain < or >' }
     f.zone_name = v
   }
   if (has('zone_type')) {
@@ -15266,6 +15290,12 @@ app.post('/api/beach/bookings', async (c) => {
     const guestName = String(body.guest_name == null ? '' : body.guest_name).trim()
     if (!guestName) return c.json({ error: 'Guest name is required', code: 'invalid_name' }, 400)
     const room = String(body.guest_room_number == null ? '' : body.guest_room_number).trim()
+    const tooLong = (v: any, max: number) => v != null && String(v).length > max
+    if (guestName.length > 80) return c.json({ error: 'Guest name must be 80 characters or fewer', code: 'invalid_name' }, 400)
+    if (room.length > 20) return c.json({ error: 'Room number must be 20 characters or fewer', code: 'invalid_room' }, 400)
+    if (tooLong(special_requests, 500)) return c.json({ error: 'Special requests must be 500 characters or fewer', code: 'invalid_requests' }, 400)
+    if (tooLong(guest_phone, 100)) return c.json({ error: 'Phone must be 100 characters or fewer', code: 'invalid_phone' }, 400)
+    if (tooLong(guest_email, 100)) return c.json({ error: 'Email must be 100 characters or fewer', code: 'invalid_email' }, 400)
     const guestsN = Math.min(20, Math.max(1, parseInt(num_guests, 10) || 2))
 
     // Legacy 'morning'/'afternoon' rows are compared by their normalised id.
@@ -15316,7 +15346,7 @@ app.post('/api/beach/bookings', async (c) => {
     }
 
     // 1. resolve and store the slot's times for that date
-    const sun = await beachSunFill(DB, property_id, [booking_date], settings, res[2].results || [])
+    const sun = await beachSunFill(DB, property_id, [booking_date], (res[1].results || [])[0] ? settings : null, res[2].results || [])
     const day = beachSlotsFromSettings(settings, booking_date, sun[booking_date])
     const am = day.slots[0]
     const pm = day.slots[1]
@@ -30926,7 +30956,7 @@ window.luxTogglePassForm = function() {
                 if (!el || el.classList.contains('booked') || luxBeach.posting) return;
                 var picked = luxBeach.spots[parseInt(el.dataset.idx, 10)];
                 if (!luxBeachSpotOpen(picked)) return;
-                if (!luxBeach.spot || luxBeach.spot.spot_id !== picked.spot_id) luxBeach.loungers = Math.min(2, luxBeachMaxLoungers(picked));
+                luxBeach.loungers = Math.min(parseInt(luxBeach.loungers, 10) || 2, luxBeachMaxLoungers(picked));
                 luxBeach.spot = picked;
                 luxBeachRenderMap();
                 luxBeachRenderSelection();
@@ -39724,7 +39754,11 @@ app.get('/admin/beach-management', (c) => {
         // Get authenticated property ID from localStorage
         const PROPERTY_ID = localStorage.getItem('property_id') || '1';
         const USER_ID = localStorage.getItem('user_id') || '1';
-        
+
+        function esc(v) {
+            return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         // Authenticated fetch helper
         async function fetchWithAuth(url, options = {}) {
             const headers = {
@@ -39909,15 +39943,15 @@ app.get('/admin/beach-management', (c) => {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-white rounded-lg p-4">
                             <p class="text-sm text-gray-600">Guest Name</p>
-                            <p class="text-lg font-bold">\${booking.guest_name}</p>
+                            <p class="text-lg font-bold">\${esc(booking.guest_name)}</p>
                         </div>
                         <div class="bg-white rounded-lg p-4">
                             <p class="text-sm text-gray-600">Room Number</p>
-                            <p class="text-lg font-bold">\${booking.guest_room_number || 'N/A'}</p>
+                            <p class="text-lg font-bold">\${esc(booking.guest_room_number || 'N/A')}</p>
                         </div>
                         <div class="bg-white rounded-lg p-4">
                             <p class="text-sm text-gray-600">Beach Spot</p>
-                            <p class="text-lg font-bold">Spot \${booking.spot_number}</p>
+                            <p class="text-lg font-bold">Spot \${esc(booking.spot_number)}</p>
                         </div>
                         <div class="bg-white rounded-lg p-4">
                             <p class="text-sm text-gray-600">Booking Code</p>
@@ -39969,8 +40003,8 @@ app.get('/admin/beach-management', (c) => {
                                     <i class="fas fa-user text-blue-600"></i>
                                 </div>
                                 <div>
-                                    <p class="font-semibold">\${booking.guest_name}</p>
-                                    <p class="text-sm text-gray-600">Spot \${booking.spot_number} • \${booking.booking_code}</p>
+                                    <p class="font-semibold">\${esc(booking.guest_name)}</p>
+                                    <p class="text-sm text-gray-600">Spot \${esc(booking.spot_number)} • \${booking.booking_code}</p>
                                 </div>
                             </div>
                             <div class="text-right">
@@ -40133,9 +40167,9 @@ app.get('/admin/beach-management', (c) => {
 
         function displayAvailableSpots(spots) {
             const html = spots.map(spot => \`
-                <button type="button" onclick="selectSpot(\${spot.spot_id}, '\${spot.spot_number}')" 
+                <button type="button" onclick="selectSpot(\${Number(spot.spot_id)})"
                     class="spot-btn px-4 py-3 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition" data-spot-id="\${spot.spot_id}">
-                    <div class="text-lg font-bold">\${spot.spot_number}</div>
+                    <div class="text-lg font-bold">\${esc(spot.spot_number)}</div>
                     <div class="text-xs text-gray-600">\${spot.spot_type}</div>
                 </button>
             \`).join('');
@@ -40250,7 +40284,7 @@ app.get('/admin/beach-management', (c) => {
                         </div>
                         <div class="bg-white rounded-lg p-4">
                             <p class="text-sm text-gray-600">Spot Number</p>
-                            <p class="text-2xl font-bold">\${booking.spot_number}</p>
+                            <p class="text-2xl font-bold">\${esc(booking.spot_number)}</p>
                         </div>
                         <div class="bg-white rounded-lg p-4">
                             <p class="text-sm text-gray-600">Reference</p>
@@ -40407,14 +40441,14 @@ app.get('/admin/beach-management', (c) => {
                                     </span>
                                     <span class="text-sm text-gray-600">Code: <strong>\${booking.booking_code}</strong></span>
                                 </div>
-                                <h3 class="font-bold text-lg">\${booking.guest_name}</h3>
+                                <h3 class="font-bold text-lg">\${esc(booking.guest_name)}</h3>
                                 <div class="grid grid-cols-2 gap-2 mt-2 text-sm">
-                                    <div><i class="fas fa-door-open mr-1 text-gray-500"></i>Room: <strong>\${booking.guest_room_number || 'N/A'}</strong></div>
-                                    <div><i class="fas fa-umbrella-beach mr-1 text-gray-500"></i>Spot: <strong>\${booking.spot_number}</strong> (\${booking.spot_type})</div>
+                                    <div><i class="fas fa-door-open mr-1 text-gray-500"></i>Room: <strong>\${esc(booking.guest_room_number || 'N/A')}</strong></div>
+                                    <div><i class="fas fa-umbrella-beach mr-1 text-gray-500"></i>Spot: <strong>\${esc(booking.spot_number)}</strong> (\${booking.spot_type})</div>
                                     <div><i class="fas fa-calendar mr-1 text-gray-500"></i>Date: <strong>\${bookingDate}</strong></div>
                                     <div><i class="fas fa-clock mr-1 text-gray-500"></i>Slot: <strong>\${booking.slot_type.replace('_', ' ')}</strong></div>
-                                    \${booking.guest_phone ? \`<div><i class="fas fa-phone mr-1 text-gray-500"></i>Phone: <strong>\${booking.guest_phone}</strong></div>\` : ''}
-                                    \${booking.guest_email ? \`<div><i class="fas fa-envelope mr-1 text-gray-500"></i>Email: <strong>\${booking.guest_email}</strong></div>\` : ''}
+                                    \${booking.guest_phone ? \`<div><i class="fas fa-phone mr-1 text-gray-500"></i>Phone: <strong>\${esc(booking.guest_phone)}</strong></div>\` : ''}
+                                    \${booking.guest_email ? \`<div><i class="fas fa-envelope mr-1 text-gray-500"></i>Email: <strong>\${esc(booking.guest_email)}</strong></div>\` : ''}
                                     <div><i class="fas fa-users mr-1 text-gray-500"></i>Guests: <strong>\${booking.num_guests}</strong></div>
                                 </div>
                             </div>
@@ -40715,7 +40749,7 @@ input:disabled{background:#f3f4f6;color:#6b7280}
       <h2><i class="fas fa-scale-balanced"></i>Booking limits</h2>
       <p class="muted sm">A standard booking is <b>1 umbrella + up to <span id="lngTxt">3</span> sun loungers</b>. The most specific limit wins: spot → zone → global.</p>
       <div class="limits">
-        <div class="field"><label class="lb" for="gUmb">Umbrellas per room (same date &amp; slot)</label><input type="number" id="gUmb" min="1" max="20" step="1"></div>
+        <div class="field"><label class="lb" for="gUmb">Umbrellas per room (same date &amp; slot)</label><input type="number" id="gUmb" min="1" max="10" step="1"></div>
         <div class="field"><label class="lb" for="gLng">Sun loungers per booking</label><input type="number" id="gLng" min="1" max="20" step="1"></div>
       </div>
       <button class="btn pri" id="limSave" onclick="saveLimits()"><i class="fas fa-floppy-disk"></i>Save limits</button>
@@ -40806,6 +40840,8 @@ function r2(n) { return Math.round(n * 100) / 100; }
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 function numOrNull(v) { if (v === null || v === undefined || v === '') return null; var n = Number(v); return isFinite(n) ? n : null; }
 function natCmp(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }); }
+// Same key the server uses for duplicate checks (beachNumKey)
+function numKey(v) { return String(v == null ? '' : v).trim().toLowerCase(); }
 function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
 function cairoToday() {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
@@ -41210,7 +41246,7 @@ el('cells').addEventListener('pointermove', function (ev) {
   if (!drag.moved && Math.abs(mx) + Math.abs(my) < 4) return;
   drag.moved = true;
   var dx = mx / drag.rect.width * 100, dy = my / drag.rect.height * 100;
-  drag.ids.forEach(function (i) { var o = drag.orig[i]; dx = clamp(dx, -o.x, 100 - o.x); dy = clamp(dy, -o.y - o.h / 2, 100 - o.y - o.h / 2); });
+  drag.ids.forEach(function (i) { var o = drag.orig[i]; dx = clamp(dx, -o.x, 100 - o.x); dy = clamp(dy, -o.y, 100 - o.y - o.h); });
   drag.dx = dx; drag.dy = dy;
   drag.ids.forEach(function (i) {
     var o = drag.orig[i], c = el('cells').querySelector('.cell[data-id="' + i + '"]');
@@ -41327,13 +41363,13 @@ document.addEventListener('keydown', function (e) {
   e.preventDefault();
   ids.forEach(function (id) {
     var g = geo(S.byId[id]);
-    setDirty(id, { map_x: clamp(g.x + dx, 0, 100), map_y: clamp(g.y + dy, -g.h / 2, 100 - g.h / 2) });
+    setDirty(id, { map_x: clamp(g.x + dx, 0, 100), map_y: clamp(g.y + dy, 0, Math.max(0, 100 - g.h)) });
   });
   renderMap();
   renderLegend();
 });
 window.addEventListener('beforeunload', function (e) {
-  if (dirtyCount() || SL.dirty) { e.preventDefault(); e.returnValue = ''; }
+  if (dirtyCount() || SL.dirty || zoneEditCount()) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // ---------- layout writes ----------
@@ -41345,7 +41381,12 @@ async function saveLayout() {
   renderLegend();
   var r = await api('POST', BULK, { updates: updates });
   S.busy = false;
-  if (!r.ok) { renderLegend(); toast(errText(r, 'Could not save the layout'), 'err'); return; }
+  if (!r.ok) {
+    renderLegend();
+    var bad = r.data || {}, bid = bad.spot_id || (updates[bad.index] || {}).spot_id, bs = bid && S.byId[bid];
+    toast(errText(r, 'Could not save the layout') + (bs ? ' (spot ' + bs.spot_number + ')' : ''), 'err');
+    return;
+  }
   S.dirty = {};
   await loadLayout();
   toast('Layout saved: ' + plural(updates.length, 'spot') + ' updated', 'ok');
@@ -41383,7 +41424,7 @@ async function saveSpot() {
   var num = el('edNum').value.trim();
   if (!num) { err.textContent = 'Enter a spot number.'; return; }
   if (num !== s.spot_number) {
-    var clash = S.spots.filter(function (o) { return o.spot_id !== s.spot_id && o.spot_number === num; })[0];
+    var clash = S.spots.filter(function (o) { return o.spot_id !== s.spot_id && numKey(o.spot_number) === numKey(num); })[0];
     if (clash) { err.textContent = 'Number ' + num + ' is already used by another spot (' + TIERS[clash.tier].label + (clash.row_no ? ', row ' + clash.row_no : '') + (isPlaced(clash) ? '' : ', not on the photo') + ').'; return; }
     body.spot_number = num;
   }
@@ -41510,7 +41551,7 @@ async function createSpot() {
   err.textContent = '';
   var num = (P.num || '').trim();
   if (!num) { err.textContent = 'Enter a spot number.'; return; }
-  if (S.spots.some(function (s) { return s.spot_number === num; })) { err.textContent = 'Number ' + num + ' is already used by another spot.'; return; }
+  if (S.spots.some(function (s) { return numKey(s.spot_number) === numKey(num); })) { err.textContent = 'Number ' + num + ' is already used by another spot.'; return; }
   if (P.row != null && !(Number.isInteger(P.row) && P.row >= 1 && P.row <= 50)) { err.textContent = 'Row must be a whole number (1 = first line).'; return; }
   S.busy = true;
   el('addGo').disabled = true;
@@ -41546,9 +41587,16 @@ async function addCabanas() {
   var names = todo.map(function (i) { return 'VC-' + i; });
   if (!confirm('Create cabana' + (todo.length > 1 ? 's ' : ' ') + names.join(', ') + ' by the white gazebos (top right of the photo)? They start as staff only: drag each box onto its gazebo, then tick "Guests can book it".')) return;
   S.busy = true;
-  var results = await Promise.all(todo.map(function (i) {
-    return api('POST', '/api/admin/beach/spots', newSpotBody('VC-' + i, 'cabana', null, null, false, { x: X[i - 1], y: 35.5, w: SIZE.cabana.w, h: SIZE.cabana.h }));
-  }));
+  var mk = function (i) { return api('POST', '/api/admin/beach/spots', newSpotBody('VC-' + i, 'cabana', null, null, false, { x: X[i - 1], y: 35.5, w: SIZE.cabana.w, h: SIZE.cabana.h })); };
+  var results = [];
+  if (!S.zones.length) {
+    // With no zones the server creates a default one; the rest must join it rather than race to create more
+    results.push(await mk(todo[0]));
+    await loadLayout();
+    results = results.concat(await Promise.all(todo.slice(1).map(mk)));
+  } else {
+    results = await Promise.all(todo.map(mk));
+  }
   S.busy = false;
   var made = [], failed = [];
   results.forEach(function (r, k) { if (r.ok) made.push(names[k]); else failed.push(names[k] + ' (' + errText(r, 'failed') + ')'); });
@@ -41586,13 +41634,13 @@ function planNumbering() {
   var prefix = String(N.prefix || '').trim();
   var inSet = {}, taken = {};
   seq.forEach(function (s) { inSet[s.spot_id] = 1; });
-  S.spots.forEach(function (s) { if (!inSet[s.spot_id]) taken[s.spot_number] = s; });
+  S.spots.forEach(function (s) { if (!inSet[s.spot_id]) taken[numKey(s.spot_number)] = s; });
   var list = [], to = {}, clashes = [];
   seq.forEach(function (s, i) {
     var n = prefix + (start + i);
     list.push({ id: s.spot_id, from: s.spot_number, to: n });
     to[s.spot_id] = n;
-    if (taken[n]) clashes.push({ number: n, spot: taken[n] });
+    if (taken[numKey(n)]) clashes.push({ number: n, spot: taken[numKey(n)] });
   });
   return { list: list, to: to, clashes: clashes, offCount: N.src === 'sel' ? 0 : off.length };
 }
@@ -41625,30 +41673,14 @@ async function applyNumbering() {
   S.busy = true;
   el('nApply').disabled = true;
   var fin = ch.map(function (x) { return { spot_id: x.id, spot_number: x.to }; });
-  var r = await api('POST', BULK, { updates: fin }), stuck = false;
-  if (!r.ok && r.status === 409) {
-    // A reversed row (27..1 becoming 1..27) can be rejected if each new number is checked against the
-    // numbers stored right now, so step through unique temporary numbers first
-    var r1 = await api('POST', BULK, { updates: ch.map(function (x) { return { spot_id: x.id, spot_number: 'TMP' + x.id }; }) });
-    if (r1.ok) {
-      r = await api('POST', BULK, { updates: fin });
-      if (!r.ok) {
-        var back = await api('POST', BULK, { updates: ch.map(function (x) { return { spot_id: x.id, spot_number: x.from }; }) });
-        stuck = !back.ok;
-      }
-    }
-  }
+  // The server checks the batch's final state, so swaps and reversed rows pass; a 409 is a real clash.
+  var r = await api('POST', BULK, { updates: fin });
   S.busy = false;
   if (!r.ok) {
     await loadLayout();
-    if (stuck) { toast('Renumbering stopped half-way: some spots show a temporary number (TMP…). Press Apply again.', 'err'); return; }
-    var d = r.data || {}, list = d.conflicts || d.duplicates || d.clashes || d.numbers;
-    var detail = Array.isArray(list) && list.length
-      ? list.map(function (v) { return typeof v === 'object' && v ? (v.spot_number || v.number || '?') : v; }).join(', ')
-      : (d.spot_number || '');
-    var human = d.message || d.error;
-    if (typeof human !== 'string' || human.indexOf(' ') < 0) human = 'These numbers are already taken';
-    toast(r.status === 409 ? human + (detail ? ': ' + detail : '') : errText(r, 'Could not renumber'), 'err');
+    var d = r.data || {};
+    var human = typeof d.message === 'string' ? d.message : (d.spot_number ? 'Spot number ' + d.spot_number + ' is already in use' : '');
+    toast(r.status === 409 ? (human || 'These numbers are already taken') : errText(r, 'Could not renumber'), 'err');
     return;
   }
   S.mode = 'select';
@@ -41658,11 +41690,30 @@ async function applyNumbering() {
 }
 
 // ---------- zones & capacity ----------
+// Unsaved edits (zone id, or 'g' for the global limits) survive the re-render after any other save
+var ZD = {};
+var ZF = ['zn', 'zt', 'zu', 'zl', 'za'];
+function markZoneEdit(ev) {
+  var t = ev.target, id = t && t.id ? t.id : '';
+  if (id === 'gUmb' || id === 'gLng') ZD.g = 1;
+  else if (ZF.indexOf(id.slice(0, 2)) >= 0 && Number(id.slice(2))) ZD[id.slice(2)] = 1;
+}
+function zoneEditCount() { return Object.keys(ZD).length; }
+['zoneRows', 'gUmb', 'gLng'].forEach(function (id) {
+  el(id).addEventListener('input', markZoneEdit);
+  el(id).addEventListener('change', markZoneEdit);
+});
 function renderZones() {
   var gl = S.limits;
-  if (document.activeElement !== el('gUmb')) el('gUmb').value = gl.max_umbrellas_per_booking;
-  if (document.activeElement !== el('gLng')) el('gLng').value = gl.max_loungers_per_booking;
+  if (!ZD.g && document.activeElement !== el('gUmb')) el('gUmb').value = gl.max_umbrellas_per_booking;
+  if (!ZD.g && document.activeElement !== el('gLng')) el('gLng').value = gl.max_loungers_per_booking;
   el('lngTxt').textContent = gl.max_loungers_per_booking;
+  var keep = {};
+  Object.keys(ZD).forEach(function (id) {
+    if (id === 'g') return;
+    if (!el('zn' + id)) { delete ZD[id]; return; }
+    keep[id] = { zn: el('zn' + id).value, zt: el('zt' + id).value, zu: el('zu' + id).value, zl: el('zl' + id).value, za: el('za' + id).checked };
+  });
   var counts = {};
   S.spots.forEach(function (s) { counts[s.zone_id] = (counts[s.zone_id] || 0) + 1; });
   el('zoneRows').innerHTML = S.zones.length ? S.zones.map(function (z) {
@@ -41671,29 +41722,36 @@ function renderZones() {
       '<td><input type="text" id="zn' + z.zone_id + '" maxlength="60" value="' + esc(z.zone_name) + '" aria-label="Zone name"></td>' +
       '<td><select id="zt' + z.zone_id + '" aria-label="Zone type">' + types.map(function (t) { return '<option' + (t === z.zone_type ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select></td>' +
       '<td class="num">' + (counts[z.zone_id] || 0) + '</td>' +
-      '<td><input type="number" id="zu' + z.zone_id + '" min="1" max="20" step="1" placeholder="' + gl.max_umbrellas_per_booking + ' (global)" value="' + (z.max_umbrellas == null ? '' : z.max_umbrellas) + '" aria-label="Umbrellas per room"></td>' +
+      '<td><input type="number" id="zu' + z.zone_id + '" min="1" max="10" step="1" placeholder="' + gl.max_umbrellas_per_booking + ' (global)" value="' + (z.max_umbrellas == null ? '' : z.max_umbrellas) + '" aria-label="Umbrellas per room"></td>' +
       '<td><input type="number" id="zl' + z.zone_id + '" min="1" max="20" step="1" placeholder="' + gl.max_loungers_per_booking + ' (global)" value="' + (z.max_loungers == null ? '' : z.max_loungers) + '" aria-label="Loungers per booking"></td>' +
       '<td><label class="chk"><input type="checkbox" id="za' + z.zone_id + '"' + (z.is_active ? ' checked' : '') + ' aria-label="Active"></label></td>' +
       '<td><button class="btn" onclick="saveZone(' + z.zone_id + ')">Save</button></td></tr>';
   }).join('') : '<tr><td colspan="7" class="muted">No zones yet. Add one below.</td></tr>';
+  Object.keys(keep).forEach(function (id) {
+    if (!el('zn' + id)) { delete ZD[id]; return; }
+    var k = keep[id];
+    el('zn' + id).value = k.zn; el('zt' + id).value = k.zt; el('zu' + id).value = k.zu; el('zl' + id).value = k.zl; el('za' + id).checked = k.za;
+  });
   var ov = S.spots.filter(function (s) { return s.max_loungers != null; }).sort(function (a, b) { return natCmp(a.spot_number, b.spot_number); });
   el('spotOverrides').innerHTML = ov.length
     ? '<div class="chips">' + ov.map(function (s) { return '<button class="chip t-' + s.tier + '" onclick="jumpToSpot(' + s.spot_id + ')">' + esc(s.spot_number) + ' · ' + plural(s.max_loungers, 'lounger') + '</button>'; }).join('') + '</div>'
     : 'None. Every spot uses its zone limit or the global one. To give one spot its own limit (for example a cabana with 4 loungers), select it in the Layout tab.';
 }
-function limitVal(v) {
+// Server caps: umbrellas 1-10, loungers 1-20
+function limitVal(v, max) {
   v = String(v).trim();
   if (v === '') return null;
   var n = Number(v);
-  return (Number.isInteger(n) && n >= 1 && n <= 20) ? n : false;
+  return (Number.isInteger(n) && n >= 1 && n <= max) ? n : false;
 }
 async function saveLimits() {
-  var u = limitVal(el('gUmb').value), l = limitVal(el('gLng').value);
-  if (!u || !l) { toast('Both limits must be whole numbers from 1 to 20', 'err'); return; }
+  var u = limitVal(el('gUmb').value, 10), l = limitVal(el('gLng').value, 20);
+  if (!u || !l) { toast('Umbrellas must be a whole number from 1 to 10 and loungers from 1 to 20', 'err'); return; }
   el('limSave').disabled = true;
   var r = await api('POST', '/api/admin/beach/settings', { max_umbrellas_per_booking: u, max_loungers_per_booking: l });
   el('limSave').disabled = false;
   if (!r.ok) { toast(errText(r, 'Could not save the limits'), 'err'); return; }
+  delete ZD.g;
   S.limits = { max_umbrellas_per_booking: u, max_loungers_per_booking: l };
   toast('Booking limits saved', 'ok');
   await loadLayout();
@@ -41701,8 +41759,8 @@ async function saveLimits() {
 async function saveZone(id) {
   var name = el('zn' + id).value.trim();
   if (!name) { toast('Zone name is required', 'err'); return; }
-  var u = limitVal(el('zu' + id).value), l = limitVal(el('zl' + id).value);
-  if (u === false || l === false) { toast('Zone limits must be whole numbers from 1 to 20, or blank to inherit', 'err'); return; }
+  var u = limitVal(el('zu' + id).value, 10), l = limitVal(el('zl' + id).value, 20);
+  if (u === false || l === false) { toast('Zone umbrellas must be 1 to 10 and loungers 1 to 20 (whole numbers), or blank to inherit', 'err'); return; }
   var active = el('za' + id).checked ? 1 : 0, z = zoneById(id);
   if (z && z.is_active && !active) {
     var n = S.spots.filter(function (s) { return s.zone_id === id; }).length;
@@ -41710,6 +41768,7 @@ async function saveZone(id) {
   }
   var r = await api('PUT', '/api/admin/beach/zones/' + id, { zone_name: name, name: name, zone_type: el('zt' + id).value, max_umbrellas: u, max_loungers: l, is_active: active });
   if (!r.ok) { toast(errText(r, 'Could not save the zone'), 'err'); return; }
+  delete ZD[id];
   toast('Zone ' + name + ' saved', 'ok');
   await loadLayout();
 }
@@ -42049,6 +42108,10 @@ app.get('/admin/beach-analytics', (c) => {
         const propertyId = 1;
         let charts = {};
 
+        function esc(v) {
+            return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         async function loadDashboardData() {
             try {
                 const response = await fetch('/api/analytics/beach/dashboard/' + propertyId);
@@ -42107,7 +42170,7 @@ app.get('/admin/beach-analytics', (c) => {
                 return \`
                     <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="font-semibold text-gray-800">\${zone}</h4>
+                            <h4 class="font-semibold text-gray-800">\${esc(zone)}</h4>
                             <span class="text-2xl font-bold text-\${color}-600">\${rate}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
@@ -42145,7 +42208,7 @@ app.get('/admin/beach-analytics', (c) => {
                 return \`
                     <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 text-center">
                         <div class="text-3xl mb-2">\${icons[type] || '🔵'}</div>
-                        <h4 class="font-semibold text-gray-800 capitalize mb-2">\${type}</h4>
+                        <h4 class="font-semibold text-gray-800 capitalize mb-2">\${esc(type)}</h4>
                         <div class="text-2xl font-bold text-blue-600 mb-1">\${rate}%</div>
                         <div class="text-xs text-gray-600">\${stats.occupied}/\${stats.total} Occupied</div>
                     </div>
@@ -42264,8 +42327,8 @@ app.get('/admin/beach-analytics', (c) => {
                             <i class="fas \${insight.icon} text-\${insight.color}-600"></i>
                         </div>
                         <div>
-                            <h4 class="font-semibold text-gray-800 mb-1">\${insight.title}</h4>
-                            <p class="text-sm text-gray-600">\${insight.text}</p>
+                            <h4 class="font-semibold text-gray-800 mb-1">\${esc(insight.title)}</h4>
+                            <p class="text-sm text-gray-600">\${esc(insight.text)}</p>
                         </div>
                     </div>
                 </div>
@@ -42361,7 +42424,7 @@ app.get('/admin/beach-analytics', (c) => {
                 statistics.forEach(stat => {
                     html += '<div class="bg-gray-50 rounded-lg p-4 border border-gray-200">';
                     html += '<div class="flex justify-between items-center">';
-                    html += '<span class="font-medium text-gray-800">' + stat.zone_name + '</span>';
+                    html += '<span class="font-medium text-gray-800">' + esc(stat.zone_name) + '</span>';
                     html += '<span class="text-red-600 font-semibold">' + stat.no_show_count + ' no-shows</span>';
                     html += '</div>';
                     html += '<div class="text-sm text-gray-600 mt-1">Lost: $' + (stat.lost_revenue || 0).toFixed(2) + '</div>';
@@ -65681,26 +65744,11 @@ app.get('/admin/dashboard', (c) => {
 
       window.saveBeachCardCustomization = async function() {
         try {
-          // Get basic settings to preserve them
-          const beachBookingEnabled = document.getElementById('beachBookingEnabled')?.checked ? 1 : 0;
-          const freeForGuests = document.getElementById('freeForGuests')?.checked ? 1 : 0;
-          const openingTime = document.getElementById('openingTime')?.value || '08:00';
-          const closingTime = document.getElementById('closingTime')?.value || '18:00';
-          const advanceBookingDays = parseInt(document.getElementById('advanceBookingDays')?.value || '7');
-          const maxDurationHours = parseInt(document.getElementById('maxDurationHours')?.value || '12');
-          
+          // The server writes only the keys sent, so this panel sends only its own fields
           const response = await fetchWithAuth('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              // Preserve basic settings
-              beach_booking_enabled: beachBookingEnabled,
-              free_for_hotel_guests: freeForGuests,
-              opening_time: openingTime,
-              closing_time: closingTime,
-              advance_booking_days: advanceBookingDays,
-              max_booking_duration_hours: maxDurationHours,
-              // Card customization
               card_title: document.getElementById('beachCardTitle').value,
               card_subtitle: document.getElementById('beachCardSubtitle').value,
               feature1_text: document.getElementById('feature1Text').value,
@@ -65740,36 +65788,20 @@ app.get('/admin/dashboard', (c) => {
       
       window.saveImportantInformation = async function() {
         try {
-          // Get basic settings to preserve them
-          const beachBookingEnabled = document.getElementById('beachBookingEnabled')?.checked ? 1 : 0;
-          const freeForGuests = document.getElementById('freeForGuests')?.checked ? 1 : 0;
-          const openingTime = document.getElementById('openingTime')?.value || '08:00';
-          const closingTime = document.getElementById('closingTime')?.value || '18:00';
-          const advanceBookingDays = parseInt(document.getElementById('advanceBookingDays')?.value || '7');
-          const maxDurationHours = parseInt(document.getElementById('maxDurationHours')?.value || '12');
-          
           const response = await fetchWithAuth('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              // Preserve basic settings
-              beach_booking_enabled: beachBookingEnabled,
-              free_for_hotel_guests: freeForGuests,
-              opening_time: openingTime,
-              closing_time: closingTime,
-              advance_booking_days: advanceBookingDays,
-              max_booking_duration_hours: maxDurationHours,
-              // Important Information
               important_information: document.getElementById('importantInformation').value
             })
           });
-          
+
           const data = await response.json();
-          
-          if (data.success) {
+
+          if (data.success && Array.isArray(data.updated) && data.updated.indexOf('important_information') >= 0) {
             alert('✅ Important information saved successfully!');
           } else {
-            alert('❌ Failed to save important information: ' + data.error);
+            alert('❌ Failed to save important information: ' + (data.error || 'the server did not store it'));
           }
         } catch (error) {
           console.error('Save important information error:', error);
@@ -65779,31 +65811,7 @@ app.get('/admin/dashboard', (c) => {
       
       window.saveBeachSettings = async function() {
         try {
-          // Get current color values to preserve them
-          const bgColorFrom = document.getElementById('bgColorFrom')?.value || '#3b82f6';
-          const bgColorTo = document.getElementById('bgColorTo')?.value || '#06b6d4';
-          const textColor = document.getElementById('textColor')?.value || '#1f2937';
-          const buttonColorFrom = document.getElementById('buttonColorFrom')?.value || '#ffffff';
-          const buttonColorTo = document.getElementById('buttonColorTo')?.value || '#ffffff';
-          const buttonTextColor = document.getElementById('buttonTextColor')?.value || '#3b82f6';
-          const trafficLightTextColor = document.getElementById('trafficLightTextColor')?.value || '#ffffff';
-          
-          // Get current text values to preserve them
-          const cardTitle = document.getElementById('beachCardTitle')?.value || 'Beach Booking';
-          const cardSubtitle = document.getElementById('beachCardSubtitle')?.value || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
-          const feature1Text = document.getElementById('feature1Text')?.value || 'Free for Hotel Guests';
-          const feature2Text = document.getElementById('feature2Text')?.value || 'Book Up to 7 Days Ahead';
-          const feature3Text = document.getElementById('feature3Text')?.value || 'QR Code Check-in';
-          const umbrellasLabel = document.getElementById('umbrellasLabel')?.value || 'Umbrellas';
-          const umbrellasDesc = document.getElementById('umbrellasDesc')?.value || 'Classic Beach';
-          const cabanasLabel = document.getElementById('cabanasLabel')?.value || 'Cabanas';
-          const cabanasDesc = document.getElementById('cabanasDesc')?.value || 'Private & Cozy';
-          const loungersLabel = document.getElementById('loungersLabel')?.value || 'Loungers';
-          const loungersDesc = document.getElementById('loungersDesc')?.value || 'Relax in Style';
-          const daybedsLabel = document.getElementById('daybedslabel')?.value || 'Daybeds';
-          const daybedsDesc = document.getElementById('daybedsDesc')?.value || 'Ultimate Comfort';
-          const buttonText = document.getElementById('buttonText')?.value || 'Book Your Spot Now';
-          
+          // Only this panel's keys: the server writes just what is sent, so card texts/colours stay untouched
           const beachMapImageUrl = document.getElementById('beachMapImageUrl')?.value || null;
           console.log('🏖️ Beach Map Image URL being sent:', beachMapImageUrl);
           
@@ -65820,30 +65828,7 @@ app.get('/admin/dashboard', (c) => {
             max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value),
             beach_map_image_url: beachMapImageUrl,
             booking_button_override_enabled: bookingButtonOverrideEnabled,
-            booking_button_override_message: bookingButtonOverrideMessage,
-            // Preserve colors
-            bg_color_from: bgColorFrom,
-            bg_color_to: bgColorTo,
-            text_color: textColor,
-            button_color_from: buttonColorFrom,
-            button_color_to: buttonColorTo,
-            button_text_color: buttonTextColor,
-            traffic_light_text_color: trafficLightTextColor,
-            // Preserve text customization
-            card_title: cardTitle,
-            card_subtitle: cardSubtitle,
-            feature1_text: feature1Text,
-            feature2_text: feature2Text,
-            feature3_text: feature3Text,
-            umbrellas_label: umbrellasLabel,
-            umbrellas_desc: umbrellasDesc,
-            cabanas_label: cabanasLabel,
-            cabanas_desc: cabanasDesc,
-            loungers_label: loungersLabel,
-            loungers_desc: loungersDesc,
-            daybeds_label: daybedsLabel,
-            daybeds_desc: daybedsDesc,
-            button_text: buttonText
+            booking_button_override_message: bookingButtonOverrideMessage
           };
           
           console.log('📤 Sending beach settings payload:', payload);
@@ -65906,6 +65891,10 @@ app.get('/admin/dashboard', (c) => {
         loadBeachSettingsForm();
       }
       
+      function beachEsc(v) {
+        return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
       async function loadBeachSpots() {
         try {
           const response = await fetchWithAuth('/api/admin/beach/spots/' + propertyId);
@@ -65921,7 +65910,7 @@ app.get('/admin/dashboard', (c) => {
                     '<i class="fas fa-umbrella-beach"></i>' +
                   '</div>' +
                   '<div>' +
-                    '<div class="font-medium">' + spot.spot_number + '</div>' +
+                    '<div class="font-medium">' + beachEsc(spot.spot_number) + '</div>' +
                     '<div class="text-sm text-gray-600">' + spot.spot_type + ' • Capacity: ' + spot.max_capacity + '</div>' +
                   '</div>' +
                 '</div>' +
@@ -66056,13 +66045,19 @@ app.get('/admin/dashboard', (c) => {
             method: 'DELETE'
           });
           
-          const data = await response.json();
-          
+          let data = await response.json();
+
+          if (response.status === 409 && data && data.error === 'has_bookings') {
+            const n = Number(data.count) || 0;
+            if (!confirm('This spot has ' + n + ' upcoming booking' + (n === 1 ? '' : 's') + '. Delete it anyway? Those bookings are kept, but the spot will no longer show on the maps.')) return;
+            data = await (await fetchWithAuth('/api/admin/beach/spots/' + spotId + '?force=1', { method: 'DELETE' })).json();
+          }
+
           if (data.success) {
             alert('✅ Spot deleted!');
             await loadBeachSpots();
           } else {
-            alert('❌ Failed to delete spot');
+            alert('❌ Failed to delete spot: ' + (data.message || data.error || 'unknown error'));
           }
         } catch (error) {
           console.error('Delete spot error:', error);
@@ -66083,16 +66078,16 @@ app.get('/admin/dashboard', (c) => {
               return '<div class="border-l-4 ' + (booking.booking_status === 'confirmed' ? 'border-green-500' : 'border-gray-400') + ' bg-gray-50 p-4 rounded-lg">' +
                 '<div class="flex items-center justify-between mb-2">' +
                   '<div class="flex items-center gap-2">' +
-                    '<span class="font-bold text-blue-600">' + booking.spot_number + '</span>' +
-                    '<span class="text-sm text-gray-600">' + booking.guest_name + '</span>' +
-                    (booking.guest_room_number ? '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Room ' + booking.guest_room_number + '</span>' : '') +
+                    '<span class="font-bold text-blue-600">' + beachEsc(booking.spot_number) + '</span>' +
+                    '<span class="text-sm text-gray-600">' + beachEsc(booking.guest_name) + '</span>' +
+                    (booking.guest_room_number ? '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Room ' + beachEsc(booking.guest_room_number) + '</span>' : '') +
                   '</div>' +
                   '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">' + booking.slot_type + '</span>' +
                 '</div>' +
                 '<div class="text-sm text-gray-600">' +
                   '<i class="fas fa-users mr-1"></i>' + booking.num_guests + ' guests' +
                   '<i class="fas fa-clock ml-3 mr-1"></i>' + booking.start_time + ' - ' + booking.end_time +
-                  (booking.special_requests ? '<div class="mt-1"><i class="fas fa-comment mr-1"></i>' + booking.special_requests + '</div>' : '') +
+                  (booking.special_requests ? '<div class="mt-1"><i class="fas fa-comment mr-1"></i>' + beachEsc(booking.special_requests) + '</div>' : '') +
                 '</div>' +
                 '<div class="mt-2 flex gap-2">' +
                   '<button onclick="viewBookingQR(\\'' + booking.booking_reference + '\\')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">' +
