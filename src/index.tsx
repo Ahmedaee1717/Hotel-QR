@@ -24916,6 +24916,7 @@ window.luxTogglePassForm = function() {
           .lux-slot-chip .st { font-size: 0.6rem; letter-spacing: 0.05em; }
           .lux-slot-chip.on { background: var(--lux-gold-grad); border-color: transparent; }
           .lux-slot-chip.on .sn, .lux-slot-chip.on .st { color: #231307; }
+          .lux-slot-chip.past { opacity: 0.4; cursor: not-allowed; }
           .lux-beach-stats { display: flex; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.6rem; font-size: 0.72rem; color: var(--lux-text-dim); }
           .lux-stat { display: inline-flex; align-items: center; gap: 0.4rem; }
           .lux-stat strong { color: var(--lux-text); font-size: 0.9rem; }
@@ -25099,6 +25100,10 @@ window.luxTogglePassForm = function() {
             white-space: nowrap;
             transform: translateY(50%);
           }
+          .lux-seat.t-vip { border-color: rgba(232, 197, 106, 0.8); background: rgba(212, 175, 55, 0.12); }
+          .lux-seat.t-vip .n { border-color: rgba(212, 175, 55, 0.9); color: #6b4a12; }
+          .lux-seat.t-cabana { border-style: dashed; border-color: rgba(186, 230, 253, 0.85); background: rgba(125, 211, 252, 0.12); border-radius: 6px; }
+          .lux-seat.t-cabana .n { background: #eaf7fb; border-color: rgba(14, 116, 144, 0.55); color: #0c4a5a; }
           .lux-seat.selected {
             border-color: var(--lux-gold);
             border-width: 2px;
@@ -25112,6 +25117,34 @@ window.luxTogglePassForm = function() {
             cursor: not-allowed;
           }
           .lux-seat.booked .n { filter: grayscale(1) brightness(0.7); opacity: 0.75; }
+          .lux-beach-selcard.t-vip { border-color: rgba(232, 197, 106, 0.75); background: rgba(212, 175, 55, 0.12); }
+          .lux-beach-selcard.t-cabana { border-color: rgba(186, 230, 253, 0.6); background: rgba(125, 211, 252, 0.08); }
+          .lux-bch-step {
+            display: flex; align-items: center; gap: 0.6rem;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            background: rgba(250, 246, 236, 0.06);
+            border-radius: 0.8rem;
+            padding: 0.4rem;
+          }
+          .lux-bch-stepbtn {
+            flex: 0 0 auto; width: 2.4rem; height: 2.4rem; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(212, 175, 55, 0.14);
+            border: 1px solid rgba(212, 175, 55, 0.45);
+            color: var(--lux-gold-2); font-size: 1.25rem; font-weight: 700; line-height: 1; cursor: pointer;
+          }
+          .lux-bch-stepbtn:disabled { opacity: 0.35; cursor: not-allowed; }
+          .lux-bch-stepval { flex: 1; text-align: center; font-size: 0.9rem; font-weight: 600; color: var(--lux-text); }
+          .lux-beach-msg {
+            margin-top: 0.9rem; padding: 0.75rem 0.9rem;
+            border-radius: 0.8rem;
+            border: 1px solid rgba(244, 63, 94, 0.45);
+            background: rgba(244, 63, 94, 0.1);
+            color: #fecdd3; font-size: 0.8rem; line-height: 1.45;
+          }
+          .lux-beach-msg[hidden] { display: none; }
+          .lux-bch-when { color: var(--lux-gold-2); font-weight: 600; }
+          .lux-bch-code { font-family: var(--lux-serif); font-size: 1.6rem; font-weight: 800; color: #241318; letter-spacing: 0.12em; text-align: center; margin-top: 0.5rem; }
 
           /* ── Live resort map ── */
           .lux-map-head { padding: 2.6rem 1.25rem 0.8rem; }
@@ -29740,12 +29773,62 @@ window.luxTogglePassForm = function() {
         };
 
         // ── Beach booking: seamless in-app aerial experience ──
-        const luxBeach = { settings: {}, spots: [], zones: [], bookings: [], date: null, slot: null, spot: null };
+        const luxBeach = { settings: {}, spots: [], zones: [], limits: {}, image: '', slots: [], bookings: [], date: null, slot: null, spot: null, loungers: 2, posting: false };
         const LUX_BEACH_SCALE = 1.35;
 
         function luxBeachDateStr(d) {
             var m = d.getMonth() + 1, dd = d.getDate();
             return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd;
+        }
+
+        function luxBeachCairoParts(opts) {
+            var o = {};
+            new Intl.DateTimeFormat('en-CA', Object.assign({ timeZone: 'Africa/Cairo' }, opts)).formatToParts(new Date())
+                .forEach(function(p) { o[p.type] = p.value; });
+            return o;
+        }
+
+        function luxBeachCairoToday() {
+            try {
+                var p = luxBeachCairoParts({ year: 'numeric', month: '2-digit', day: '2-digit' });
+                return p.year + '-' + p.month + '-' + p.day;
+            } catch (e) { return luxBeachDateStr(new Date()); }
+        }
+
+        function luxBeachCairoNow() {
+            try {
+                var p = luxBeachCairoParts({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+                return p.hour + ':' + p.minute;
+            } catch (e) { return ''; }
+        }
+
+        function luxBeachUtcDate(ds) {
+            var p = String(ds).split('-');
+            return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        }
+
+        function luxBeachAddDays(ds, n) {
+            var d = luxBeachUtcDate(ds);
+            d.setUTCDate(d.getUTCDate() + n);
+            return d.toISOString().slice(0, 10);
+        }
+
+        function luxBeachDayLabel(ds) {
+            try {
+                return luxBeachUtcDate(ds).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+            } catch (e) { return ds; }
+        }
+
+        function luxBeachDays() {
+            var st = luxBeach.settings || {};
+            var n = parseInt(st.advance_booking_days, 10);
+            if (!(n > 0)) n = 7;
+            n = Math.min(n, 60);
+            var start = luxBeachCairoToday();
+            if (st.allow_same_day_booking === 0 || st.allow_same_day_booking === '0') start = luxBeachAddDays(start, 1);
+            var out = [];
+            for (var i = 0; i < n; i++) out.push(luxBeachAddDays(start, i));
+            return out;
         }
 
         window.luxOpenBeach = async function() {
@@ -29755,17 +29838,24 @@ window.luxTogglePassForm = function() {
                 const pid = propertyData.property_id;
                 const results = await Promise.all([
                     fetch('/api/admin/beach/settings/' + pid).then(r => r.json()).catch(() => null),
-                    fetch('/api/admin/beach/spots/' + pid).then(r => r.json()).catch(() => null),
+                    fetch('/api/beach/layout/' + pid).then(r => r.ok ? r.json() : null).catch(() => null),
                     fetch('/api/admin/beach/zone-overlays/' + pid).then(r => r.json()).catch(() => null)
                 ]);
+                var layout = results[1];
+                if (!layout || !layout.success) {
+                    layout = await fetch('/api/admin/beach/spots/' + pid).then(r => r.json()).catch(() => null);
+                }
                 luxBeach.settings = (results[0] && results[0].settings) || {};
-                luxBeach.spots = (results[1] && results[1].spots) || [];
+                luxBeach.spots = (layout && layout.spots) || [];
+                luxBeach.limits = (layout && layout.limits) || {};
+                luxBeach.image = (layout && layout.image && layout.image.url) || luxBeach.settings.beach_map_image_url || '';
                 luxBeach.zones = (results[2] && results[2].overlays) || [];
-                luxBeach.date = luxBeachDateStr(new Date());
+                luxBeach.date = luxBeachDays()[0];
                 luxBeach.slot = null;
                 luxBeach.spot = null;
                 luxBeach.bookable = null;
-                await luxBeachLoadBookings();
+                luxBeach.posting = false;
+                await luxBeachLoadDay();
                 luxBeachRenderSheet();
             } catch (e) {
                 console.error('beach sheet', e);
@@ -29773,33 +29863,99 @@ window.luxTogglePassForm = function() {
             }
         };
 
+        function luxBeachFetchBookings(date) {
+            return fetch('/api/beach/availability/' + propertyData.property_id + '/' + date)
+                .then(function(r) { return r.json(); })
+                .then(function(d) { return (d && d.bookings) || []; })
+                .catch(function() { return []; });
+        }
+
         async function luxBeachLoadBookings() {
-            try {
-                const r = await fetch('/api/beach/availability/' + propertyData.property_id + '/' + luxBeach.date);
-                const d = await r.json();
-                luxBeach.bookings = (d && d.bookings) || [];
-            } catch (e) { luxBeach.bookings = []; }
+            var date = luxBeach.date;
+            var list = await luxBeachFetchBookings(date);
+            if (luxBeach.date === date) luxBeach.bookings = list;
+        }
+
+        // Slots and availability for the selected day; false when the guest moved to another day meanwhile
+        async function luxBeachLoadDay() {
+            var date = luxBeach.date;
+            var res = await Promise.all([
+                luxBeachFetchBookings(date),
+                fetch('/api/beach/slots/' + propertyData.property_id + '?date=' + date)
+                    .then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; })
+            ]);
+            if (luxBeach.date !== date) return false;
+            luxBeach.bookings = res[0];
+            var sd = res[1];
+            luxBeach.slots = (sd && sd.success && sd.slots && sd.slots.length) ? sd.slots : luxBeachFallbackSlots();
+            var cur = luxBeachSlotById(luxBeach.slot);
+            if (!cur || luxBeachSlotPast(cur)) luxBeach.slot = null;
+            luxBeachDropStaleSpot();
+            return true;
         }
 
         function luxBeachSpotFree(spotId) {
             var slot = luxBeach.slot;
             if (!slot) return true;
             return !luxBeach.bookings.some(function(b) {
-                if (b.spot_id !== spotId || b.booking_status === 'cancelled') return false;
+                if (b.spot_id !== spotId || b.booking_status === 'cancelled' || b.booking_status === 'no_show') return false;
                 return b.slot_type === slot || b.slot_type === 'full_day' || slot === 'full_day';
             });
         }
 
-        function luxBeachSlots() {
+        function luxBeachSpotOpen(s) {
+            return !!s && Number(s.guest_bookable) === 1 && Number(s.maintenance_mode) !== 1 && luxBeachSpotFree(s.spot_id);
+        }
+
+        function luxBeachDropStaleSpot() {
+            if (luxBeach.spot && !luxBeachSpotOpen(luxBeach.spot)) luxBeach.spot = null;
+        }
+
+        function luxBeachTier(s) {
+            if (!s) return '';
+            if (s.tier === 'cabana' || s.spot_type === 'cabana') return 'cabana';
+            if (s.tier === 'vip') return 'vip';
+            return s.tier || 'standard';
+        }
+
+        function luxBeachMaxLoungers(s) {
+            var cands = [s && s.effective_max_loungers, s && s.max_loungers, luxBeach.limits.max_loungers_per_booking, luxBeach.settings.max_loungers_per_booking];
+            for (var i = 0; i < cands.length; i++) {
+                var n = parseInt(cands[i], 10);
+                if (n >= 1) return n;
+            }
+            return 3;
+        }
+
+        function luxBeachLoungerLabel(n, s) {
+            return '1 ' + (luxBeachTier(s) === 'cabana' ? 'cabana' : 'umbrella') + ' · ' + n + ' sun lounger' + (n === 1 ? '' : 's');
+        }
+
+        function luxBeachFallbackSlots() {
             try {
                 var arr = luxBeach.settings.time_slots ? JSON.parse(luxBeach.settings.time_slots) : null;
                 if (arr && arr.length) return arr;
             } catch (e) {}
             return [
                 { id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00' },
-                { id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00' },
-                { id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00' }
+                { id: 'half_day_pm', name: 'Afternoon', start: '13:30', end: '18:00' }
             ];
+        }
+
+        function luxBeachSlots() {
+            return (luxBeach.slots && luxBeach.slots.length) ? luxBeach.slots : luxBeachFallbackSlots();
+        }
+
+        function luxBeachSlotById(id) {
+            var found = null;
+            if (id) luxBeachSlots().forEach(function(s) { if (s.id === id) found = s; });
+            return found;
+        }
+
+        function luxBeachSlotPast(s) {
+            if (!s || !s.end || luxBeach.date !== luxBeachCairoToday()) return false;
+            var now = luxBeachCairoNow();
+            return !!now && String(s.end).slice(0, 5) <= now;
         }
 
         function luxBeachRenderSheet() {
@@ -29813,7 +29969,7 @@ window.luxTogglePassForm = function() {
                 '<div class="lux-beach-map-wrap" id="luxBeachMapWrap">' +
                     '<div class="lux-beach-canvas" id="luxBeachCanvas"></div>' +
                 '</div>' +
-                '<p class="lux-beach-hint"><i class="fas fa-hand-pointer"></i> Drag to explore — tap a numbered spot on the front row to reserve</p>' +
+                '<p class="lux-beach-hint"><i class="fas fa-hand-pointer"></i> Drag to explore — tap a numbered spot to reserve</p>' +
                 '<div id="luxBeachSel"></div>' +
                 '<div id="luxBeachForm"></div>' +
             '</div>';
@@ -29830,24 +29986,31 @@ window.luxTogglePassForm = function() {
             var host = document.getElementById('luxDayStrip');
             if (!host) return;
             var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            var today = luxBeachCairoToday();
             var html = '';
-            for (var i = 0; i < 7; i++) {
-                var d = new Date();
-                d.setDate(d.getDate() + i);
-                var ds = luxBeachDateStr(d);
+            luxBeachDays().forEach(function(ds) {
+                var d = luxBeachUtcDate(ds);
                 html += '<button class="lux-day-chip' + (ds === luxBeach.date ? ' on' : '') + '" data-date="' + ds + '">' +
-                    '<span class="dw">' + (i === 0 ? 'Today' : names[d.getDay()]) + '</span>' +
-                    '<span class="dn">' + d.getDate() + '</span>' +
+                    '<span class="dw">' + (ds === today ? 'Today' : names[d.getUTCDay()]) + '</span>' +
+                    '<span class="dn">' + d.getUTCDate() + '</span>' +
                 '</button>';
-            }
+            });
             host.innerHTML = html;
             host.querySelectorAll('.lux-day-chip').forEach(function(btn) {
                 btn.addEventListener('click', async function() {
+                    if (luxBeach.posting || btn.dataset.date === luxBeach.date) return;
                     luxBeach.date = btn.dataset.date;
-                    await luxBeachLoadBookings();
                     luxBeachRenderDays();
+                    var slotRow = document.getElementById('luxSlotRow');
+                    if (slotRow) slotRow.style.opacity = '0.55';
+                    var current = await luxBeachLoadDay();
+                    if (slotRow) slotRow.style.opacity = '';
+                    if (!current) return;
+                    luxBeachRenderSlots();
                     luxBeachRenderMap();
                     luxBeachRenderStats();
+                    luxBeachRenderSelection();
+                    luxBeachRenderForm();
                 });
             });
             luxBeachRenderStats();
@@ -29858,16 +30021,20 @@ window.luxTogglePassForm = function() {
             if (!host) return;
             var html = '';
             luxBeachSlots().forEach(function(s) {
-                html += '<button class="lux-slot-chip' + (luxBeach.slot === s.id ? ' on' : '') + '" data-slot="' + s.id + '">' +
-                    '<span class="sn">' + s.name + '</span><span class="st">' + s.start + ' – ' + s.end + '</span></button>';
+                var past = luxBeachSlotPast(s);
+                html += '<button class="lux-slot-chip' + (luxBeach.slot === s.id ? ' on' : '') + (past ? ' past' : '') + '" data-slot="' + luxEsc(s.id) + '"' + (past ? ' disabled' : '') + '>' +
+                    '<span class="sn">' + luxEsc(s.name) + '</span><span class="st">' + luxEsc(s.start) + ' – ' + luxEsc(s.end) + '</span></button>';
             });
             host.innerHTML = html;
             host.querySelectorAll('.lux-slot-chip').forEach(function(btn) {
                 btn.addEventListener('click', function() {
+                    if (luxBeach.posting || btn.disabled) return;
                     luxBeach.slot = btn.dataset.slot;
+                    luxBeachDropStaleSpot();
                     luxBeachRenderSlots();
                     luxBeachRenderMap();
                     luxBeachRenderStats();
+                    luxBeachRenderSelection();
                     luxBeachRenderForm();
                 });
             });
@@ -29876,9 +30043,9 @@ window.luxTogglePassForm = function() {
         function luxBeachRenderStats() {
             var host = document.getElementById('luxBeachStats');
             if (!host) return;
-            var pool = luxBeach.bookable || luxBeach.spots;
+            var pool = luxBeach.bookable || luxBeach.spots.filter(function(s) { return Number(s.guest_bookable) === 1; });
             var total = pool.length;
-            var free = pool.filter(function(s) { return luxBeachSpotFree(s.spot_id); }).length;
+            var free = pool.filter(luxBeachSpotOpen).length;
             host.innerHTML = '' +
                 '<span class="lux-stat"><span class="dot free"></span><strong>' + free + '</strong> Available</span>' +
                 (luxBeach.slot ? '<span class="lux-stat"><span class="dot taken"></span><strong>' + (total - free) + '</strong> Booked</span>' : '') +
@@ -29939,7 +30106,7 @@ window.luxTogglePassForm = function() {
             var canvas = document.getElementById('luxBeachCanvas');
             if (!canvas) return;
             var S = LUX_BEACH_SCALE;
-            var hasImage = !!luxBeach.settings.beach_map_image_url;
+            var hasImage = !!luxBeach.image;
             var maxX = 0, maxY = 0, minY = Infinity;
             luxBeach.spots.forEach(function(s) {
                 maxX = Math.max(maxX, s.position_x);
@@ -29949,39 +30116,34 @@ window.luxTogglePassForm = function() {
             if (!isFinite(minY)) minY = 0;
 
             if (hasImage) {
-                // Photorealistic resort render — the FRONT row (closest to the sea) is bookable.
-                // Measured umbrella centers on the render (fractions of image width), one cell per
-                // painted umbrella so highlights sit exactly on the umbrella + its beds
-                var UMB = [0.0180, 0.0592, 0.1003, 0.1420, 0.1832, 0.2255, 0.2666, 0.3083,
-                           0.3495, 0.3917, 0.4329, 0.4746, 0.5158, 0.5580, 0.5992, 0.6409,
-                           0.6821, 0.7244, 0.7655, 0.8072, 0.8484, 0.8907, 0.9318, 0.9735];
-                var UMB_LANE = { top: 0.588, h: 0.118, w: 0.040 };
+                // Photorealistic resort render: one highlight cell per spot placed on the photo.
+                // map_* are percent of the image (left = map_x - map_w/2, top = map_y)
                 var DISP_H = 500;
                 canvas.classList.remove('lux-3d');
                 canvas.style.backgroundImage = 'none';
                 canvas.style.width = 'auto';
                 canvas.style.height = 'auto';
 
-                var minY2 = Infinity;
-                luxBeach.spots.forEach(function(s) { minY2 = Math.min(minY2, s.position_y); });
-                var front = [];
-                luxBeach.spots.forEach(function(s, idx) { if (s.position_y <= minY2 + 25) front.push({ s: s, idx: idx }); });
-                front.sort(function(a, b) { return a.s.position_x - b.s.position_x; });
-                // one spot per painted umbrella — extra configured spots beyond the
-                // render's umbrella count are not shown on the map
-                var count = Math.min(front.length, UMB.length);
-                front = front.slice(0, count);
-                luxBeach.bookable = front.map(function(f) { return f.s; });
+                var placed = [];
+                luxBeach.spots.forEach(function(s, idx) {
+                    if (s.map_x != null && s.map_x !== '' && Number(s.guest_bookable) === 1) placed.push({ s: s, idx: idx });
+                });
+                luxBeach.bookable = placed.map(function(f) { return f.s; });
 
                 var hero = '<div class="lux-hero-box" style="height:' + DISP_H + 'px;">' +
-                    '<img class="lux-hero-img" src="' + luxBeach.settings.beach_map_image_url + '" alt="Beach" style="height:' + DISP_H + 'px;">';
-                front.forEach(function(f, i) {
-                    var freeS = luxBeachSpotFree(f.s.spot_id);
-                    var selS = luxBeach.spot && luxBeach.spot.spot_id === f.s.spot_id;
-                    var left = UMB[i] - UMB_LANE.w / 2;
-                    hero += '<button class="lux-seat' + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + '" data-idx="' + f.idx + '"' +
-                        ' style="left:' + (left * 100).toFixed(2) + '%; width:' + (UMB_LANE.w * 100).toFixed(2) + '%; top:' + (UMB_LANE.top * 100).toFixed(2) + '%; height:' + (UMB_LANE.h * 100).toFixed(2) + '%;">' +
-                        '<span class="n">' + f.s.spot_number + (f.s.is_premium ? '★' : '') + '</span>' +
+                    '<img class="lux-hero-img" src="' + luxEsc(luxBeach.image) + '" alt="Beach" style="height:' + DISP_H + 'px;">';
+                placed.forEach(function(f) {
+                    var s = f.s;
+                    var mx = Number(s.map_x);
+                    var mw = s.map_w != null ? Number(s.map_w) : 4;
+                    var mh = s.map_h != null ? Number(s.map_h) : 11.8;
+                    var my = s.map_y != null ? Number(s.map_y) : 58.8;
+                    var tier = luxBeachTier(s);
+                    var freeS = luxBeachSpotOpen(s);
+                    var selS = luxBeach.spot && luxBeach.spot.spot_id === s.spot_id;
+                    hero += '<button class="lux-seat' + (tier === 'vip' ? ' t-vip' : '') + (tier === 'cabana' ? ' t-cabana' : '') + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + '" data-idx="' + f.idx + '"' +
+                        ' style="left:' + (mx - mw / 2).toFixed(2) + '%; width:' + mw.toFixed(2) + '%; top:' + my.toFixed(2) + '%; height:' + mh.toFixed(2) + '%;">' +
+                        '<span class="n">' + luxEsc(s.spot_number) + ((tier === 'vip' || s.is_premium) ? '★' : '') + '</span>' +
                     '</button>';
                 });
                 hero += '</div>';
@@ -30042,11 +30204,13 @@ window.luxTogglePassForm = function() {
                     } catch (e) {}
                 });
 
+                luxBeach.bookable = luxBeach.spots.filter(function(s) { return Number(s.guest_bookable) === 1; });
+
                 // paint back-to-front so nearer umbrellas overlap the far ones
                 var order = luxBeach.spots.map(function(s, idx) { return { s: s, idx: idx, py: yFlip(s.position_y) }; });
                 order.sort(function(a, b) { return a.py - b.py; });
                 order.forEach(function(o) {
-                    var free = luxBeachSpotFree(o.s.spot_id);
+                    var free = luxBeachSpotOpen(o.s);
                     var sel = luxBeach.spot && luxBeach.spot.spot_id === o.s.spot_id;
                     html += luxBeachSpriteHtml(o.s, o.idx, free, sel)
                         .replace('class="lux-spot3d', 'style="left:' + Math.round(o.s.position_x * S) + 'px; top:' + o.py + 'px; z-index:' + o.py + ';" class="lux-spot3d');
@@ -30056,12 +30220,12 @@ window.luxTogglePassForm = function() {
                 // Floating number plates in screen space — never hidden behind umbrellas
                 html += '<div class="lux-plate-layer">';
                 order.forEach(function(o) {
-                    var free = luxBeachSpotFree(o.s.spot_id);
+                    var free = luxBeachSpotOpen(o.s);
                     var sel = luxBeach.spot && luxBeach.spot.spot_id === o.s.spot_id;
                     var pt = project(o.s.position_x * S, o.py + 14);
                     html += '<button class="lux-plate' + (free ? '' : ' booked') + (sel ? ' selected' : '') + '" data-idx="' + o.idx + '"' +
                         ' style="left:' + pt.x.toFixed(1) + 'px; top:' + pt.y.toFixed(1) + 'px; z-index:' + (1000 + o.py) + '; transform: translate(-50%, -50%) scale(' + Math.max(0.72, pt.k).toFixed(2) + ');">' +
-                        o.s.spot_number + (o.s.is_premium ? '★' : '') + '</button>';
+                        luxEsc(o.s.spot_number) + ((luxBeachTier(o.s) === 'vip' || o.s.is_premium) ? '★' : '') + '</button>';
                 });
                 html += '</div>';
 
@@ -30076,8 +30240,11 @@ window.luxTogglePassForm = function() {
 
             canvas.onclick = function(e) {
                 var el = e.target.closest('.lux-spot3d, .lux-flatspot, .lux-plate, .lux-seat');
-                if (!el || el.classList.contains('booked')) return;
-                luxBeach.spot = luxBeach.spots[parseInt(el.dataset.idx, 10)];
+                if (!el || el.classList.contains('booked') || luxBeach.posting) return;
+                var picked = luxBeach.spots[parseInt(el.dataset.idx, 10)];
+                if (!luxBeachSpotOpen(picked)) return;
+                if (!luxBeach.spot || luxBeach.spot.spot_id !== picked.spot_id) luxBeach.loungers = Math.min(2, luxBeachMaxLoungers(picked));
+                luxBeach.spot = picked;
                 luxBeachRenderMap();
                 luxBeachRenderSelection();
                 luxBeachRenderForm();
@@ -30099,18 +30266,35 @@ window.luxTogglePassForm = function() {
             var s = luxBeach.spot;
             if (!s) { host.innerHTML = ''; return; }
             var typeNames = { umbrella: 'Straw Umbrella', cabana: 'Cabana', lounger: 'Lounger', daybed: 'Daybed' };
+            var tier = luxBeachTier(s);
+            var title = tier === 'cabana' ? 'Cabana' : (tier === 'vip' ? 'VIP ' : '') + (typeNames[s.spot_type] || 'Beach Spot');
+            var where = [s.zone_name, tier === 'first_line' ? 'Front row' : ''].filter(Boolean).join(' · ');
+            var maxL = luxBeachMaxLoungers(s);
             var price = parseFloat(s.price_full_day) || 0;
             host.innerHTML = '' +
-            '<div class="lux-beach-selcard">' +
-                '<div class="hd"><span class="badge">' + s.spot_number + '</span>' +
-                '<div><div class="tt">' + (typeNames[s.spot_type] || 'Beach Spot') + (s.is_premium ? ' <i class="fas fa-star" style="color: var(--lux-gold-2); font-size: 0.7rem;"></i>' : '') + '</div>' +
-                (s.zone_name ? '<div class="zz"><i class="fas fa-map-marker-alt"></i>' + s.zone_name + '</div>' : '') + '</div></div>' +
+            '<div class="lux-beach-selcard' + (tier === 'vip' || tier === 'cabana' ? ' t-' + tier : '') + '">' +
+                '<div class="hd"><span class="badge">' + luxEsc(s.spot_number) + '</span>' +
+                '<div><div class="tt">' + luxEsc(title) + ((tier === 'vip' || s.is_premium) ? ' <i class="fas fa-star" style="color: var(--lux-gold-2); font-size: 0.7rem;"></i>' : '') + '</div>' +
+                (where ? '<div class="zz"><i class="fas fa-map-marker-alt"></i>' + luxEsc(where) + '</div>' : '') + '</div></div>' +
                 '<div class="mm">' +
-                    '<span><i class="fas fa-users"></i>Up to ' + (s.max_capacity || 2) + ' guests</span>' +
-                    '<span><i class="fas fa-tag"></i>' + (price > 0 ? (s.currency || 'USD') + ' ' + price : 'Free for hotel guests') + '</span>' +
+                    '<span><i class="fas fa-umbrella-beach"></i>1 ' + (tier === 'cabana' ? 'cabana' : 'umbrella') + ' · up to ' + maxL + ' sun lounger' + (maxL === 1 ? '' : 's') + '</span>' +
+                    '<span><i class="fas fa-tag"></i>' + (price > 0 ? luxEsc(s.currency || 'USD') + ' ' + price : 'Free for hotel guests') + '</span>' +
                 '</div>' +
-                (s.spot_description ? '<p class="dd">' + s.spot_description + '</p>' : '') +
+                (s.spot_description ? '<p class="dd">' + luxEsc(s.spot_description) + '</p>' : '') +
             '</div>';
+        }
+
+        function luxBeachOverrideHtml(msg) {
+            return '<div class="lux-beach-override"><i class="fas fa-circle-info"></i>' +
+                luxEsc(msg || 'Beach bookings are currently unavailable. Please contact our beach team.') + '</div>';
+        }
+
+        function luxBeachFormMsg(msg) {
+            var el = document.getElementById('luxBchMsg');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.hidden = !msg;
+            if (msg) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function luxBeachRenderForm() {
@@ -30118,80 +30302,171 @@ window.luxTogglePassForm = function() {
             if (!host) return;
             var st = luxBeach.settings || {};
             if (st.booking_button_override_enabled === 1) {
-                host.innerHTML = '<div class="lux-beach-override"><i class="fas fa-circle-info"></i>' +
-                    (st.booking_button_override_message || 'Beach bookings are currently unavailable. Please contact our beach team.') + '</div>';
+                host.innerHTML = luxBeachOverrideHtml(st.booking_button_override_message);
                 return;
             }
-            var ready = luxBeach.spot && luxBeach.slot;
+            var ids = ['luxBchName', 'luxBchRoom', 'luxBchGuests', 'luxBchNotes'];
+            var prev = {};
+            ids.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) prev[id] = el.value;
+            });
+            var spot = luxBeach.spot;
+            var maxL = luxBeachMaxLoungers(spot);
+            luxBeach.loungers = Math.max(1, Math.min(parseInt(luxBeach.loungers, 10) || Math.min(2, maxL), maxL));
+            var ready = spot && luxBeach.slot;
             host.innerHTML = '' +
             '<form id="luxBeachBookForm" class="lux-form">' +
+                '<label>Sun loungers (up to ' + maxL + ')</label>' +
+                '<div class="lux-bch-step">' +
+                    '<button type="button" class="lux-bch-stepbtn" data-step="-1" aria-label="Fewer sun loungers"' + (luxBeach.loungers <= 1 ? ' disabled' : '') + '>−</button>' +
+                    '<span class="lux-bch-stepval" id="luxBchLoungers">' + luxEsc(luxBeachLoungerLabel(luxBeach.loungers, spot)) + '</span>' +
+                    '<button type="button" class="lux-bch-stepbtn" data-step="1" aria-label="More sun loungers"' + (luxBeach.loungers >= maxL ? ' disabled' : '') + '>+</button>' +
+                '</div>' +
                 '<label>Your Name</label><input type="text" id="luxBchName" required autocomplete="name">' +
                 '<label>Room Number</label><input type="text" id="luxBchRoom" required>' +
                 '<label>Number of Guests</label><input type="number" id="luxBchGuests" min="1" value="2" required>' +
                 '<label>Special Requests (optional)</label><textarea id="luxBchNotes" rows="2" placeholder="Extra towels, shade setup..."></textarea>' +
-                '<button type="submit" class="lux-cta" id="luxBchSubmit"' + (ready ? '' : ' disabled') + '>' +
-                    '<i class="fas fa-umbrella-beach mr-2"></i>' + (ready ? 'Confirm Booking' : 'Choose a spot and time above') +
+                '<div class="lux-beach-msg" id="luxBchMsg" role="alert" hidden></div>' +
+                '<button type="submit" class="lux-cta" id="luxBchSubmit"' + (ready && !luxBeach.posting ? '' : ' disabled') + '>' +
+                    (luxBeach.posting ? 'Reserving...' : '<i class="fas fa-umbrella-beach mr-2"></i>' + (ready ? 'Confirm Booking' : 'Choose a spot and time above')) +
                 '</button>' +
             '</form>';
-            // Pre-fill from OnePass session when available
+            // Keep what the guest typed across re-renders; otherwise pre-fill from the OnePass session
+            var g = {};
             try {
                 var sess = JSON.parse(localStorage.getItem('guestPassSession') || 'null');
-                if (sess && sess.guest) {
-                    if (sess.guest.full_name) document.getElementById('luxBchName').value = sess.guest.full_name;
-                    if (sess.guest.room_number) document.getElementById('luxBchRoom').value = sess.guest.room_number;
-                }
+                if (sess && sess.guest) g = sess.guest;
             } catch (e) {}
-            var form = document.getElementById('luxBeachBookForm');
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                if (!luxBeach.spot || !luxBeach.slot) return;
-                var btn = document.getElementById('luxBchSubmit');
-                btn.disabled = true;
-                btn.textContent = 'Reserving...';
-                try {
-                    var resp = await fetch('/api/beach/bookings', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            property_id: propertyData.property_id,
-                            spot_id: luxBeach.spot.spot_id,
-                            booking_date: luxBeach.date,
-                            slot_type: luxBeach.slot,
-                            guest_name: document.getElementById('luxBchName').value,
-                            guest_room_number: document.getElementById('luxBchRoom').value,
-                            num_guests: parseInt(document.getElementById('luxBchGuests').value) || 1,
-                            special_requests: document.getElementById('luxBchNotes').value
-                        })
-                    });
-                    var data = await resp.json();
-                    if (data.success && data.booking) {
-                        var ref = data.booking.booking_reference;
-                        var slotName = '';
-                        luxBeachSlots().forEach(function(s) { if (s.id === luxBeach.slot) slotName = s.name; });
-                        document.getElementById('luxSheetBody').innerHTML = '' +
-                        '<div class="lux-sheet-ok">' +
-                            '<div class="ic"><i class="fas fa-umbrella-beach"></i></div>' +
-                            '<h2 style="font-family: var(--lux-serif); font-size: 1.8rem; color: var(--lux-text); margin-bottom: 0.4rem;">Your spot is reserved</h2>' +
-                            '<p class="lux-sheet-desc">Spot ' + luxBeach.spot.spot_number + ' · ' + slotName + ' · ' + luxBeach.date + '</p>' +
-                            '<div class="lux-qr-card">' +
-                                '<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&bgcolor=faf6ec&color=241318&data=' + encodeURIComponent(ref) + '" alt="Booking QR">' +
-                                '<p class="ref">' + ref + '</p>' +
-                            '</div>' +
-                            '<p class="lux-sheet-desc" style="font-size: 0.76rem;">Show this code at the beach entrance</p>' +
-                            '<button class="lux-cta" style="max-width: 280px; margin: 1.4rem auto 0; display: block;" onclick="luxCloseSheet()">Done</button>' +
-                        '</div>';
-                    } else {
-                        alert('Booking failed: ' + (data.error || 'Please try again'));
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-umbrella-beach mr-2"></i>Confirm Booking';
-                    }
-                } catch (err) {
-                    console.error('beach booking', err);
-                    alert('Booking failed. Please try again.');
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-umbrella-beach mr-2"></i>Confirm Booking';
-                }
+            var fill = { luxBchName: g.full_name, luxBchRoom: g.room_number };
+            ids.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                if (prev[id] != null) el.value = prev[id];
+                else if (fill[id]) el.value = fill[id];
             });
+            host.querySelectorAll('.lux-bch-stepbtn').forEach(function(b) {
+                b.addEventListener('click', function() {
+                    var m = luxBeachMaxLoungers(luxBeach.spot);
+                    luxBeach.loungers = Math.max(1, Math.min(luxBeach.loungers + parseInt(b.dataset.step, 10), m));
+                    var v = document.getElementById('luxBchLoungers');
+                    if (v) v.textContent = luxBeachLoungerLabel(luxBeach.loungers, luxBeach.spot);
+                    host.querySelectorAll('.lux-bch-stepbtn').forEach(function(x) {
+                        x.disabled = parseInt(x.dataset.step, 10) < 0 ? luxBeach.loungers <= 1 : luxBeach.loungers >= m;
+                    });
+                });
+            });
+            document.getElementById('luxBeachBookForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                luxBeachSubmit();
+            });
+        }
+
+        async function luxBeachSubmit() {
+            if (luxBeach.posting || !luxBeach.spot || !luxBeach.slot) return;
+            var name = (document.getElementById('luxBchName').value || '').trim();
+            var room = (document.getElementById('luxBchRoom').value || '').trim();
+            if (!name || !room) { luxBeachFormMsg('Please enter your name and room number.'); return; }
+            var spot = luxBeach.spot, slotId = luxBeach.slot, date = luxBeach.date, loungers = luxBeach.loungers;
+            luxBeach.posting = true;
+            luxBeachFormMsg('');
+            var btn = document.getElementById('luxBchSubmit');
+            if (btn) { btn.disabled = true; btn.textContent = 'Reserving...'; }
+            var status = 0, data = null;
+            try {
+                var resp = await fetch('/api/beach/bookings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        property_id: propertyData.property_id,
+                        spot_id: spot.spot_id,
+                        booking_date: date,
+                        slot_type: slotId,
+                        guest_name: name,
+                        guest_room_number: room,
+                        num_guests: parseInt(document.getElementById('luxBchGuests').value, 10) || 1,
+                        num_loungers: loungers,
+                        booking_source: 'guest',
+                        special_requests: document.getElementById('luxBchNotes').value
+                    })
+                });
+                status = resp.status;
+                data = await resp.json().catch(function() { return null; });
+            } catch (err) {
+                console.error('beach booking', err);
+            }
+            luxBeach.posting = false;
+            if (data && data.success && data.booking) {
+                luxBeachRenderSuccess(data.booking, spot, slotId, date, loungers);
+                return;
+            }
+            await luxBeachBookingFailed(status, data || {}, spot);
+        }
+
+        async function luxBeachBookingFailed(status, data, spot) {
+            var err = typeof data.error === 'string' ? data.error : '';
+            var human = err.indexOf(' ') > 0 ? err : '';
+            if (status === 403) {
+                var host = document.getElementById('luxBeachForm');
+                var st = luxBeach.settings || {};
+                if (host) host.innerHTML = luxBeachOverrideHtml(data.message || human || st.booking_button_override_message || 'Online booking is not available for this spot. Please book with our beach team.');
+                return;
+            }
+            if (err === 'taken' || (status === 409 && !err) || /already booked/i.test(err)) {
+                var num = spot.spot_number;
+                luxBeach.spot = null;
+                await luxBeachLoadBookings();
+                luxBeachRenderMap();
+                luxBeachRenderStats();
+                luxBeachRenderSelection();
+                luxBeachRenderForm();
+                luxBeachFormMsg('Sorry, spot ' + num + ' was just reserved for this time. Please choose another spot.');
+                return;
+            }
+            var msg;
+            if (err === 'room_limit') {
+                var mu = parseInt(data.max_umbrellas, 10) || 1;
+                msg = mu > 1 ? 'Your room already has ' + mu + ' umbrellas for this time slot' : 'Your room already has an umbrella for this time slot';
+            } else if (data.max_loungers != null) {
+                var ml = parseInt(data.max_loungers, 10) || 1;
+                spot.effective_max_loungers = ml;
+                luxBeach.loungers = Math.min(luxBeach.loungers, ml);
+                luxBeachRenderSelection();
+                msg = 'This spot allows up to ' + ml + ' sun lounger' + (ml === 1 ? '' : 's') + '. Please adjust and try again.';
+            } else if (status) {
+                msg = human || 'Booking failed. Please try again.';
+            } else {
+                msg = 'Connection problem. Please check your internet and try again.';
+            }
+            luxBeachRenderForm();
+            luxBeachFormMsg(msg);
+        }
+
+        function luxBeachRenderSuccess(b, spot, slotId, date, loungers) {
+            var body = document.getElementById('luxSheetBody');
+            if (!body) return;
+            var slot = luxBeachSlotById(slotId);
+            var start = String(b.start_time || (slot && slot.start) || '').slice(0, 5);
+            var end = String(b.end_time || (slot && slot.end) || '').slice(0, 5);
+            var when = ((slot && slot.name) || '') + (start && end ? ' ' + start + ' – ' + end : '');
+            var n = parseInt(b.num_loungers, 10) || loungers;
+            var ref = b.booking_reference || '';
+            var code = b.booking_code || '';
+            body.innerHTML = '' +
+            '<div class="lux-sheet-ok">' +
+                '<div class="ic"><i class="fas fa-umbrella-beach"></i></div>' +
+                '<h2 style="font-family: var(--lux-serif); font-size: 1.8rem; color: var(--lux-text); margin-bottom: 0.4rem;">Your spot is reserved</h2>' +
+                '<p class="lux-sheet-desc">Spot ' + luxEsc(spot.spot_number) + ' · ' + luxEsc(luxBeachDayLabel(date)) + '</p>' +
+                (when.trim() ? '<p class="lux-sheet-desc lux-bch-when">' + luxEsc(when.trim()) + '</p>' : '') +
+                '<p class="lux-sheet-desc">' + luxEsc(luxBeachLoungerLabel(n, spot)) + '</p>' +
+                '<div class="lux-qr-card">' +
+                    '<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&bgcolor=faf6ec&color=241318&data=' + encodeURIComponent(ref) + '" alt="Booking QR">' +
+                    (code ? '<p class="lux-bch-code">' + luxEsc(code) + '</p>' : '') +
+                    '<p class="ref">' + luxEsc(ref) + '</p>' +
+                '</div>' +
+                '<p class="lux-sheet-desc" style="font-size: 0.76rem;">Show this QR code or your booking code at the beach entrance</p>' +
+                '<button class="lux-cta" style="max-width: 280px; margin: 1.4rem auto 0; display: block;" onclick="luxCloseSheet()">Done</button>' +
+            '</div>';
         }
 
         // ── Live resort map: real satellite view, live guest location, annotated spots ──
@@ -42001,8 +42276,8 @@ app.get('/admin/interactive-map-builder', (c) => {
 
 // Guest Beach Booking Interface - Visual beach map for guests to book spots
 app.get('/beach-booking/:property_id', async (c) => {
-  const { property_id } = c.req.param()
-  
+  const property_id = parseInt(c.req.param('property_id'), 10) || 0
+
   return c.html(`
 <!DOCTYPE html>
 <html lang="en">
@@ -42074,6 +42349,12 @@ app.get('/beach-booking/:property_id', async (c) => {
             transform: scale(1.3);
             filter: drop-shadow(0 0 12px rgba(59, 130, 246, 1));
         }
+        .spot-icon.locked {
+            opacity: 0.35;
+            filter: grayscale(100%);
+            cursor: not-allowed;
+        }
+        .spot-icon.locked:hover { transform: none; }
         .time-slot {
             transition: all 0.2s;
             cursor: pointer;
@@ -42225,6 +42506,12 @@ app.get('/beach-booking/:property_id', async (c) => {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-2">
+                                <i class="fas fa-couch mr-2 text-amber-500"></i>Sun Loungers
+                            </label>
+                            <select id="numLoungers" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">
                                 <i class="fas fa-comment mr-2 text-orange-500"></i>Special Requests (Optional)
                             </label>
                             <textarea id="specialRequests" rows="2" placeholder="Extra towels, umbrella setup, etc." class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
@@ -42259,20 +42546,47 @@ app.get('/beach-booking/:property_id', async (c) => {
         let bookings = [];
         let settings = {};
         let zones = [];
+        let timeSlots = [];
+        let maxLoungersById = {};
+        let submitting = false;
         const propertyId = ${property_id};
-        
+
         // Helper function for API calls
         async function fetchWithAuth(url, options = {}) {
             return fetch(url, options);
         }
-        
+
         const canvas = document.getElementById('beachCanvas');
-        
-        // Set today as minimum date
-        const today = new Date().toISOString().split('T')[0];
+
+        function cairoToday() {
+            try {
+                const p = {};
+                new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' })
+                    .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+                return p.year + '-' + p.month + '-' + p.day;
+            } catch (e) { return new Date().toISOString().split('T')[0]; }
+        }
+        function addDays(ds, n) {
+            const p = ds.split('-');
+            const d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
+            return d.toISOString().slice(0, 10);
+        }
+
+        // Resort-local (Cairo) booking window
+        const today = cairoToday();
         document.getElementById('bookingDate').min = today;
         document.getElementById('bookingDate').value = today;
-        
+        function applyDateWindow() {
+            const input = document.getElementById('bookingDate');
+            const sameDay = !(settings.allow_same_day_booking === 0 || settings.allow_same_day_booking === '0');
+            const first = sameDay ? today : addDays(today, 1);
+            let n = parseInt(settings.advance_booking_days, 10);
+            if (!(n > 0)) n = 7;
+            input.min = first;
+            input.max = addDays(first, Math.min(n, 60) - 1);
+            if (!input.value || input.value < input.min || input.value > input.max) input.value = first;
+        }
+
         // Auto-fill guest information from OnePass
         function autoFillGuestInfo() {
             const session = localStorage.getItem('guestPassSession');
@@ -42353,64 +42667,123 @@ app.get('/beach-booking/:property_id', async (c) => {
                         console.log('🏖️ Applied beach map image:', settings.beach_map_image_url);
                     }
                     
-                    // Load and render time slots
-                    renderTimeSlots(settings.time_slots);
+                    applyDateWindow();
                 }
             } catch (error) {
                 console.error('Load settings error:', error);
             }
         }
-        
-        function renderTimeSlots(timeSlotsJson) {
+
+        function fallbackSlots() {
             try {
-                const timeSlots = timeSlotsJson ? JSON.parse(timeSlotsJson) : [
-                    {id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00'},
-                    {id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00'},
-                    {id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00'}
-                ];
-                
+                const arr = settings.time_slots ? JSON.parse(settings.time_slots) : null;
+                if (arr && arr.length) return arr;
+            } catch (e) {}
+            return [
+                {id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00'},
+                {id: 'half_day_pm', name: 'Afternoon', start: '13:30', end: '18:00'}
+            ];
+        }
+
+        // Sunrise/sunset-resolved slots for the chosen date
+        async function loadSlotsForDate() {
+            const date = document.getElementById('bookingDate').value;
+            let list = null;
+            try {
+                const r = await fetch('/api/beach/slots/' + propertyId + '?date=' + encodeURIComponent(date));
+                const d = r.ok ? await r.json() : null;
+                if (d && d.success && d.slots && d.slots.length) list = d.slots;
+            } catch (e) {
+                console.error('Load slots error:', e);
+            }
+            if (document.getElementById('bookingDate').value !== date) return;
+            timeSlots = list || fallbackSlots();
+            if (selectedTimeSlot && !timeSlots.some(s => s.id === selectedTimeSlot)) selectedTimeSlot = null;
+            renderTimeSlots();
+        }
+
+        function slotText(v) {
+            return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        }
+
+        function renderTimeSlots() {
+            try {
                 const grid = document.getElementById('timeSlotsGrid');
                 if (!grid) return;
-                
+
                 const html = timeSlots.map(slot => {
-                    const startTime = slot.start.split(':')[0];
-                    const endTime = slot.end.split(':')[0];
-                    const isFullDay = (parseInt(endTime) - parseInt(startTime)) >= 8;
-                    
-                    return '<button onclick="selectTimeSlot(\\'' + slot.id + '\\')" data-slot="' + slot.id + '" class="time-slot px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium ' + (isFullDay ? 'col-span-2' : '') + '">' +
-                        '<div class="text-sm">' + slot.name + '</div>' +
-                        '<div class="text-xs text-gray-600">' + formatTime(slot.start) + ' - ' + formatTime(slot.end) + '</div>' +
+                    const isFullDay = slot.id === 'full_day';
+
+                    return '<button type="button" data-slot="' + slotText(slot.id) + '" class="time-slot px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium ' + (isFullDay ? 'col-span-2' : '') + (selectedTimeSlot === slot.id ? ' selected' : '') + '">' +
+                        '<div class="text-sm">' + slotText(slot.name) + '</div>' +
+                        '<div class="text-xs ' + (selectedTimeSlot === slot.id ? '' : 'text-gray-600') + '">' + formatTime(slot.start) + ' – ' + formatTime(slot.end) + '</div>' +
                     '</button>';
                 }).join('');
-                
+
                 grid.innerHTML = html;
+                grid.querySelectorAll('.time-slot').forEach(btn => {
+                    btn.addEventListener('click', () => selectTimeSlot(btn.dataset.slot));
+                });
             } catch (error) {
                 console.error('Render time slots error:', error);
             }
         }
-        
+
+        // 24-hour HH:MM, keeping the minutes (13:30, not 1PM)
         function formatTime(time) {
-            const [hours, minutes] = time.split(':');
-            const h = parseInt(hours);
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            const displayHour = h > 12 ? h - 12 : (h === 0 ? 12 : h);
-            return displayHour + ampm;
+            const parts = String(time || '').split(':');
+            if (parts.length < 2) return slotText(time);
+            return slotText(parts[0].padStart(2, '0') + ':' + parts[1].slice(0, 2));
         }
-        
+
+        function maxLoungersFor(spot) {
+            const cands = [maxLoungersById[spot.spot_id], spot.max_loungers, settings.max_loungers_per_booking];
+            for (const v of cands) {
+                const n = parseInt(v, 10);
+                if (n >= 1) return n;
+            }
+            return 3;
+        }
+
+        function renderLoungerOptions(spot) {
+            const sel = document.getElementById('numLoungers');
+            if (!sel) return;
+            const max = maxLoungersFor(spot);
+            const prev = parseInt(sel.value, 10);
+            const unit = (spot.tier === 'cabana' || spot.spot_type === 'cabana') ? 'cabana' : 'umbrella';
+            let html = '';
+            for (let i = 1; i <= max; i++) {
+                html += '<option value="' + i + '">1 ' + unit + ' · ' + i + ' sun lounger' + (i === 1 ? '' : 's') + '</option>';
+            }
+            sel.innerHTML = html;
+            sel.value = String(prev >= 1 && prev <= max ? prev : Math.min(2, max));
+        }
+
         // Load beach spots and bookings
         async function loadBeachData() {
             try {
                 // Load settings first
                 await loadAndApplySettings();
-                
-                // Load spots
-                const spotsResponse = await fetch('/api/admin/beach/spots/' + propertyId);
-                const spotsData = await spotsResponse.json();
-                
+
+                // Load spots (+ per-spot lounger limits from the public layout)
+                const spotRes = await Promise.all([
+                    fetch('/api/admin/beach/spots/' + propertyId).then(r => r.json()).catch(() => null),
+                    fetch('/api/beach/layout/' + propertyId).then(r => r.ok ? r.json() : null).catch(() => null)
+                ]);
+                const spotsData = spotRes[0] || {};
+
                 if (spotsData.success && spotsData.spots) {
                     spots = spotsData.spots;
                 }
-                
+                const layoutData = spotRes[1];
+                if (layoutData && layoutData.success && layoutData.spots) {
+                    maxLoungersById = {};
+                    layoutData.spots.forEach(s => { maxLoungersById[s.spot_id] = s.effective_max_loungers; });
+                    if (layoutData.limits && layoutData.limits.max_loungers_per_booking && !settings.max_loungers_per_booking) {
+                        settings.max_loungers_per_booking = layoutData.limits.max_loungers_per_booking;
+                    }
+                }
+
                 // Load zone overlays from database
                 const zonesResponse = await fetch('/api/admin/beach/zone-overlays/' + propertyId);
                 const zonesData = await zonesResponse.json();
@@ -42437,21 +42810,21 @@ app.get('/beach-booking/:property_id', async (c) => {
                 // Update zone legend
                 updateZoneLegend();
                 
-                // Load bookings for selected date
-                await loadBookingsForDate();
+                // Load bookings and time slots for selected date
+                await Promise.all([loadBookingsForDate(), loadSlotsForDate()]);
                 renderSpots();
             } catch (error) {
                 console.error('Load error:', error);
             }
         }
-        
+
         async function loadBookingsForDate() {
             const date = document.getElementById('bookingDate').value;
             try {
                 const response = await fetch('/api/beach/availability/' + propertyId + '/' + date);
                 const data = await response.json();
-                
-                if (data.success) {
+
+                if (data.success && document.getElementById('bookingDate').value === date) {
                     bookings = data.bookings || [];
                 }
             } catch (error) {
@@ -42471,12 +42844,17 @@ app.get('/beach-booking/:property_id', async (c) => {
         
         function isSpotAvailable(spotId, timeSlot) {
             if (!timeSlot) return true;
-            
-            return !bookings.some(booking => 
-                booking.spot_id === spotId && 
-                booking.slot_type === timeSlot &&
-                booking.booking_status !== 'cancelled'
+
+            return !bookings.some(booking =>
+                booking.spot_id === spotId &&
+                (booking.slot_type === timeSlot || booking.slot_type === 'full_day' || timeSlot === 'full_day') &&
+                booking.booking_status !== 'cancelled' && booking.booking_status !== 'no_show'
             );
+        }
+
+        // Guests may only book spots the resort opened for in-app booking
+        function isSpotBookable(spot) {
+            return (spot.guest_bookable == null || Number(spot.guest_bookable) === 1) && Number(spot.maintenance_mode) !== 1;
         }
         
         function updateZoneLegend() {
@@ -42561,14 +42939,21 @@ app.get('/beach-booking/:property_id', async (c) => {
             
             // Remove existing spot elements
             document.querySelectorAll('.spot-icon').forEach(el => el.remove());
-            
+
+            if (selectedSpot && !(isSpotBookable(selectedSpot) && isSpotAvailable(selectedSpot.spot_id, selectedTimeSlot))) {
+                selectedSpot = null;
+                document.getElementById('selectedSpotInfo').classList.add('hidden');
+            }
+
             spots.forEach(spot => {
                 const spotEl = document.createElement('div');
                 spotEl.className = 'spot-icon';
-                
+
                 // Check if spot is available for selected time slot
-                const available = isSpotAvailable(spot.spot_id, selectedTimeSlot);
-                spotEl.classList.add(available ? 'available' : 'booked');
+                const bookable = isSpotBookable(spot);
+                const available = bookable && isSpotAvailable(spot.spot_id, selectedTimeSlot);
+                spotEl.classList.add(!bookable ? 'locked' : (available ? 'available' : 'booked'));
+                if (!bookable) spotEl.title = 'Book this spot with our beach team';
                 
                 if (selectedSpot && selectedSpot.spot_id === spot.spot_id) {
                     spotEl.classList.add('selected');
@@ -42626,79 +43011,115 @@ app.get('/beach-booking/:property_id', async (c) => {
             
             document.getElementById('selectedSpotInfo').classList.remove('hidden');
             document.getElementById('timeSlotSection').classList.remove('hidden');
-            
+            renderLoungerOptions(spot);
+
             checkFormComplete();
         }
-        
+
         function selectTimeSlot(slot) {
+            if (submitting) return;
             selectedTimeSlot = slot;
-            
+
             // Update UI
-            document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
-            document.querySelector('[data-slot="' + slot + '"]').classList.add('selected');
-            
+            renderTimeSlots();
+
             document.getElementById('guestDetailsSection').classList.remove('hidden');
-            
+
             // Re-render spots to update availability
             renderSpots();
             checkFormComplete();
         }
-        
+
         function checkFormComplete() {
             const hasSpot = selectedSpot !== null;
             const hasSlot = selectedTimeSlot !== null;
             const hasName = document.getElementById('guestName').value.trim() !== '';
             const hasRoom = document.getElementById('roomNumber').value.trim() !== '';
-            
-            document.getElementById('bookButton').disabled = !(hasSpot && hasSlot && hasName && hasRoom);
+
+            document.getElementById('bookButton').disabled = submitting || !(hasSpot && hasSlot && hasName && hasRoom);
         }
-        
+
         // Add input listeners
         document.getElementById('guestName').addEventListener('input', checkFormComplete);
         document.getElementById('roomNumber').addEventListener('input', checkFormComplete);
         document.getElementById('bookingDate').addEventListener('change', async () => {
-            await loadBookingsForDate();
+            await Promise.all([loadBookingsForDate(), loadSlotsForDate()]);
             renderSpots();
+            checkFormComplete();
         });
-        
+
+        function bookingErrorMessage(status, data) {
+            const err = typeof data.error === 'string' ? data.error : '';
+            if (status === 403) {
+                return data.message || (err.indexOf(' ') > 0 ? err : '') || settings.booking_button_override_message || 'Online booking is not available for this spot. Please book with our beach team.';
+            }
+            if (err === 'taken' || /already booked/i.test(err)) return 'Sorry, this spot was just reserved for this time. Please choose another spot.';
+            if (err === 'room_limit') {
+                const mu = parseInt(data.max_umbrellas, 10) || 1;
+                return mu > 1 ? 'Your room already has ' + mu + ' umbrellas for this time slot' : 'Your room already has an umbrella for this time slot';
+            }
+            if (data.max_loungers != null) return 'This spot allows up to ' + data.max_loungers + ' sun loungers. Please adjust and try again.';
+            return err.indexOf(' ') > 0 ? err : 'Please try again';
+        }
+
         async function completeBooking() {
+            if (submitting) return;
             if (!selectedSpot || !selectedTimeSlot) {
                 alert('Please select a spot and time slot');
                 return;
             }
-            
+
+            const spot = selectedSpot;
             const bookingData = {
                 property_id: propertyId,
-                spot_id: selectedSpot.spot_id,
+                spot_id: spot.spot_id,
                 booking_date: document.getElementById('bookingDate').value,
                 slot_type: selectedTimeSlot,
-                guest_name: document.getElementById('guestName').value,
-                guest_room_number: document.getElementById('roomNumber').value,
-                num_guests: parseInt(document.getElementById('numGuests').value),
+                guest_name: document.getElementById('guestName').value.trim(),
+                guest_room_number: document.getElementById('roomNumber').value.trim(),
+                num_guests: parseInt(document.getElementById('numGuests').value, 10) || 1,
+                num_loungers: parseInt(document.getElementById('numLoungers').value, 10) || Math.min(2, maxLoungersFor(spot)),
+                booking_source: 'guest',
                 special_requests: document.getElementById('specialRequests').value
             };
-            
+
+            const btn = document.getElementById('bookButton');
+            const btnHtml = btn.innerHTML;
+            submitting = true;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Booking...';
+
             try {
                 const response = await fetchWithAuth('/api/beach/bookings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(bookingData)
                 });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('✅ Booking Confirmed!\\n\\nBooking Reference: ' + data.booking.booking_reference + '\\n\\nPlease show your QR code at the beach entrance.');
-                    
-                    // Redirect to booking confirmation
-                    window.location.href = '/beach-booking-confirmation/' + data.booking.booking_reference;
-                } else {
-                    alert('❌ Booking failed: ' + (data.error || 'Please try again'));
+
+                const data = await response.json().catch(() => ({}));
+
+                if (data.success && data.booking) {
+                    // Redirect to booking confirmation (button stays disabled)
+                    window.location.href = '/beach-booking-confirmation/' + encodeURIComponent(data.booking.booking_reference);
+                    return;
                 }
+                const err = typeof data.error === 'string' ? data.error : '';
+                if (err === 'taken' || /already booked/i.test(err)) {
+                    await loadBookingsForDate();
+                    renderSpots();
+                }
+                if (data.max_loungers != null) {
+                    maxLoungersById[spot.spot_id] = data.max_loungers;
+                    renderLoungerOptions(spot);
+                }
+                alert('❌ Booking failed: ' + bookingErrorMessage(response.status, data));
             } catch (error) {
                 console.error('Booking error:', error);
                 alert('❌ Booking failed. Please try again.');
             }
+            submitting = false;
+            btn.innerHTML = btnHtml;
+            checkFormComplete();
         }
         
         // Initialize
@@ -42711,8 +43132,9 @@ app.get('/beach-booking/:property_id', async (c) => {
 
 // Beach Booking Confirmation Page with QR Code
 app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
-  const { booking_reference } = c.req.param()
-  
+  // Interpolated into HTML and a script string below: references are BCH-<digits>-<ALNUM>
+  const booking_reference = (c.req.param('booking_reference') || '').replace(/[^A-Za-z0-9_-]/g, '')
+
   return c.html(`
 <!DOCTYPE html>
 <html lang="en">
@@ -42881,9 +43303,10 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                     const roomNumberEl = document.getElementById('roomNumber');
                     
                     if (bookingCodeEl) bookingCodeEl.textContent = booking.booking_code || 'N/A';
-                    if (spotInfoEl) spotInfoEl.textContent = getSpotIcon(booking.spot_type) + ' Spot ' + booking.spot_number;
-                    if (bookingDateInfoEl) bookingDateInfoEl.textContent = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                    if (slotInfoEl) slotInfoEl.textContent = formatSlotType(booking.slot_type);
+                    const loungers = parseInt(booking.num_loungers, 10);
+                    if (spotInfoEl) spotInfoEl.textContent = getSpotIcon(booking.spot_type) + ' Spot ' + booking.spot_number + (loungers > 0 ? ' · ' + loungers + ' sun lounger' + (loungers === 1 ? '' : 's') : '');
+                    if (bookingDateInfoEl) bookingDateInfoEl.textContent = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+                    if (slotInfoEl) slotInfoEl.textContent = formatSlotType(booking.slot_type, booking.start_time, booking.end_time);
                     if (guestNameEl) guestNameEl.textContent = booking.guest_name || 'N/A';
                     if (roomNumberEl) roomNumberEl.textContent = booking.guest_room_number || 'N/A';
                     
@@ -42996,7 +43419,13 @@ Late arrivals may result in reduced time\`;
             return icons[type] || '🔵';
         }
         
-        function formatSlotType(slot) {
+        // Stored start/end (sunrise/sunset-resolved) win; legacy rows without them keep the old labels
+        function formatSlotType(slot, start, end) {
+            const hhmm = t => String(t || '').slice(0, 5);
+            if (start && end) {
+                const names = { half_day_am: 'Morning', half_day_pm: 'Afternoon', full_day: 'Full Day', morning: 'Morning', afternoon: 'Afternoon' };
+                return (names[slot] || slot || 'Time') + ' (' + hhmm(start) + ' – ' + hhmm(end) + ')';
+            }
             const slots = {
                 half_day_am: 'Morning (8AM - 1PM)',
                 half_day_pm: 'Afternoon (1PM - 6PM)',
