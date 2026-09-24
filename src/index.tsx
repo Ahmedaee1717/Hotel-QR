@@ -42810,8 +42810,9 @@ async function runQuickFill() {
   if (!r.ok) { if (el('qGo')) el('qGo').disabled = false; if (el('qErr')) el('qErr').innerHTML = conflictHtml(r, 'Could not create the tables'); return; }
   closeDlg(true);
   var made = Array.isArray(r.data.created) ? r.data.created.length : (Number(r.data.created) || p.count);
+  var madeNums = Array.isArray(r.data.created) ? r.data.created.map(function (t) { return t && t.table_number; }).filter(Boolean) : [];
   await loadAll();
-  toast(plural(made, 'table') + ' added to Zone ' + z.code + '. Drag them into place, then press Save layout.', 'ok');
+  toast(plural(made, 'table') + ' added to Zone ' + z.code + (madeNums.length ? ' (' + madeNums[0] + (madeNums.length > 1 ? '–' + madeNums[madeNums.length - 1] : '') + ')' : '') + '. Drag them into place, then press Save layout.', 'ok');
 }
 
 // ---------- time slots ----------
@@ -92355,6 +92356,8 @@ function rstErr(status: number, error: string, message: string, extra: any = {})
 // Create a booking (guest / staff / admin / walk_in). Validation, auto table
 // assignment, then an atomic INSERT…SELECT…WHERE NOT EXISTS (table overlap
 // incl. buffers against holding bookings) with one retry on the next table.
+// No content-based dedupe (a family may book identical tables): only an explicit
+// request_id makes a retry idempotent (reference derived from it, see rstRefFromRequest).
 async function rstCreate(env: any, oid: number, input: any): Promise<{ status: number, body: any }> {
   const DB = env.DB
   const now = rstNow()
