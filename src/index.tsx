@@ -13845,6 +13845,388 @@ app.get('/api/admin/chatbot/analytics/chat-history', async (c) => {
 
 // ========== BEACH BOOKING API ENDPOINTS ==========
 
+const BEACH_SLOT_IDS = ['half_day_am', 'half_day_pm', 'full_day']
+const BEACH_ACTIVE_STATUSES = "('confirmed', 'checked_in')"
+// Legacy writers stored 'morning'/'afternoon'; conflict SQL compares the normalised id.
+const BEACH_SLOT_SQL = "(CASE slot_type WHEN 'morning' THEN 'half_day_am' WHEN 'afternoon' THEN 'half_day_pm' ELSE slot_type END)"
+const BEACH_DEFAULT_LAT = 27.047736
+const BEACH_DEFAULT_LNG = 33.887975
+
+function cairoToday(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date())
+}
+
+function normBeachSlot(s: string): string {
+  const v = String(s == null ? '' : s).trim()
+  if (v === 'morning') return 'half_day_am'
+  if (v === 'afternoon') return 'half_day_pm'
+  return v
+}
+
+function isBeachYmd(v: any): boolean {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
+  const d = new Date(v + 'T00:00:00Z')
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v
+}
+
+function isBeachHHMM(v: any): boolean {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v)
+}
+
+function addDaysYmd(date: string, n: number): string {
+  const d = new Date(date + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+// Egypt observes DST with changing rules, so the offset is read from the tz database per date.
+function cairoUtcOffsetMinutes(date: string): number {
+  const probe = new Date(date + 'T10:00:00Z')
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo', hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  }).formatToParts(probe)
+  const get = (t: string) => Number((parts.find((p: any) => p.type === t) || { value: '0' }).value)
+  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'))
+  return Math.round((asUtc - probe.getTime()) / 60000)
+}
+
+// NOAA solar-position algorithm (zenith 90.833°), iterated so declination and the equation of
+// time are evaluated at each event rather than at noon. Accurate to ~1-2 min at this latitude.
+function beachSunCalc(date: string, lat: number, lng: number): { sunrise: string, sunset: string } {
+  const offset = cairoUtcOffsetMinutes(date)
+  const [y, m, d] = date.split('-').map(Number)
+  const rad = Math.PI / 180
+  const jd0 = Date.UTC(y, m - 1, d) / 86400000 + 2440587.5
+  const sun = (utcMin: number) => {
+    const t = (jd0 + utcMin / 1440 - 2451545) / 36525
+    const L0 = ((280.46646 + t * (36000.76983 + t * 0.0003032)) % 360 + 360) % 360
+    const M = 357.52911 + t * (35999.05029 - 0.0001537 * t)
+    const e = 0.016708634 - t * (0.000042037 + 0.0000001267 * t)
+    const C = Math.sin(M * rad) * (1.914602 - t * (0.004817 + 0.000014 * t))
+      + Math.sin(2 * M * rad) * (0.019993 - 0.000101 * t)
+      + Math.sin(3 * M * rad) * 0.000289
+    const omega = 125.04 - 1934.136 * t
+    const lambda = L0 + C - 0.00569 - 0.00478 * Math.sin(omega * rad)
+    const eps0 = 23 + (26 + (21.448 - t * (46.815 + t * (0.00059 - t * 0.001813))) / 60) / 60
+    const eps = eps0 + 0.00256 * Math.cos(omega * rad)
+    const decl = Math.asin(Math.sin(eps * rad) * Math.sin(lambda * rad))
+    const yv = Math.pow(Math.tan(eps * rad / 2), 2)
+    const eqTime = 4 / rad * (yv * Math.sin(2 * L0 * rad) - 2 * e * Math.sin(M * rad)
+      + 4 * e * yv * Math.sin(M * rad) * Math.cos(2 * L0 * rad)
+      - 0.5 * yv * yv * Math.sin(4 * L0 * rad) - 1.25 * e * e * Math.sin(2 * M * rad))
+    return { decl, eqTime }
+  }
+  const event = (sign: number) => {
+    let utc = 720 - 4 * lng
+    for (let i = 0; i < 3; i++) {
+      const s = sun(utc)
+      const cosH = Math.cos(90.833 * rad) / (Math.cos(lat * rad) * Math.cos(s.decl)) - Math.tan(lat * rad) * Math.tan(s.decl)
+      const H = Math.acos(Math.max(-1, Math.min(1, cosH))) / rad
+      utc = 720 - 4 * (lng + sign * H) - s.eqTime
+    }
+    return utc + offset
+  }
+  const fmt = (mins: number) => {
+    const v = ((Math.round(mins) % 1440) + 1440) % 1440
+    return String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0')
+  }
+  return { sunrise: fmt(event(1)), sunset: fmt(event(-1)) }
+}
+
+async function fetchBeachSunApi(date: string, lat: number, lng: number): Promise<{ sunrise: string, sunset: string } | null> {
+  try {
+    const url = 'https://api.sunrise-sunset.org/json?lat=' + lat + '&lng=' + lng + '&date=' + date + '&formatted=0&tzid=Africa/Cairo'
+    const r = await fetch(url, { signal: AbortSignal.timeout(6000) })
+    if (!r.ok) return null
+    const j: any = await r.json()
+    if (!j || j.status !== 'OK' || !j.results) return null
+    const sr = String(j.results.sunrise || '').slice(11, 16)
+    const ss = String(j.results.sunset || '').slice(11, 16)
+    if (!isBeachHHMM(sr) || !isBeachHHMM(ss)) return null
+    if (String(j.results.sunrise).slice(0, 10) !== date) return null
+    return { sunrise: sr, sunset: ss }
+  } catch (_) {
+    return null
+  }
+}
+
+// Fills cache misses (API, else NOAA) and batch-writes them. cachedRows come from beach_sun_times.
+async function beachSunFill(DB: any, property_id: any, dates: string[], settings: any, cachedRows: any[]) {
+  const out: Record<string, { sunrise: string, sunset: string, source: string }> = {}
+  for (const r of cachedRows || []) {
+    if (r && dates.includes(r.date) && isBeachHHMM(r.sunrise) && isBeachHHMM(r.sunset)) {
+      out[r.date] = { sunrise: r.sunrise, sunset: r.sunset, source: 'cache' }
+    }
+  }
+  const misses = dates.filter((d) => !out[d])
+  if (!misses.length) return out
+  const latN = Number(settings && settings.beach_lat)
+  const lngN = Number(settings && settings.beach_lng)
+  const lat = settings && settings.beach_lat != null && isFinite(latN) ? latN : BEACH_DEFAULT_LAT
+  const lng = settings && settings.beach_lng != null && isFinite(lngN) ? lngN : BEACH_DEFAULT_LNG
+  const fetched = await Promise.all(misses.map((d) => fetchBeachSunApi(d, lat, lng)))
+  const writes: any[] = []
+  misses.forEach((d, i) => {
+    const api = fetched[i]
+    const v = api ? { ...api, source: 'api' } : { ...beachSunCalc(d, lat, lng), source: 'calc' }
+    out[d] = v
+    writes.push(DB.prepare(`
+      INSERT OR REPLACE INTO beach_sun_times (property_id, date, sunrise, sunset, source, fetched_at)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(Number(property_id), d, v.sunrise, v.sunset, v.source))
+  })
+  try { await DB.batch(writes) } catch (e) { console.error('beach_sun_times write error:', e) }
+  return out
+}
+
+function beachUniqDates(dates: string[]): string[] {
+  return Array.from(new Set((dates || []).filter(isBeachYmd)))
+}
+
+// One round trip: settings row + cached sun times for the given dates.
+async function beachLoadSettingsAndSun(DB: any, property_id: any, dates: string[], settingsCols: string) {
+  const ph = dates.map(() => '?').join(',')
+  try {
+    const res = await DB.batch([
+      DB.prepare(`SELECT ${settingsCols} FROM beach_settings WHERE property_id = ?`).bind(property_id),
+      DB.prepare(`SELECT date, sunrise, sunset FROM beach_sun_times WHERE property_id = ? AND date IN (${ph})`).bind(Number(property_id), ...dates)
+    ])
+    return { settings: (res[0].results || [])[0] || null, cached: res[1].results || [] }
+  } catch (e) {
+    console.error('Beach settings/sun load error:', e)
+    const settings = await DB.prepare(`SELECT ${settingsCols} FROM beach_settings WHERE property_id = ?`).bind(property_id).first().catch(() => null)
+    return { settings, cached: [] }
+  }
+}
+
+async function getBeachSunTimes(env: any, property_id: any, dates: string[]): Promise<Record<string, { sunrise: string, sunset: string, source: string }>> {
+  const uniq = beachUniqDates(dates)
+  if (!uniq.length) return {}
+  const { settings, cached } = await beachLoadSettingsAndSun(env.DB, property_id, uniq, 'beach_lat, beach_lng')
+  return beachSunFill(env.DB, property_id, uniq, settings, cached)
+}
+
+function beachSlotsFromSettings(settings: any, date: string, sun: { sunrise: string, sunset: string, source: string }) {
+  const s = settings || {}
+  const pick = (v: any) => (typeof v === 'string' && isBeachHHMM(v.trim()) ? v.trim() : null)
+  const amStartOv = pick(s.slot_am_start)
+  const pmEndOv = pick(s.slot_pm_end)
+  const am: any = { id: 'half_day_am', name: 'Morning', start: amStartOv || sun.sunrise, end: pick(s.slot_am_end) || '13:00', auto_start: !amStartOv }
+  const pm: any = { id: 'half_day_pm', name: 'Afternoon', start: pick(s.slot_pm_start) || '13:30', end: pmEndOv || sun.sunset, auto_end: !pmEndOv }
+  const slots: any[] = [am, pm]
+  if (Number(s.full_day_enabled) === 1) slots.push({ id: 'full_day', name: 'Full Day', start: am.start, end: pm.end })
+  return { date, sunrise: sun.sunrise, sunset: sun.sunset, source: sun.source, slots }
+}
+
+const BEACH_SLOT_SETTING_COLS = 'beach_lat, beach_lng, slot_am_start, slot_am_end, slot_pm_start, slot_pm_end, full_day_enabled'
+
+async function resolveBeachSlotsForDates(env: any, property_id: any, dates: string[], settingsRow?: any) {
+  const uniq = beachUniqDates(dates)
+  if (!uniq.length) return []
+  let settings = settingsRow
+  let cached: any[] = []
+  if (settingsRow === undefined) {
+    const loaded = await beachLoadSettingsAndSun(env.DB, property_id, uniq, BEACH_SLOT_SETTING_COLS)
+    settings = loaded.settings
+    cached = loaded.cached
+  } else {
+    const ph = uniq.map(() => '?').join(',')
+    cached = (await env.DB.prepare(`SELECT date, sunrise, sunset FROM beach_sun_times WHERE property_id = ? AND date IN (${ph})`)
+      .bind(Number(property_id), ...uniq).all().catch(() => ({ results: [] }))).results || []
+  }
+  const sun = await beachSunFill(env.DB, property_id, uniq, settings, cached)
+  return uniq.map((d) => beachSlotsFromSettings(settings, d, sun[d]))
+}
+
+async function resolveBeachSlots(env: any, property_id: any, date: string): Promise<{ date: string, sunrise: string, sunset: string, source: string, slots: any[] }> {
+  const d = isBeachYmd(date) ? date : cairoToday()
+  const days = await resolveBeachSlotsForDates(env, property_id, [d])
+  return days[0] as any
+}
+
+function beachPosIntOrNull(v: any): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+function beachLimitsFromRow(r: any): { max_loungers: number, max_umbrellas: number } {
+  const x = r || {}
+  return {
+    max_loungers: beachPosIntOrNull(x.spot_max_loungers) ?? beachPosIntOrNull(x.zone_max_loungers) ?? beachPosIntOrNull(x.max_loungers_per_booking) ?? 3,
+    max_umbrellas: beachPosIntOrNull(x.zone_max_umbrellas) ?? beachPosIntOrNull(x.max_umbrellas_per_booking) ?? 1
+  }
+}
+
+async function beachLimitsFor(DB: any, property_id: any, spot_id: any): Promise<{ max_loungers: number, max_umbrellas: number }> {
+  const row = await DB.prepare(`
+    SELECT s.max_loungers AS spot_max_loungers, z.max_loungers AS zone_max_loungers, z.max_umbrellas AS zone_max_umbrellas,
+           bs.max_loungers_per_booking, bs.max_umbrellas_per_booking
+    FROM (SELECT ? AS pid, ? AS sid) p
+    LEFT JOIN beach_spots s ON s.spot_id = p.sid AND s.property_id = p.pid
+    LEFT JOIN beach_zones z ON z.zone_id = s.zone_id
+    LEFT JOIN beach_settings bs ON bs.property_id = p.pid
+  `).bind(Number(property_id), Number(spot_id) || 0).first()
+  return beachLimitsFromRow(row)
+}
+
+const BEACH_TIERS = ['first_line', 'standard', 'vip', 'cabana']
+
+// Validates a spot patch against the admin allow-list. Returns { fields } or { error }.
+function beachSpotFields(body: any): { fields?: Record<string, any>, error?: string } {
+  const f: Record<string, any> = {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body || {}, k)
+  const flag = (v: any) => (v === true || v === 1 || v === '1' || v === 'true' ? 1 : 0)
+  if (has('spot_number')) {
+    const v = String(body.spot_number == null ? '' : body.spot_number).trim()
+    if (!v || v.length > 20) return { error: 'spot_number must be 1-20 characters' }
+    f.spot_number = v
+  }
+  if (has('spot_type')) {
+    const v = String(body.spot_type == null ? '' : body.spot_type).trim().toLowerCase()
+    if (!/^[a-z_]{1,30}$/.test(v)) return { error: 'Invalid spot_type' }
+    f.spot_type = v
+  }
+  if (has('tier')) {
+    const v = String(body.tier == null ? '' : body.tier).trim()
+    if (!BEACH_TIERS.includes(v)) return { error: 'tier must be one of ' + BEACH_TIERS.join(', ') }
+    f.tier = v
+  }
+  if (has('zone_id')) {
+    const n = Number(body.zone_id)
+    if (!Number.isInteger(n) || n <= 0) return { error: 'Invalid zone_id' }
+    f.zone_id = n
+  }
+  if (has('row_no')) {
+    if (body.row_no === null || body.row_no === '') f.row_no = null
+    else {
+      const n = Number(body.row_no)
+      if (!Number.isInteger(n) || n < 1 || n > 100) return { error: 'row_no must be an integer 1-100' }
+      f.row_no = n
+    }
+  }
+  for (const k of ['map_x', 'map_y', 'map_w', 'map_h']) {
+    if (!has(k)) continue
+    if (body[k] === null || body[k] === '') { f[k] = null; continue }
+    const n = Number(body[k])
+    const ok = (k === 'map_w' || k === 'map_h') ? (isFinite(n) && n > 0 && n <= 100) : (isFinite(n) && n >= -10 && n <= 110)
+    if (!ok) return { error: 'Invalid ' + k }
+    f[k] = Math.round(n * 1000) / 1000
+  }
+  for (const k of ['position_x', 'position_y']) {
+    if (!has(k)) continue
+    const n = Number(body[k])
+    if (!isFinite(n)) return { error: 'Invalid ' + k }
+    f[k] = Math.round(n)
+  }
+  if (has('max_loungers')) {
+    if (body.max_loungers === null || body.max_loungers === '') f.max_loungers = null
+    else {
+      const n = Number(body.max_loungers)
+      if (!Number.isInteger(n) || n < 1 || n > 20) return { error: 'max_loungers must be an integer 1-20' }
+      f.max_loungers = n
+    }
+  }
+  for (const k of ['guest_bookable', 'maintenance_mode', 'is_premium']) {
+    if (has(k)) f[k] = flag(body[k])
+  }
+  return { fields: f }
+}
+
+// Applies the tier ⇒ is_premium rule against the spot's previous tier.
+function beachApplyTierRule(fields: Record<string, any>, prevTier: any, bodyHasPremium: boolean) {
+  if (fields.tier === 'vip') fields.is_premium = 1
+  else if (fields.tier !== undefined && prevTier === 'vip' && !bodyHasPremium) fields.is_premium = 0
+}
+
+function beachNumKey(v: any): string {
+  return String(v == null ? '' : v).trim().toLowerCase()
+}
+
+function beachAdminPropertyId(c: any, body?: any): string | null {
+  const v = getAuthenticatedPropertyId(c) || (body && body.property_id) || c.req.query('property_id')
+  return v == null || v === '' ? null : String(v)
+}
+
+// API: Beach layout (public) — geometry + tiers + capacity for the guest photo map and admin builder
+app.get('/api/beach/layout/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  try {
+    const res = await DB.batch([
+      DB.prepare('SELECT * FROM beach_settings WHERE property_id = ?').bind(property_id),
+      DB.prepare(`
+        SELECT zone_id, zone_name, zone_type, max_loungers, max_umbrellas, is_active, display_order
+        FROM beach_zones WHERE property_id = ? ORDER BY display_order, zone_id
+      `).bind(property_id),
+      DB.prepare(`
+        SELECT s.spot_id, s.spot_number, s.spot_type, s.tier, s.zone_id, z.zone_name, s.row_no,
+               s.map_x, s.map_y, s.map_w, s.map_h, s.guest_bookable, s.max_loungers, s.is_premium,
+               s.maintenance_mode, s.position_x, s.position_y, z.max_loungers AS zone_max_loungers
+        FROM beach_spots s
+        LEFT JOIN beach_zones z ON s.zone_id = z.zone_id
+        WHERE s.property_id = ? AND s.is_active = 1
+      `).bind(property_id)
+    ])
+    const settings: any = (res[0].results || [])[0] || {}
+    const globalMax = beachPosIntOrNull(settings.max_loungers_per_booking) ?? 3
+    const url = settings.beach_map_image_url || null
+    const image = {
+      url,
+      width: url === '/static/beach-map.jpg' ? 1774 : (Number(settings.beach_map_width) || null),
+      height: url === '/static/beach-map.jpg' ? 887 : (Number(settings.beach_map_height) || null)
+    }
+    const nullsLast = (a: any, b: any) => (a == null ? (b == null ? 0 : 1) : (b == null ? -1 : Number(a) - Number(b)))
+    const spots = (res[2].results || []).map((s: any) => {
+      const { zone_max_loungers, ...rest } = s
+      return {
+        ...rest,
+        effective_max_loungers: beachPosIntOrNull(s.max_loungers) ?? beachPosIntOrNull(zone_max_loungers) ?? globalMax
+      }
+    }).sort((a: any, b: any) =>
+      nullsLast(a.row_no, b.row_no) || nullsLast(a.map_x, b.map_x) ||
+      String(a.spot_number).localeCompare(String(b.spot_number), 'en', { numeric: true }))
+    return c.json({
+      success: true,
+      image,
+      zones: res[1].results || [],
+      limits: {
+        max_loungers_per_booking: globalMax,
+        max_umbrellas_per_booking: beachPosIntOrNull(settings.max_umbrellas_per_booking) ?? 1
+      },
+      spots
+    })
+  } catch (error) {
+    console.error('Get beach layout error:', error)
+    return c.json({ error: 'Failed to get beach layout' }, 500)
+  }
+})
+
+// API: Resolved beach time slots (public). ?date= or ?from=&days= (max 14)
+app.get('/api/beach/slots/:property_id', async (c) => {
+  const { property_id } = c.req.param()
+  const from = c.req.query('from')
+  const date = c.req.query('date')
+  try {
+    if (from !== undefined) {
+      if (!isBeachYmd(from)) return c.json({ error: 'from must be YYYY-MM-DD' }, 400)
+      const n = Math.min(14, Math.max(1, parseInt(c.req.query('days') || '7', 10) || 7))
+      const dates = Array.from({ length: n }, (_, i) => addDaysYmd(from, i))
+      const days = await resolveBeachSlotsForDates(c.env, property_id, dates)
+      return c.json({ success: true, days })
+    }
+    if (date !== undefined && date !== '' && !isBeachYmd(date)) return c.json({ error: 'date must be YYYY-MM-DD' }, 400)
+    const day = await resolveBeachSlots(c.env, property_id, date || cairoToday())
+    return c.json({ success: true, ...day })
+  } catch (error) {
+    console.error('Get beach slots error:', error)
+    return c.json({ error: 'Failed to get beach slots' }, 500)
+  }
+})
+
 // API: Get or Create Beach Settings
 // Public endpoint - guests need to see if beach booking is enabled and get card customization
 app.get('/api/admin/beach/settings/:property_id', async (c) => {
@@ -13959,7 +14341,16 @@ app.get('/api/admin/beach/settings/:property_id', async (c) => {
         }
       }
     }
-    
+
+    if (settings) {
+      try {
+        const days = await resolveBeachSlotsForDates(c.env, property_id, [cairoToday()], settings)
+        if (days[0]) settings = { ...settings, time_slots: JSON.stringify(days[0].slots) }
+      } catch (slotError) {
+        console.error('Beach slot resolve error:', slotError)
+      }
+    }
+
     return c.json({ success: true, settings })
   } catch (error) {
     console.error('Get beach settings error:', error)
@@ -13981,177 +14372,126 @@ app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async
       return c.json({ error: 'Unauthorized: property_id not found' }, 401);
     }
     
-    const body = await c.req.json()
-    console.log('📦 DEBUG: Request body keys:', Object.keys(body));
-    console.log('🏖️ DEBUG: beach_map_image_url length:', body.beach_map_image_url?.length || 0);
-    
-    const {
-      beach_booking_enabled,
-      beach_map_image_url,
-      opening_time,
-      closing_time,
-      advance_booking_days,
-      max_booking_duration_hours,
-      free_for_hotel_guests,
-      booking_button_override_enabled,
-      booking_button_override_message,
-      card_title,
-      card_subtitle,
-      feature1_text,
-      feature2_text,
-      feature3_text,
-      umbrellas_label,
-      umbrellas_desc,
-      cabanas_label,
-      cabanas_desc,
-      loungers_label,
-      loungers_desc,
-      daybeds_label,
-      daybeds_desc,
-      button_text,
-      bg_color_from,
-      bg_color_to,
-      text_color,
-      button_color_from,
-      button_color_to,
-      button_text_color,
-      traffic_light_text_color,
-      time_slots
-    } = body
-    
-    console.log('🏖️ Backend received beach_map_image_url:', beach_map_image_url);
-    console.log('📦 Full body:', body);
-    
-    // Check if settings exist
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return c.json({ error: 'Invalid request body' }, 400)
+    }
+    const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k) && body[k] !== undefined
+    const blank = (v: any) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '')
+
+    // Partial update: only keys present in the body are written, so a save from one admin panel can
+    // never reset another panel's fields (booking_button_override_enabled in particular).
+    const TEXT_DEFAULTS: Record<string, string | null> = {
+      beach_map_image_url: null,
+      opening_time: '08:00',
+      closing_time: '18:00',
+      booking_button_override_message: 'Beach bookings are currently unavailable. Please contact staff at the beach.',
+      card_title: 'Beach Booking',
+      card_subtitle: 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.',
+      feature1_text: 'Free for Hotel Guests',
+      feature2_text: 'Book Up to 7 Days Ahead',
+      feature3_text: 'QR Code Check-in',
+      umbrellas_label: 'Umbrellas',
+      umbrellas_desc: 'Classic Beach',
+      cabanas_label: 'Cabanas',
+      cabanas_desc: 'Private & Cozy',
+      loungers_label: 'Loungers',
+      loungers_desc: 'Relax in Style',
+      daybeds_label: 'Daybeds',
+      daybeds_desc: 'Ultimate Comfort',
+      button_text: 'Book Your Spot Now',
+      bg_color_from: '#3b82f6',
+      bg_color_to: '#06b6d4',
+      text_color: '#ffffff',
+      button_color_from: '#ffffff',
+      button_color_to: '#ffffff',
+      button_text_color: '#3b82f6',
+      traffic_light_text_color: '#ffffff'
+    }
+    const FLAG_COLS = ['beach_booking_enabled', 'free_for_hotel_guests', 'booking_button_override_enabled',
+      'full_day_enabled', 'allow_same_day_booking', 'require_room_number']
+    const INT_DEFAULTS: Record<string, number> = { advance_booking_days: 7, max_booking_duration_hours: 12 }
+    const INT_RANGES: Record<string, [number, number]> = {
+      max_loungers_per_booking: [1, 20], max_umbrellas_per_booking: [1, 10],
+      beach_map_width: [1, 20000], beach_map_height: [1, 20000]
+    }
+
+    const sets: Record<string, any> = {}
+    for (const k of Object.keys(TEXT_DEFAULTS)) {
+      if (has(k)) sets[k] = blank(body[k]) ? TEXT_DEFAULTS[k] : String(body[k])
+    }
+    for (const k of FLAG_COLS) {
+      if (!has(k)) continue
+      const v = body[k]
+      sets[k] = (v === true || v === 1 || v === '1' || v === 'true' || v === 'on') ? 1 : 0
+    }
+    for (const k of Object.keys(INT_DEFAULTS)) {
+      if (!has(k)) continue
+      const n = parseInt(body[k], 10)
+      sets[k] = Number.isFinite(n) && n > 0 ? n : INT_DEFAULTS[k]
+    }
+    for (const k of Object.keys(INT_RANGES)) {
+      if (!has(k)) continue
+      const n = Number(body[k])
+      const [lo, hi] = INT_RANGES[k]
+      if (!Number.isInteger(n) || n < lo || n > hi) {
+        return c.json({ error: k + ' must be a whole number between ' + lo + ' and ' + hi }, 400)
+      }
+      sets[k] = n
+    }
+    for (const k of ['slot_am_start', 'slot_pm_end']) {
+      if (!has(k)) continue
+      if (blank(body[k])) { sets[k] = null; continue }
+      const v = String(body[k]).trim()
+      if (!isBeachHHMM(v)) return c.json({ error: k + ' must be HH:MM (or empty for automatic)' }, 400)
+      sets[k] = v
+    }
+    for (const k of ['slot_am_end', 'slot_pm_start']) {
+      if (!has(k)) continue
+      const v = String(body[k] == null ? '' : body[k]).trim()
+      if (!isBeachHHMM(v)) return c.json({ error: k + ' must be HH:MM' }, 400)
+      sets[k] = v
+    }
+    for (const [k, lim] of [['beach_lat', 90], ['beach_lng', 180]] as [string, number][]) {
+      if (!has(k)) continue
+      const n = Number(body[k])
+      if (blank(body[k]) || !isFinite(n) || Math.abs(n) > lim) return c.json({ error: 'Invalid ' + k }, 400)
+      sets[k] = n
+    }
+    if (has('time_slots')) {
+      const v = body.time_slots
+      sets.time_slots = blank(v)
+        ? '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]'
+        : (typeof v === 'string' ? v : JSON.stringify(v))
+    }
+
+    const keys = Object.keys(sets)
     const existing = await DB.prepare(`
       SELECT setting_id FROM beach_settings WHERE property_id = ?
     `).bind(property_id).first()
-    
+
+    const stmts: any[] = []
     if (existing) {
-      // Update
-      await DB.prepare(`
-        UPDATE beach_settings
-        SET beach_booking_enabled = ?,
-            beach_map_image_url = ?,
-            opening_time = ?,
-            closing_time = ?,
-            advance_booking_days = ?,
-            max_booking_duration_hours = ?,
-            free_for_hotel_guests = ?,
-            booking_button_override_enabled = ?,
-            booking_button_override_message = ?,
-            card_title = ?,
-            card_subtitle = ?,
-            feature1_text = ?,
-            feature2_text = ?,
-            feature3_text = ?,
-            umbrellas_label = ?,
-            umbrellas_desc = ?,
-            cabanas_label = ?,
-            cabanas_desc = ?,
-            loungers_label = ?,
-            loungers_desc = ?,
-            daybeds_label = ?,
-            daybeds_desc = ?,
-            button_text = ?,
-            bg_color_from = ?,
-            bg_color_to = ?,
-            text_color = ?,
-            button_color_from = ?,
-            button_color_to = ?,
-            button_text_color = ?,
-            traffic_light_text_color = ?,
-            time_slots = ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE property_id = ?
-      `).bind(
-        beach_booking_enabled || 0,
-        beach_map_image_url || null,
-        opening_time || '08:00',
-        closing_time || '18:00',
-        advance_booking_days || 7,
-        max_booking_duration_hours || 12,
-        free_for_hotel_guests || 1,
-        booking_button_override_enabled || 0,
-        booking_button_override_message || 'Beach bookings are currently unavailable. Please contact staff at the beach.',
-        card_title || 'Beach Booking',
-        card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.',
-        feature1_text || 'Free for Hotel Guests',
-        feature2_text || 'Book Up to 7 Days Ahead',
-        feature3_text || 'QR Code Check-in',
-        umbrellas_label || 'Umbrellas',
-        umbrellas_desc || 'Classic Beach',
-        cabanas_label || 'Cabanas',
-        cabanas_desc || 'Private & Cozy',
-        loungers_label || 'Loungers',
-        loungers_desc || 'Relax in Style',
-        daybeds_label || 'Daybeds',
-        daybeds_desc || 'Ultimate Comfort',
-        button_text || 'Book Your Spot Now',
-        bg_color_from || '#3b82f6',
-        bg_color_to || '#06b6d4',
-        text_color || '#ffffff',
-        button_color_from || '#ffffff',
-        button_color_to || '#ffffff',
-        button_text_color || '#3b82f6',
-        traffic_light_text_color || '#ffffff',
-        time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]',
-        property_id
-      ).run()
-      
-      console.log('✅ Beach settings UPDATED with beach_map_image_url:', beach_map_image_url);
+      if (keys.length) {
+        stmts.push(DB.prepare(`
+          UPDATE beach_settings SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP
+          WHERE property_id = ?
+        `).bind(...keys.map((k) => sets[k]), property_id))
+      }
     } else {
-      // Insert
-      await DB.prepare(`
-        INSERT INTO beach_settings (
-          property_id, beach_booking_enabled, beach_map_image_url,
-          opening_time, closing_time, advance_booking_days,
-          max_booking_duration_hours, free_for_hotel_guests,
-          booking_button_override_enabled, booking_button_override_message,
-          card_title, card_subtitle, feature1_text, feature2_text, feature3_text,
-          umbrellas_label, umbrellas_desc, cabanas_label, cabanas_desc,
-          loungers_label, loungers_desc, daybeds_label, daybeds_desc, button_text,
-          bg_color_from, bg_color_to, text_color, button_color_from, button_color_to, button_text_color, traffic_light_text_color, time_slots
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        property_id,
-        beach_booking_enabled || 0,
-        beach_map_image_url || null,
-        opening_time || '08:00',
-        closing_time || '18:00',
-        advance_booking_days || 7,
-        max_booking_duration_hours || 12,
-        free_for_hotel_guests || 1,
-        booking_button_override_enabled || 0,
-        booking_button_override_message || 'Beach bookings are currently unavailable. Please contact staff at the beach.',
-        card_title || 'Beach Booking',
-        card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.',
-        feature1_text || 'Free for Hotel Guests',
-        feature2_text || 'Book Up to 7 Days Ahead',
-        feature3_text || 'QR Code Check-in',
-        umbrellas_label || 'Umbrellas',
-        umbrellas_desc || 'Classic Beach',
-        cabanas_label || 'Cabanas',
-        cabanas_desc || 'Private & Cozy',
-        loungers_label || 'Loungers',
-        loungers_desc || 'Relax in Style',
-        daybeds_label || 'Daybeds',
-        daybeds_desc || 'Ultimate Comfort',
-        button_text || 'Book Your Spot Now',
-        bg_color_from || '#3b82f6',
-        bg_color_to || '#06b6d4',
-        text_color || '#ffffff',
-        button_color_from || '#ffffff',
-        button_color_to || '#ffffff',
-        button_text_color || '#3b82f6',
-        traffic_light_text_color || '#ffffff',
-        time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]'
-      ).run()
-      
-      console.log('✅ Beach settings INSERTED with beach_map_image_url:', beach_map_image_url);
+      stmts.push(DB.prepare(`
+        INSERT INTO beach_settings (property_id${keys.map((k) => ', ' + k).join('')})
+        VALUES (?${keys.map(() => ', ?').join('')})
+      `).bind(property_id, ...keys.map((k) => sets[k])))
     }
-    
-    return c.json({ success: true })
+    // Cached sun times belong to the old coordinates.
+    if (has('beach_lat') || has('beach_lng')) {
+      stmts.push(DB.prepare('DELETE FROM beach_sun_times WHERE property_id = ?').bind(Number(property_id)))
+    }
+    if (stmts.length) await DB.batch(stmts)
+    console.log('Beach settings saved for property', property_id, 'keys:', keys.join(','))
+
+    return c.json({ success: true, updated: keys })
   } catch (error) {
     console.error('Save beach settings error:', error)
     return c.json({ error: 'Failed to save beach settings' }, 500)
@@ -14319,83 +14659,333 @@ app.get('/api/admin/beach/spots', async (c) => {
 // API: Create Beach Spot
 app.post('/api/admin/beach/spots', requirePermission('beach_zones_manage'), async (c) => {
   const { DB } = c.env
-  
+
   try {
-    const body = await c.req.json()
-    const {
-      property_id,
-      zone_id,
-      spot_number,
-      spot_type,
-      position_x,
-      position_y,
-      max_capacity,
-      price_full_day,
-      price_half_day,
-      price_hourly,
-      spot_description,
-      zone_name
-    } = body
-    
-    // Create default zone if none exists
-    let zoneIdToUse = zone_id
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid request body' }, 400)
+    const property_id = beachAdminPropertyId(c, body)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    const v = beachSpotFields(body)
+    if (v.error) return c.json({ error: v.error }, 400)
+    const f = v.fields || {}
+    if (!f.spot_number) return c.json({ error: 'spot_number is required' }, 400)
+
+    const reads: any[] = [
+      DB.prepare(`
+        SELECT spot_id FROM beach_spots
+        WHERE property_id = ? AND is_active = 1 AND LOWER(TRIM(spot_number)) = ? LIMIT 1
+      `).bind(property_id, beachNumKey(f.spot_number)),
+      f.zone_id
+        ? DB.prepare('SELECT zone_id FROM beach_zones WHERE zone_id = ? AND property_id = ?').bind(f.zone_id, property_id)
+        : DB.prepare('SELECT zone_id FROM beach_zones WHERE property_id = ? ORDER BY is_active DESC, display_order, zone_id LIMIT 1').bind(property_id)
+    ]
+    const res = await DB.batch(reads)
+    const dup = (res[0].results || [])[0]
+    if (dup) return c.json({ error: 'duplicate_number', message: 'Spot number ' + f.spot_number + ' is already in use', spot_id: dup.spot_id }, 409)
+    const zoneRow = (res[1].results || [])[0]
+    if (f.zone_id && !zoneRow) return c.json({ error: 'Zone not found for this property' }, 400)
+
+    let zoneIdToUse = zoneRow ? zoneRow.zone_id : null
     if (!zoneIdToUse) {
-      const defaultZone = await DB.prepare(`
-        SELECT zone_id FROM beach_zones WHERE property_id = ? LIMIT 1
-      `).bind(property_id).first()
-      
-      if (!defaultZone) {
-        const zoneResult = await DB.prepare(`
-          INSERT INTO beach_zones (property_id, zone_name, zone_type)
-          VALUES (?, 'Main Beach', 'standard')
-        `).bind(property_id).run()
-        zoneIdToUse = zoneResult.meta.last_row_id
-      } else {
-        zoneIdToUse = defaultZone.zone_id
-      }
+      const zoneResult = await DB.prepare(`
+        INSERT INTO beach_zones (property_id, zone_name, zone_type)
+        VALUES (?, 'Main Beach', 'standard')
+      `).bind(property_id).run()
+      zoneIdToUse = zoneResult.meta.last_row_id
     }
-    
-    await DB.prepare(`
+
+    const tier = f.tier || 'standard'
+    const isPremium = tier === 'vip' ? 1 : (f.is_premium ?? 0)
+    const result = await DB.prepare(`
       INSERT INTO beach_spots (
         property_id, zone_id, spot_number, spot_type,
         position_x, position_y, max_capacity,
-        price_full_day, price_half_day, price_hourly, spot_description
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        price_full_day, price_half_day, price_hourly, spot_description,
+        tier, row_no, map_x, map_y, map_w, map_h,
+        guest_bookable, max_loungers, is_premium, maintenance_mode
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       property_id,
       zoneIdToUse,
-      spot_number,
-      spot_type,
-      position_x,
-      position_y,
-      max_capacity || 2,
-      price_full_day || 0,
-      price_half_day || 0,
-      price_hourly || 0,
-      body.spot_description || null
+      f.spot_number,
+      f.spot_type || 'umbrella',
+      f.position_x ?? 0,
+      f.position_y ?? 0,
+      Number(body.max_capacity) || 2,
+      Number(body.price_full_day) || 0,
+      Number(body.price_half_day) || 0,
+      Number(body.price_hourly) || 0,
+      body.spot_description || null,
+      tier,
+      f.row_no ?? null,
+      f.map_x ?? null,
+      f.map_y ?? null,
+      f.map_w ?? null,
+      f.map_h ?? null,
+      f.guest_bookable ?? 0,
+      f.max_loungers ?? null,
+      isPremium,
+      f.maintenance_mode ?? 0
     ).run()
-    
-    return c.json({ success: true })
+
+    return c.json({ success: true, spot_id: result.meta.last_row_id })
   } catch (error) {
     console.error('Create beach spot error:', error)
     return c.json({ error: 'Failed to create beach spot' }, 500)
   }
 })
 
-// API: Delete Beach Spot
+// API: Update Beach Spot in place (partial)
+app.put('/api/admin/beach/spots/:spot_id', requirePermission('beach_zones_manage'), async (c) => {
+  const { DB } = c.env
+  const spot_id = Number(c.req.param('spot_id'))
+
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid request body' }, 400)
+    const property_id = beachAdminPropertyId(c, body)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    if (!Number.isInteger(spot_id) || spot_id <= 0) return c.json({ error: 'Invalid spot_id' }, 400)
+    const v = beachSpotFields(body)
+    if (v.error) return c.json({ error: v.error }, 400)
+    const f = v.fields || {}
+
+    const reads: any[] = [DB.prepare('SELECT * FROM beach_spots WHERE spot_id = ? AND property_id = ?').bind(spot_id, property_id)]
+    if (f.spot_number !== undefined) {
+      reads.push(DB.prepare(`
+        SELECT spot_id FROM beach_spots
+        WHERE property_id = ? AND is_active = 1 AND spot_id != ? AND LOWER(TRIM(spot_number)) = ? LIMIT 1
+      `).bind(property_id, spot_id, beachNumKey(f.spot_number)))
+    }
+    if (f.zone_id !== undefined) {
+      reads.push(DB.prepare('SELECT zone_id FROM beach_zones WHERE zone_id = ? AND property_id = ?').bind(f.zone_id, property_id))
+    }
+    const res = await DB.batch(reads)
+    const spot = (res[0].results || [])[0]
+    if (!spot) return c.json({ error: 'Spot not found' }, 404)
+    let i = 1
+    if (f.spot_number !== undefined) {
+      const dup = (res[i++].results || [])[0]
+      if (dup) return c.json({ error: 'duplicate_number', message: 'Spot number ' + f.spot_number + ' is already in use', spot_id: dup.spot_id }, 409)
+    }
+    if (f.zone_id !== undefined && !(res[i++].results || [])[0]) {
+      return c.json({ error: 'Zone not found for this property' }, 400)
+    }
+
+    beachApplyTierRule(f, spot.tier, Object.prototype.hasOwnProperty.call(body, 'is_premium'))
+    const keys = Object.keys(f)
+    if (keys.length) {
+      await DB.prepare(`
+        UPDATE beach_spots SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP
+        WHERE spot_id = ? AND property_id = ?
+      `).bind(...keys.map((k) => f[k]), spot_id, property_id).run()
+    }
+
+    return c.json({ success: true, spot: { ...spot, ...f } })
+  } catch (error) {
+    console.error('Update beach spot error:', error)
+    return c.json({ error: 'Failed to update beach spot' }, 500)
+  }
+})
+
+// API: Bulk in-place layout update (drag-save, auto-numbering). All-or-nothing.
+app.post('/api/admin/beach/layout/bulk', requirePermission('beach_zones_manage'), async (c) => {
+  const { DB } = c.env
+
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid request body' }, 400)
+    const property_id = beachAdminPropertyId(c, body)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    const updates = body.updates
+    if (!Array.isArray(updates)) return c.json({ error: 'updates must be an array' }, 400)
+    if (!updates.length) return c.json({ success: true, updated: 0 })
+    if (updates.length > 300) return c.json({ error: 'Too many updates (max 300)' }, 400)
+
+    const parsed: { spot_id: number, fields: Record<string, any>, hasPremium: boolean }[] = []
+    const seen = new Set<number>()
+    for (let idx = 0; idx < updates.length; idx++) {
+      const u = updates[idx] || {}
+      const sid = Number(u.spot_id)
+      if (!Number.isInteger(sid) || sid <= 0) return c.json({ error: 'Invalid spot_id', index: idx }, 400)
+      if (seen.has(sid)) return c.json({ error: 'Spot listed twice', index: idx, spot_id: sid }, 400)
+      seen.add(sid)
+      const v = beachSpotFields(u)
+      if (v.error) return c.json({ error: v.error, index: idx, spot_id: sid }, 400)
+      parsed.push({ spot_id: sid, fields: v.fields || {}, hasPremium: Object.prototype.hasOwnProperty.call(u, 'is_premium') })
+    }
+
+    const res = await DB.batch([
+      DB.prepare('SELECT spot_id, spot_number, tier, is_active FROM beach_spots WHERE property_id = ?').bind(property_id),
+      DB.prepare('SELECT zone_id FROM beach_zones WHERE property_id = ?').bind(property_id)
+    ])
+    const spots = new Map<number, any>()
+    for (const s of res[0].results || []) spots.set(Number(s.spot_id), s)
+    const zoneIds = new Set((res[1].results || []).map((z: any) => Number(z.zone_id)))
+
+    for (const p of parsed) {
+      if (!spots.has(p.spot_id)) return c.json({ error: 'Spot not found', spot_id: p.spot_id }, 404)
+      if (p.fields.zone_id !== undefined && !zoneIds.has(p.fields.zone_id)) {
+        return c.json({ error: 'Zone not found for this property', spot_id: p.spot_id }, 400)
+      }
+    }
+
+    const changedNumber = new Map<number, string>()
+    for (const p of parsed) if (p.fields.spot_number !== undefined) changedNumber.set(p.spot_id, p.fields.spot_number)
+    if (changedNumber.size) {
+      const byNum = new Map<string, number[]>()
+      for (const s of spots.values()) {
+        if (Number(s.is_active) !== 1) continue
+        const sid = Number(s.spot_id)
+        const key = beachNumKey(changedNumber.has(sid) ? changedNumber.get(sid) : s.spot_number)
+        if (!byNum.has(key)) byNum.set(key, [])
+        byNum.get(key)!.push(sid)
+      }
+      for (const [num, ids] of byNum) {
+        if (ids.length > 1 && ids.some((id) => changedNumber.has(id))) {
+          return c.json({ error: 'duplicate_number', message: 'Spot number ' + num + ' would be used more than once', spot_number: num, spot_ids: ids }, 409)
+        }
+      }
+    }
+
+    const stmts: any[] = []
+    for (const p of parsed) {
+      beachApplyTierRule(p.fields, spots.get(p.spot_id).tier, p.hasPremium)
+      const keys = Object.keys(p.fields)
+      if (!keys.length) continue
+      stmts.push(DB.prepare(`
+        UPDATE beach_spots SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP
+        WHERE spot_id = ? AND property_id = ?
+      `).bind(...keys.map((k) => p.fields[k]), p.spot_id, property_id))
+    }
+    if (stmts.length) await DB.batch(stmts)
+
+    return c.json({ success: true, updated: stmts.length })
+  } catch (error) {
+    console.error('Bulk beach layout error:', error)
+    return c.json({ error: 'Failed to save beach layout' }, 500)
+  }
+})
+
+// API: Delete Beach Spot (soft). Refuses while future active bookings exist unless ?force=1.
 app.delete('/api/admin/beach/spots/:spot_id', requirePermission('beach_zones_manage'), async (c) => {
   const { DB } = c.env
-  const { spot_id } = c.req.param()
-  
+  const spot_id = Number(c.req.param('spot_id'))
+
   try {
+    const property_id = beachAdminPropertyId(c)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    if (!Number.isInteger(spot_id) || spot_id <= 0) return c.json({ error: 'Invalid spot_id' }, 400)
+    const force = c.req.query('force') === '1'
+
+    const res = await DB.batch([
+      DB.prepare('SELECT spot_id FROM beach_spots WHERE spot_id = ? AND property_id = ?').bind(spot_id, property_id),
+      DB.prepare(`
+        SELECT COUNT(*) AS n FROM beach_bookings
+        WHERE spot_id = ? AND booking_date >= ? AND booking_status IN ${BEACH_ACTIVE_STATUSES}
+      `).bind(spot_id, cairoToday())
+    ])
+    if (!(res[0].results || [])[0]) return c.json({ error: 'Spot not found' }, 404)
+    const count = Number(((res[1].results || [])[0] || {}).n) || 0
+    if (count > 0 && !force) {
+      return c.json({ error: 'has_bookings', count, message: 'This spot has ' + count + ' upcoming booking(s)' }, 409)
+    }
+
     await DB.prepare(`
-      UPDATE beach_spots SET is_active = 0 WHERE spot_id = ?
-    `).bind(spot_id).run()
-    
-    return c.json({ success: true })
+      UPDATE beach_spots SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE spot_id = ? AND property_id = ?
+    `).bind(spot_id, property_id).run()
+
+    return c.json({ success: true, future_bookings: count })
   } catch (error) {
     console.error('Delete beach spot error:', error)
     return c.json({ error: 'Failed to delete beach spot' }, 500)
+  }
+})
+
+function beachZoneFields(body: any): { fields?: Record<string, any>, error?: string } {
+  const f: Record<string, any> = {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body || {}, k)
+  if (has('zone_name') || has('name')) {
+    const v = String((has('zone_name') ? body.zone_name : body.name) ?? '').trim()
+    if (!v || v.length > 60) return { error: 'Zone name must be 1-60 characters' }
+    f.zone_name = v
+  }
+  if (has('zone_type')) {
+    const v = String(body.zone_type ?? '').trim().toLowerCase()
+    if (!/^[a-z_]{1,30}$/.test(v)) return { error: 'Invalid zone_type' }
+    f.zone_type = v
+  }
+  for (const [k, hi] of [['max_loungers', 20], ['max_umbrellas', 10]] as [string, number][]) {
+    if (!has(k)) continue
+    if (body[k] === null || body[k] === '') { f[k] = null; continue }
+    const n = Number(body[k])
+    if (!Number.isInteger(n) || n < 1 || n > hi) return { error: k + ' must be a whole number 1-' + hi + ' (or empty to inherit)' }
+    f[k] = n
+  }
+  if (has('is_active')) {
+    const v = body.is_active
+    f.is_active = (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0
+  }
+  if (has('display_order')) {
+    const n = Number(body.display_order)
+    if (!Number.isInteger(n)) return { error: 'display_order must be an integer' }
+    f.display_order = n
+  }
+  if (has('description')) f.description = body.description == null ? null : String(body.description)
+  return { fields: f }
+}
+
+// API: Create Beach Zone
+app.post('/api/admin/beach/zones', requirePermission('beach_zones_manage'), async (c) => {
+  const { DB } = c.env
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid request body' }, 400)
+    const property_id = beachAdminPropertyId(c, body)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    const v = beachZoneFields(body)
+    if (v.error) return c.json({ error: v.error }, 400)
+    const f = v.fields || {}
+    if (!f.zone_name) return c.json({ error: 'zone_name is required' }, 400)
+    if (f.zone_type === undefined) f.zone_type = 'standard'
+    const keys = Object.keys(f)
+    const result = await DB.prepare(`
+      INSERT INTO beach_zones (property_id, ${keys.join(', ')}) VALUES (?, ${keys.map(() => '?').join(', ')})
+    `).bind(property_id, ...keys.map((k) => f[k])).run()
+    const zone_id = result.meta.last_row_id
+    return c.json({ success: true, zone_id, zone: { zone_id, property_id: Number(property_id), is_active: 1, display_order: 0, max_loungers: null, max_umbrellas: null, ...f } })
+  } catch (error) {
+    console.error('Create beach zone error:', error)
+    return c.json({ error: 'Failed to create beach zone' }, 500)
+  }
+})
+
+// API: Update Beach Zone (partial)
+app.put('/api/admin/beach/zones/:zone_id', requirePermission('beach_zones_manage'), async (c) => {
+  const { DB } = c.env
+  const zone_id = Number(c.req.param('zone_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid request body' }, 400)
+    const property_id = beachAdminPropertyId(c, body)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    if (!Number.isInteger(zone_id) || zone_id <= 0) return c.json({ error: 'Invalid zone_id' }, 400)
+    const v = beachZoneFields(body)
+    if (v.error) return c.json({ error: v.error }, 400)
+    const f = v.fields || {}
+    const zone = await DB.prepare('SELECT * FROM beach_zones WHERE zone_id = ? AND property_id = ?').bind(zone_id, property_id).first()
+    if (!zone) return c.json({ error: 'Zone not found' }, 404)
+    const keys = Object.keys(f)
+    if (keys.length) {
+      await DB.prepare(`
+        UPDATE beach_zones SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP
+        WHERE zone_id = ? AND property_id = ?
+      `).bind(...keys.map((k) => f[k]), zone_id, property_id).run()
+    }
+    return c.json({ success: true, zone: { ...zone, ...f } })
+  } catch (error) {
+    console.error('Update beach zone error:', error)
+    return c.json({ error: 'Failed to update beach zone' }, 500)
   }
 })
 
@@ -14552,46 +15142,39 @@ app.get('/api/admin/guest-profiles', async (c) => {
 app.get('/api/beach/availability/:property_id/:date', async (c) => {
   const { DB } = c.env
   const { property_id, date } = c.req.param()
-  const slot_type = c.req.query('slot_type') || 'full_day'
-  
+  const slot_type = normBeachSlot(c.req.query('slot_type') || 'full_day')
+
   try {
-    // Get all active spots
-    const spots = await DB.prepare(`
-      SELECT * FROM beach_spots
-      WHERE property_id = ? AND is_active = 1 AND maintenance_mode = 0
-    `).bind(property_id).all()
-    
-    // Get bookings for the date
-    const bookings = await DB.prepare(`
-      SELECT spot_id, slot_type FROM beach_bookings
-      WHERE property_id = ? AND booking_date = ? AND booking_status IN ('confirmed', 'checked_in')
-    `).bind(property_id, date).all()
-    
-    // Mark spots as available/unavailable
-    const availableSpots = (spots.results || []).map(spot => {
-      const spotBookings = (bookings.results || []).filter(b => b.spot_id === spot.spot_id)
-      
-      // Check if spot is available for requested slot
-      let isAvailable = true
-      
-      for (const booking of spotBookings) {
-        if (booking.slot_type === 'full_day' || slot_type === 'full_day') {
-          isAvailable = false
-          break
-        }
-        if (booking.slot_type === slot_type) {
-          isAvailable = false
-          break
-        }
-      }
-      
+    const res = await DB.batch([
+      DB.prepare(`
+        SELECT * FROM beach_spots
+        WHERE property_id = ? AND is_active = 1 AND maintenance_mode = 0
+      `).bind(property_id),
+      DB.prepare(`
+        SELECT spot_id, ${BEACH_SLOT_SQL} AS slot_type, booking_status FROM beach_bookings
+        WHERE property_id = ? AND booking_date = ? AND booking_status IN ${BEACH_ACTIVE_STATUSES}
+      `).bind(property_id, date)
+    ])
+    const bookings = res[1].results || []
+
+    const bySpot = new Map<any, any[]>()
+    for (const b of bookings) {
+      if (!bySpot.has(b.spot_id)) bySpot.set(b.spot_id, [])
+      bySpot.get(b.spot_id)!.push(b)
+    }
+
+    // Conflict rule: same slot id, or either side full_day
+    const availableSpots = (res[0].results || []).map((spot: any) => {
+      const spotBookings = bySpot.get(spot.spot_id) || []
+      const isAvailable = !spotBookings.some((b: any) =>
+        b.slot_type === 'full_day' || slot_type === 'full_day' || b.slot_type === slot_type)
       return {
         ...spot,
         is_available: isAvailable
       }
     })
-    
-    return c.json({ success: true, spots: availableSpots })
+
+    return c.json({ success: true, spots: availableSpots, bookings })
   } catch (error) {
     console.error('Get beach availability error:', error)
     return c.json({ error: 'Failed to get beach availability' }, 500)
@@ -14653,107 +15236,207 @@ app.get('/api/beach/occupancy/:property_id', async (c) => {
   }
 })
 
-// API: Create Beach Booking (Guest)
+// API: Create Beach Booking (guest app, legacy guest page, staff/admin walk-ins)
 app.post('/api/beach/bookings', async (c) => {
   const { DB } = c.env
-  
+
   try {
-    const body = await c.req.json()
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid request body' }, 400)
     const {
       property_id,
-      spot_id,
-      guest_name,
-      guest_room_number,
       guest_phone,
       guest_email,
       booking_date,
-      slot_type,
-      start_time,
-      end_time,
       num_guests,
       special_requests
     } = body
-    
-    // Check if spot is available
-    const existingBookings = await DB.prepare(`
-      SELECT COUNT(*) as count FROM beach_bookings
-      WHERE spot_id = ? AND booking_date = ? AND booking_status IN ('confirmed', 'checked_in')
-        AND (slot_type = 'full_day' OR slot_type = ? OR ? = 'full_day')
-    `).bind(spot_id, booking_date, slot_type, slot_type).first()
-    
-    if (existingBookings.count > 0) {
-      return c.json({ error: 'This spot is already booked for the selected time' }, 400)
+    // Legacy staff walk-in forms send the admin X-User-ID header but no booking_source.
+    const hdrUser = String(c.req.header('X-User-ID') || '').trim()
+    const source = body.booking_source === 'staff' || body.booking_source === 'admin' || body.booking_source === 'guest'
+      ? body.booking_source
+      : (hdrUser && !['0', 'null', 'undefined'].includes(hdrUser) ? 'admin' : 'guest')
+
+    const slot = normBeachSlot(body.slot_type)
+    if (!BEACH_SLOT_IDS.includes(slot)) return c.json({ error: 'Please choose a valid time slot', code: 'invalid_slot' }, 400)
+    if (!isBeachYmd(booking_date)) return c.json({ error: 'Please choose a valid date', code: 'invalid_date' }, 400)
+    if (property_id === undefined || property_id === null || property_id === '') return c.json({ error: 'property_id is required' }, 400)
+    const spotId = Number(body.spot_id)
+    if (!Number.isInteger(spotId) || spotId <= 0) return c.json({ error: 'Please choose a spot', code: 'invalid_spot' }, 400)
+    const guestName = String(body.guest_name == null ? '' : body.guest_name).trim()
+    if (!guestName) return c.json({ error: 'Guest name is required', code: 'invalid_name' }, 400)
+    const room = String(body.guest_room_number == null ? '' : body.guest_room_number).trim()
+    const guestsN = Math.min(20, Math.max(1, parseInt(num_guests, 10) || 2))
+
+    // Legacy 'morning'/'afternoon' rows are compared by their normalised id.
+    const conflictSql = `(${BEACH_SLOT_SQL} = ? OR ${BEACH_SLOT_SQL} = 'full_day' OR ? = 'full_day')`
+    const roomCountSql = `
+      SELECT COUNT(*) FROM beach_bookings
+      WHERE property_id = ? AND booking_date = ? AND booking_status IN ${BEACH_ACTIVE_STATUSES}
+        AND LOWER(TRIM(guest_room_number)) = LOWER(?) AND ${conflictSql}`
+    const reads: any[] = [
+      DB.prepare(`
+        SELECT s.*, z.max_loungers AS zone_max_loungers, z.max_umbrellas AS zone_max_umbrellas
+        FROM beach_spots s LEFT JOIN beach_zones z ON z.zone_id = s.zone_id
+        WHERE s.spot_id = ?
+      `).bind(spotId),
+      DB.prepare('SELECT * FROM beach_settings WHERE property_id = ?').bind(property_id),
+      DB.prepare('SELECT date, sunrise, sunset FROM beach_sun_times WHERE property_id = ? AND date = ?').bind(Number(property_id), booking_date)
+    ]
+    if (room) reads.push(DB.prepare(`SELECT (${roomCountSql}) AS n`).bind(property_id, booking_date, room, slot, slot))
+    const res = await DB.batch(reads)
+    const spot: any = (res[0].results || [])[0]
+    const settings: any = (res[1].results || [])[0] || {}
+    if (!spot || String(spot.property_id) !== String(property_id)) {
+      return c.json({ error: 'Spot not found', code: 'invalid_spot' }, 404)
     }
-    
-    // Get spot price
-    const spot = await DB.prepare(`
-      SELECT * FROM beach_spots WHERE spot_id = ?
-    `).bind(spot_id).first()
-    
-    // Get settings to check if free for guests
-    const settings = await DB.prepare(`
-      SELECT * FROM beach_settings WHERE property_id = ?
-    `).bind(property_id).first()
-    
+
+    // 2. spot state and guest-only rules
+    if (Number(spot.is_active) !== 1 || Number(spot.maintenance_mode) === 1) {
+      return c.json({ error: 'This spot is not available for booking', code: 'spot_unavailable' }, 409)
+    }
+    if (source === 'guest') {
+      if (Number(settings.booking_button_override_enabled) === 1) {
+        const msg = settings.booking_button_override_message || 'Beach bookings are currently unavailable. Please contact staff at the beach.'
+        return c.json({ error: msg, code: 'booking_disabled', message: msg }, 403)
+      }
+      if (Number(spot.guest_bookable) !== 1) {
+        const msg = 'This spot can only be booked with the beach team.'
+        return c.json({ error: msg, code: 'not_guest_bookable', message: msg }, 403)
+      }
+      if (slot === 'full_day' && Number(settings.full_day_enabled) !== 1) {
+        return c.json({ error: 'Full-day booking is not available. Please choose Morning or Afternoon.', code: 'invalid_slot' }, 400)
+      }
+      const today = cairoToday()
+      const advance = parseInt(settings.advance_booking_days, 10) || 7
+      if (booking_date < today) return c.json({ error: 'Please choose today or a later date', code: 'invalid_date' }, 400)
+      if (booking_date > addDaysYmd(today, advance)) {
+        return c.json({ error: 'Bookings open ' + advance + ' days ahead', code: 'invalid_date' }, 400)
+      }
+    }
+
+    // 1. resolve and store the slot's times for that date
+    const sun = await beachSunFill(DB, property_id, [booking_date], settings, res[2].results || [])
+    const day = beachSlotsFromSettings(settings, booking_date, sun[booking_date])
+    const am = day.slots[0]
+    const pm = day.slots[1]
+    const slotTimes = slot === 'half_day_am' ? am : slot === 'half_day_pm' ? pm : { start: am.start, end: pm.end }
+
+    // 3. sun loungers
+    const limits = beachLimitsFromRow({
+      spot_max_loungers: spot.max_loungers,
+      zone_max_loungers: spot.zone_max_loungers,
+      zone_max_umbrellas: spot.zone_max_umbrellas,
+      max_loungers_per_booking: settings.max_loungers_per_booking,
+      max_umbrellas_per_booking: settings.max_umbrellas_per_booking
+    })
+    let numLoungers: number
+    if (body.num_loungers === undefined || body.num_loungers === null || body.num_loungers === '') {
+      numLoungers = Math.max(1, Math.min(guestsN, limits.max_loungers))
+    } else {
+      numLoungers = Number(body.num_loungers)
+      if (!Number.isInteger(numLoungers) || numLoungers < 1 || numLoungers > limits.max_loungers) {
+        const msg = 'Please choose between 1 and ' + limits.max_loungers + ' sun loungers.'
+        return c.json({ error: msg, code: 'invalid_loungers', message: msg, max_loungers: limits.max_loungers }, 400)
+      }
+    }
+
+    // 4. umbrellas per room for this date + slot
+    const roomLimitResponse = () => c.json({
+      error: 'room_limit',
+      max_umbrellas: limits.max_umbrellas,
+      message: 'Room ' + room + ' already has ' + (limits.max_umbrellas === 1 ? 'an umbrella' : limits.max_umbrellas + ' umbrellas') + ' booked for this time.'
+    }, 409)
+    if (room && Number(((res[3].results || [])[0] || {}).n) >= limits.max_umbrellas) return roomLimitResponse()
+
     let totalPrice = 0
-    if (!settings?.free_for_hotel_guests || !guest_room_number) {
-      if (slot_type === 'full_day') totalPrice = spot.price_full_day
-      else if (slot_type === 'morning' || slot_type === 'afternoon') totalPrice = spot.price_half_day
-      else totalPrice = spot.price_hourly
+    if (!settings.free_for_hotel_guests || !room) {
+      if (slot === 'full_day') totalPrice = Number(spot.price_full_day) || 0
+      else totalPrice = Number(spot.price_half_day) || 0
     }
-    
+
     // Generate booking reference
     const bookingReference = 'BCH-' + Date.now() + '-' + Math.random().toString(36).substring(7).toUpperCase()
-    
+
     // Generate 6-digit booking code (e.g., B12345)
     const bookingCode = 'B' + Math.floor(10000 + Math.random() * 90000).toString()
-    
+
     // Generate QR code data (JSON with booking details)
     const qrCodeData = JSON.stringify({
       booking_reference: bookingReference,
       booking_code: bookingCode,
       spot_number: spot.spot_number,
       booking_date: booking_date,
-      guest_name: guest_name
+      guest_name: guestName
     })
-    
-    // Create booking
-    await DB.prepare(`
+
+    // 5. atomic insert: the conflict and room checks run inside the same statement
+    const spotConflictSql = `
+      SELECT 1 FROM beach_bookings
+      WHERE spot_id = ? AND booking_date = ? AND booking_status IN ${BEACH_ACTIVE_STATUSES} AND ${conflictSql}`
+    const ins = await DB.prepare(`
       INSERT INTO beach_bookings (
         booking_reference, booking_code, property_id, spot_id, guest_name, guest_room_number,
         guest_phone, guest_email, booking_date, slot_type, start_time, end_time,
         num_guests, total_price, special_requests, booking_status, payment_status,
-        qr_code_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)
+        qr_code_data, num_loungers, num_umbrellas, booking_source
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, 1, ?
+      WHERE NOT EXISTS (${spotConflictSql})
+        AND (? = '' OR (${roomCountSql}) < ?)
     `).bind(
       bookingReference,
       bookingCode,
       property_id,
-      spot_id,
-      guest_name,
-      guest_room_number || null,
+      spotId,
+      guestName,
+      room || null,
       guest_phone || null,
       guest_email || null,
       booking_date,
-      slot_type,
-      start_time || null,
-      end_time || null,
-      num_guests,
+      slot,
+      slotTimes.start,
+      slotTimes.end,
+      guestsN,
       totalPrice,
       special_requests || null,
       totalPrice === 0 ? 'free' : 'pending',
-      qrCodeData
+      qrCodeData,
+      numLoungers,
+      source,
+      spotId, booking_date, slot, slot,
+      room, property_id, booking_date, room, slot, slot, limits.max_umbrellas
     ).run()
-    
-    return c.json({ 
-      success: true, 
-      booking: { 
+
+    if (!ins.meta || !ins.meta.changes) {
+      const taken = await DB.prepare(spotConflictSql).bind(spotId, booking_date, slot, slot).first()
+      if (taken || !room) {
+        return c.json({ error: 'taken', message: 'This spot is already booked for the selected time' }, 409)
+      }
+      return roomLimitResponse()
+    }
+
+    return c.json({
+      success: true,
+      num_loungers: numLoungers,
+      start_time: slotTimes.start,
+      end_time: slotTimes.end,
+      booking: {
         booking_reference: bookingReference,
         booking_code: bookingCode,
         spot_number: spot.spot_number,
         spot_type: spot.spot_type,
-        qr_code_data: qrCodeData
-      } 
+        qr_code_data: qrCodeData,
+        booking_date,
+        slot_type: slot,
+        start_time: slotTimes.start,
+        end_time: slotTimes.end,
+        num_guests: guestsN,
+        num_loungers: numLoungers,
+        num_umbrellas: 1,
+        booking_source: source,
+        total_price: totalPrice
+      }
     })
   } catch (error) {
     console.error('Create beach booking error:', error)
