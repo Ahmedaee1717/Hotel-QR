@@ -50927,9 +50927,42 @@ app.get('/staff/app', (c) => {
             v.srcObject = scanStream;
             await v.play();
         }catch(e){ toast('Camera unavailable — type the code instead'); return; }
-        if(!('BarcodeDetector' in window)){ toast('Type the code below to confirm'); return; }
-        try{ scanDet = new BarcodeDetector({formats:['qr_code']}); bchScanLoopStart(v); }
-        catch(e){ scanDet=null; toast('Type the code below to confirm'); }
+        if('BarcodeDetector' in window){
+            try{ scanDet = new BarcodeDetector({formats:['qr_code']}); bchScanLoopStart(v); return; }
+            catch(e){ scanDet=null; }
+        }
+        // iPad / Safari and some tablets lack BarcodeDetector: decode frames with jsQR instead
+        try{
+            await bchLoadJsQR();
+            scanDet = bchJsQRDetector();
+            bchScanLoopStart(v);
+        }catch(e){ scanDet=null; toast('Type the code below to confirm'); }
+    }
+    var bchJsQRPromise=null;
+    function bchLoadJsQR(){
+        if(window.jsQR) return Promise.resolve();
+        if(!bchJsQRPromise) bchJsQRPromise = new Promise(function(res, rej){
+            var s=document.createElement('script');
+            s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+            s.onload=function(){ window.jsQR ? res() : rej(new Error('jsQR missing')); };
+            s.onerror=function(){ bchJsQRPromise=null; rej(new Error('jsQR failed to load')); };
+            document.head.appendChild(s);
+        });
+        return bchJsQRPromise;
+    }
+    // Same shape as BarcodeDetector.detect(), so the scan loop needs no changes
+    function bchJsQRDetector(){
+        var cv=document.createElement('canvas'), cx=cv.getContext('2d', {willReadFrequently:true});
+        return { detect: async function(v){
+            var vw=v.videoWidth, vh=v.videoHeight;
+            if(!vw || !vh) return [];
+            var k=Math.min(1, 720/Math.max(vw, vh));
+            cv.width=Math.round(vw*k); cv.height=Math.round(vh*k);
+            cx.drawImage(v, 0, 0, cv.width, cv.height);
+            var img=cx.getImageData(0, 0, cv.width, cv.height);
+            var r=window.jsQR(img.data, cv.width, cv.height, {inversionAttempts:'dontInvert'});
+            return (r && r.data) ? [{rawValue: r.data}] : [];
+        } };
     }
     window.openScanner=function(){ bchWithName(function(){ bchOpenScanner(); }); };
     window.closeScanner=function(){
