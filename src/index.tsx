@@ -51206,7 +51206,7 @@ app.get('/staff/app', (c) => {
     var rstSlot = null;          // selected slot_id
     var rstSlotAuto = true;      // follow the slot in progress until the waiter picks another
     var rstZone = 'all';
-    var rstSeq = 0, rstBusy = {}, rstLoading = true, rstStale = false, rstLoadedAt = '';
+    var rstSeq = 0, rstBusy = {}, rstLoading = true, rstStale = false, rstLoadedAt = '', rstLoadErr = '';
     var rstTimer = null;
     var rstOverride = {};        // table_id -> state after a local action, until the next load
     var rstSheetKind = '', rstSheetTable = null, rstWalk = null, rstPick = null, rstChoices = null, rstTaken = null;
@@ -51324,13 +51324,12 @@ app.get('/staff/app', (c) => {
     function rstGrace(){ var g=parseInt((rstData.settings||{}).grace_minutes,10); return (isFinite(g) && g>=0) ? g : 15; }
     function rstAutoRelease(){ var s=rstData.settings||{}; return !(s.auto_release===0 || s.auto_release==='0' || s.auto_release===false); }
     function rstWalkOk(){ var s=rstData.settings||{}; return !(s.allow_walk_ins===0 || s.allow_walk_ins==='0' || s.allow_walk_ins===false); }
+    // Walk-ins are limited by the largest table (max_party_size only limits guest bookings)
     function rstMaxParty(){
         var mx=0; (rstData.tables||[]).forEach(function(t){ mx=Math.max(mx, +t.capacity||0); });
-        var mp=parseInt((rstData.settings||{}).max_party_size || (rstCfg && rstCfg.settings && rstCfg.settings.max_party_size), 10);
-        if(mp>0 && (!mx || mp<mx)) mx=mp;
-        return mx || 10;
+        return mx || parseInt((rstData.settings||{}).max_party_size, 10) || 10;
     }
-    function rstGraceEnd(b){ var m=rstMin(b && b.start_time); return m==null ? '' : rstHM(m+rstGrace()); }
+    function rstGraceEnd(b){ if(b && b.grace_ends) return String(b.grace_ends); var m=rstMin(b && b.start_time); return m==null ? '' : rstHM(m+rstGrace()); }
     // Mirrors the server rule so an overdue booking shows as released before the sweep runs
     function rstExpired(b){
         if(!rstAutoRelease()) return false;
@@ -51346,7 +51345,7 @@ app.get('/staff/app', (c) => {
         if(s==='completed') return 'left';
         if(s==='cancelled') return 'cancelled';
         if(s==='no_show') return (+b.auto_released===1) ? 'released' : 'noshow';
-        return rstExpired(b) ? 'released' : 'waiting';
+        return (b.expired===true || b.expired===1 || +b.auto_released===1 || rstExpired(b)) ? 'released' : 'waiting';
     }
     function rstConflict(a, b){
         var as=rstMin(a.start_time), ae=rstMin(a.end_time), bs=rstMin(b.start_time), be=rstMin(b.end_time);
@@ -51418,8 +51417,8 @@ app.get('/staff/app', (c) => {
     function rstStatus(b){
         var k=rstBkState(b), by=b.checked_in_by ? ' · '+b.checked_in_by : '';
         if(k==='seated'){ var tm=b.checked_in_time || rstUtcHM(b.checked_in_at); return {k:k, cls:'seat', txt:'Seated'+(tm?' '+tm:'')+by}; }
-        if(k==='left'){ var lt=rstUtcHM(b.released_at || b.updated_at); return {k:k, cls:'rel', txt:'Left'+(lt?' '+lt:'')+' · table freed'}; }
-        if(k==='released'){ var rt=rstUtcHM(b.released_at) || rstGraceEnd(b); return {k:k, cls:'rel', txt:'Released'+(rt?' '+rt:'')+' · did not arrive'}; }
+        if(k==='left'){ var lt=b.released_time || rstUtcHM(b.released_at || b.updated_at); return {k:k, cls:'rel', txt:'Left'+(lt?' '+lt:'')+' · table freed'}; }
+        if(k==='released'){ var rt=b.released_time || rstUtcHM(b.released_at) || rstGraceEnd(b); return {k:k, cls:'rel', txt:'Released'+(rt?' '+rt:'')+' · did not arrive'}; }
         if(k==='noshow') return {k:k, cls:'bad', txt:'No-show'+by};
         if(k==='cancelled') return {k:k, cls:'bad', txt:'Cancelled'};
         var ge=rstGraceEnd(b);
@@ -51455,10 +51454,12 @@ app.get('/staff/app', (c) => {
             if(seq!==rstSeq || d!==rstDateStr) return;
             rstLoading=false;
             if(!j || j.success===false || !Array.isArray(j.tables)){
-                rstStale=false; rstRenderAll();
-                if(!quiet) toast(rstErr(j, 'Could not load the restaurant'));
+                rstStale=false; rstLoadErr=rstErr(j, 'Could not load the restaurant');
+                rstRenderAll();
+                if(!quiet) toast(rstLoadErr);
                 return;
             }
+            rstLoadErr='';
             rstData={ slots:j.slots||[], tables:j.tables||[], bookings:j.bookings||[], zones:j.zones||[], settings:j.settings||{}, current_slot_id:j.current_slot_id, date:j.date||d };
             var pick = j.slot_id!=null ? j.slot_id : (s!=null ? s : j.current_slot_id);
             if(pick==null && rstData.slots.length) pick=rstData.slots[0].slot_id;
@@ -51468,7 +51469,7 @@ app.get('/staff/app', (c) => {
             rstRenderAll();
             if(rstSheetKind==='table' && rstSheetTable!=null) rstOpenTable(rstSheetTable, true);
         }catch(e){
-            if(seq===rstSeq){ rstLoading=false; rstStale=false; rstRenderAll(); if(!quiet) toast('No connection — the restaurant retries every 15 s'); }
+            if(seq===rstSeq){ rstLoading=false; rstStale=false; rstLoadErr='No connection'; rstRenderAll(); if(!quiet) toast('No connection — the restaurant retries every 15 s'); }
         }
     }
     // Zone names/colours when the day view does not carry them
@@ -51510,7 +51511,7 @@ app.get('/staff/app', (c) => {
     function rstRenderSlots(){
         var host=document.getElementById('rstSlots'); if(!host) return;
         var sl=rstData.slots||[];
-        if(!sl.length){ host.innerHTML = rstLoading ? '' : '<div class="rst-none">No time slots on this day — set them up in Admin › Restaurant setup.</div>'; return; }
+        if(!sl.length){ host.innerHTML = (rstLoading || rstLoadErr) ? '' : '<div class="rst-none">No time slots on this day — set them up in Admin › Restaurant setup.</div>'; return; }
         var groups=[], by={}, nowId=null, nextId=null;
         sl.forEach(function(s){ var m=s.meal||'other'; if(!by[m]){ by[m]=[]; groups.push(m); } by[m].push(s); });
         if(rstDateStr===rstToday()){
@@ -51541,7 +51542,7 @@ app.get('/staff/app', (c) => {
         }
     }
     function rstRenderStats(){
-        var list=rstZoneTables(), c=rstCounts(list), pending=(rstLoading && !(rstData.tables||[]).length);
+        var list=rstZoneTables(), c=rstCounts(list), pending=((rstLoading || !!rstLoadErr) && !(rstData.tables||[]).length);
         var set=function(id, v){ var el=document.getElementById(id); if(el) el.textContent = pending ? '–' : String(v); };
         set('rstFreeChairs', c.freeC); set('rstFreeTables', c.freeT); set('rstBooked', c.booked); set('rstSeated', c.seated); set('rstReleased', c.released);
         set('rstFreeChairsSub', 'of '+c.totalC+' seats');
@@ -51597,7 +51598,7 @@ app.get('/staff/app', (c) => {
         var host=document.getElementById('rstMap'); if(!host) return;
         var tables=rstData.tables||[];
         if(!tables.length){
-            host.innerHTML='<div class="empty" style="padding:26px 12px">'+(rstLoading ? 'Loading…' : 'No tables yet — add them in Admin › Restaurant setup.')+'</div>';
+            host.innerHTML='<div class="empty" style="padding:26px 12px">'+(rstLoading ? 'Loading…' : (rstLoadErr ? rstE(rstLoadErr)+' — retrying every 15 s' : 'No tables yet — add them in Admin › Restaurant setup.'))+'</div>';
             return;
         }
         // keep each zone's sideways scroll across the 15 s refresh
@@ -51631,12 +51632,14 @@ app.get('/staff/app', (c) => {
             if(k==='seated') return A('release','bk-sec','<i class="fas fa-door-open"></i> Left early — free the table')+A('undo','bk-sec','Undo arrival');
             if(k==='released') return A('arrive','bk-cta','<i class="fas fa-check"></i> Arrived late — seat them');
             if(k==='noshow') return A('arrive','bk-cta','<i class="fas fa-check"></i> Arrived late — seat them')+A('undo','bk-sec','Undo no-show');
+            if(k==='left') return A('undo','bk-sec','Undo — they are still seated');
             return '';
         }
         if(k==='waiting') return A('noshow','bb ns','No-show')+A('arrive','bb in','<i class="fas fa-check"></i> Arrive');
         if(k==='seated') return A('undo','bb undo','Undo')+A('release','bb rst-rel','Left early');
         if(k==='released') return A('arrive','bb in','Arrived late');
         if(k==='noshow') return A('undo','bb undo','Undo')+A('arrive','bb in','Arrived late');
+        if(k==='left') return A('undo','bb undo','Undo');
         return '';
     }
     function rstRowHtml(b, q){
@@ -51668,6 +51671,7 @@ app.get('/staff/app', (c) => {
         if(!rows.length){
             var msg;
             if(rstLoading) msg='Loading…';
+            else if(rstLoadErr && !(rstData.tables||[]).length){ host.innerHTML=''; return; }
             else if(!sl) msg='Pick a time slot above.';
             else if(q) msg='No booking for room '+rstE(q)+' in this slot.'+rstOtherSlotsHtml(q);
             else msg='No bookings in '+rstE(sl.label||'this slot')+' yet.';
@@ -51757,16 +51761,18 @@ app.get('/staff/app', (c) => {
             rstShowSheet();
         }catch(e){ console.error('restaurant table sheet', e); }
     }
-    function rstShowChoices(ch, ctx){
+    function rstShowChoices(ch, ctx, msg){
         var panel=document.getElementById('rstPanel'); if(!panel) return;
         rstSheetKind='choices'; rstSheetTable=null; rstChoices=ch; rstTaken=null;
-        var h='<h3>'+(ctx && ctx.room ? 'Room '+rstE(ctx.room) : 'Which booking?')+'</h3><div class="sub">'+ch.length+' bookings — who has arrived?</div>';
+        var h='<h3>'+(ctx && ctx.room ? 'Room '+rstE(ctx.room) : 'Which booking?')+'</h3>'+
+              '<div class="sub">'+(ch.length>1 ? ch.length+' bookings — who has arrived?' : 'Is this the booking?')+'</div>'+
+              (msg ? '<p class="bk-note">'+rstE(msg)+'</p>' : '');
         ch.forEach(function(b){
-            var t=rstTableById(b.table_id), s=rstSlotObj(b.slot_id), zc=b.zone_code || rstTZone(t);
-            h+='<div class="bk-book"><div class="bk-bh"><b>'+rstE(b.guest_name||'Guest')+'</b><span>'+rstE((b.party_size||'?')+' guests')+'</span></div>'+
+            var t=rstTableById(b.table_id), s=rstSlotObj(b.slot_id), zc=b.zone_code || rstTZone(t), st=rstStatus(b);
+            h+='<div class="bk-book"><div class="bk-bh"><b>'+rstE(b.guest_name||'Guest')+'</b><span class="stt '+st.cls+'">'+rstE((b.party_size||'?')+' guests · '+st.txt)+'</span></div>'+
                '<div class="bk-facts">'+
                  '<div><small>Table</small><b>'+rstE((b.table_number || (t && t.table_number) || '?')+(zc ? ' · Zone '+zc : ''))+'</b></div>'+
-                 '<div><small>'+rstE(s ? s.label : 'Time')+'</small><b>'+rstE(b.start_time ? b.start_time+(b.end_time ? '–'+b.end_time : '') : rstSlotTimes(s))+'</b></div>'+
+                 '<div><small>'+rstE(s ? s.label : (b.slot_label || 'Time'))+'</small><b>'+rstE(b.start_time ? b.start_time+(b.end_time ? '–'+b.end_time : '') : rstSlotTimes(s))+'</b></div>'+
                '</div>'+
                '<button type="button" class="bk-cta" data-ract="choice" data-ref="'+rstE(b.booking_reference)+'"><i class="fas fa-check"></i> Seat this booking</button></div>';
         });
@@ -51888,7 +51894,7 @@ app.get('/staff/app', (c) => {
     // Seat a booking; ctx.room = typed room number, ctx.table_id = seat at another table
     function rstAfterArrive(j, name, ctx){
         j=j||{}; ctx=ctx||{};
-        if(Array.isArray(j.choices) && j.choices.length){ rstShowChoices(j.choices, ctx); return 'keep'; }
+        if(Array.isArray(j.choices) && j.choices.length){ rstShowChoices(j.choices, ctx, j.message); return 'keep'; }
         if(!j.success && (j.error==='table_taken' || j.suggest_table_id!=null)){ rstShowTaken(j, ctx); return 'keep'; }
         if(!j.success){
             if(ctx.room && (j._status===404 || j.error==='not_found' || j.error==='no_booking')){ rstShowNoBooking(ctx.room, j); return 'keep'; }
@@ -51993,9 +51999,13 @@ app.get('/staff/app', (c) => {
             var j=await rstPost('/api/staff/restaurant/undo', {offering_id:RST_OFFERING, booking_reference:ref, date:rstDateStr, staff_name:rstGetName()});
             if(!j.success){ toast(rstErr(j, 'Could not undo')); return; }
             if(j.changed===0){ toast('Nothing to undo'); return; }
-            var b=rstPatch(ref, {status:'confirmed', auto_released:0, checked_in_by:null, checked_in_at:null, checked_in_time:''});
-            if(b && b.table_id!=null) rstOverride[String(b.table_id)] = rstExpired(b) ? 'released' : 'booked';
-            toast('Undone — back to expected');
+            var prev=rstFindBk(ref), wasLeft=!!prev && rstBkState(prev)==='left';
+            // A freed table goes back to seated; an arrival or no-show goes back to expected
+            var nb=(j.booking && j.booking.status) ? j.booking : {status: wasLeft ? 'checked_in' : 'confirmed', auto_released:0, expired:false, released_at:null, released_time:''};
+            if(nb.status==='confirmed' && !j.booking){ nb.checked_in_by=null; nb.checked_in_at=null; nb.checked_in_time=''; }
+            var b=rstPatch(ref, nb);
+            if(b && b.table_id!=null){ var k=rstBkState(b); rstOverride[String(b.table_id)] = k==='seated' ? 'seated' : (k==='waiting' ? 'booked' : 'released'); }
+            toast(j.message || (b && rstBkState(b)==='seated' ? 'Undone — still seated' : 'Undone — back to expected'));
         });
     }
     function rstRelease(ref){
