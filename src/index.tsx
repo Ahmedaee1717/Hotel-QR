@@ -50055,20 +50055,21 @@ app.get('/staff/app', (c) => {
         .rst-z.on{background:rgba(212,175,55,.18);border-color:var(--gold);color:var(--gold2)}
         .rst-split{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"room" "map" "list";gap:14px}
         .rst-roomwrap{grid-area:room;min-width:0}
-        .rst-mapwrap{grid-area:map;background:rgba(250,246,236,.04);border:1px solid rgba(212,175,55,.25);border-radius:16px;padding:12px;min-width:0}
+        .rst-mapwrap{grid-area:map;background:rgba(250,246,236,.04);border:1px solid rgba(212,175,55,.25);border-radius:16px;padding:12px;min-width:0;scroll-margin-top:76px}
         .rst-listwrap{grid-area:list;min-width:0}
         .rst-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
         .rst-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
-        .rst-legend .free{background:#34d399}
+        .rst-legend .free{background:rgba(52,211,153,.22);box-shadow:inset 0 0 0 2px #34d399}
         .rst-legend .booked{background:#D4AF37}
-        .rst-legend .seated{background:#2dd4bf}
-        .rst-legend .released{background:#9ca3af}
+        .rst-legend .seated{background:#14b8a6}
+        .rst-legend .released{background:rgba(156,163,175,.25);box-shadow:inset 0 0 0 1.5px #9ca3af}
         .rst-zhead{display:flex;align-items:center;gap:8px;margin:14px 2px 6px;font-size:.74rem;font-weight:800;letter-spacing:.04em;color:var(--txt)}
         .rst-zhead:first-child{margin-top:0}
         .rst-zhead i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
         .rst-zhead span{font-weight:600;color:var(--dim);margin-left:auto;font-size:.66rem;text-align:right}
         .rst-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
-        .rst-canvas{position:relative;width:100%;padding-top:62.5%;border-radius:12px;border:1px solid rgba(212,175,55,.3);background:repeating-linear-gradient(0deg,rgba(250,246,236,.035) 0 1px,transparent 1px 28px),repeating-linear-gradient(90deg,rgba(250,246,236,.035) 0 1px,transparent 1px 28px),#1b1015;container-type:inline-size;overflow:hidden}
+        .rst-canvas{position:relative;width:100%;aspect-ratio:16/10;border-radius:12px;border:1px solid rgba(212,175,55,.3);background:repeating-linear-gradient(0deg,rgba(250,246,236,.035) 0 1px,transparent 1px 28px),repeating-linear-gradient(90deg,rgba(250,246,236,.035) 0 1px,transparent 1px 28px),#1b1015;container-type:inline-size;overflow:hidden}
+        @supports not (aspect-ratio:16/10){ .rst-canvas{padding-top:62.5%} }
         .rst-layer{position:absolute;inset:0}
         /* Phones: tables keep a tappable size and the floor swipes sideways instead of shrinking */
         @media(max-width:819px){ .rst-canvas{min-width:560px} }
@@ -50082,7 +50083,7 @@ app.get('/staff/app', (c) => {
         .rst-t.booked{color:#231307}
         .rst-t.booked .sh{background:linear-gradient(135deg,#f0d98c,#D4AF37);border-color:#f6e7ae}
         .rst-t.seated{color:#042f2e}
-        .rst-t.seated .sh{background:#2dd4bf;border-color:#99f6e4}
+        .rst-t.seated .sh{background:#14b8a6;border-color:#5eead4}
         .rst-t.released{color:#d1d5db}
         .rst-t.released .sh{background:rgba(156,163,175,.2);border:2px dashed #9ca3af}
         .rst-t.released .lb b{text-decoration:line-through}
@@ -51621,7 +51622,9 @@ app.get('/staff/app', (c) => {
     function rstActs(b, big){
         var ref=rstE(b.booking_reference), dis=rstBusy[b.booking_reference] ? ' disabled' : '';
         var k=rstBkState(b);
-        if(String(b.booking_date||rstDateStr) > rstToday()) return big ? '<p class="bk-note">Arrival opens on the day.</p>' : '';
+        var day=String(b.booking_date||rstDateStr), today=rstToday();
+        if(day > today) return big ? '<p class="bk-note">Arrival opens on the day.</p>' : '';
+        if(day < today) return big ? '<p class="bk-note">Past day — view only.</p>' : '';
         var A=function(act, cls, html){ return '<button type="button" class="'+cls+'" data-ract="'+act+'" data-ref="'+ref+'"'+dis+'>'+html+'</button>'; };
         if(big){
             if(k==='waiting') return A('arrive','bk-cta','<i class="fas fa-check"></i> Arrived — seat them')+A('noshow','bk-sec bad','Mark no-show');
@@ -51920,7 +51923,7 @@ app.get('/staff/app', (c) => {
     function rstArriveRoom(){
         var el=document.getElementById('rstRoom'), room=String((el && el.value)||'').trim();
         if(!room){ toast('Type the room number first'); rstPadOpen(true); return; }
-        if(rstDateStr>rstToday()){ toast('Arrivals open on the day'); return; }
+        if(rstDateStr!==rstToday()){ toast(rstDateStr>rstToday() ? 'Arrivals open on the day' : 'Arrivals are for today — go back to today first'); return; }
         var key='room:'+room;
         if(rstBusy[key]) return;
         rstWithName(function(name){
