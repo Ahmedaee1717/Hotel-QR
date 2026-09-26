@@ -43306,6 +43306,8 @@ body.embed .wrap{padding:0 0 24px;max-width:none}
 .field{margin-bottom:14px;min-width:0}
 input[type=text],input[type=password],input[type=search],select{width:100%;border:1px solid #d1d5db;border-radius:9px;padding:9px 12px;font-size:1rem;background:#fff;color:#111827;min-height:44px;font-family:inherit}
 input:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+/* The manager PIN is a plain text field drawn as dots, so browsers don't offer to save it on a shared PC */
+.pinmask{-webkit-text-security:disc;letter-spacing:.15em}
 select:disabled{background:#f3f4f6;color:#6b7280}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:9px;padding:8px 14px;font-weight:700;font-size:.86rem;cursor:pointer;min-height:40px;font-family:inherit;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .btn:hover{background:#f9fafb}
@@ -43404,7 +43406,12 @@ body.embed .solo{margin-top:24px}
 .opt.dis{opacity:.65;cursor:default}
 .opt i{color:#6b7280;margin-right:7px;width:16px;text-align:center}
 .optgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.optgrid .opt{margin:0}
+.optgrid .opt{margin:0;gap:8px;padding:10px;white-space:nowrap}
+.optgrid .opt i{margin-right:5px}
+/* Embedded in the dashboard: the frame is about one screen tall, so dialogs sit in the middle of it, never taller than it,
+   and scroll inside themselves; the wheel is not trapped so the dashboard can still scroll */
+body.embed .modal{align-items:center;padding:0 14px;overscroll-behavior:auto}
+body.embed .dlgbox{max-height:calc(100% - 24px);overflow:auto;-webkit-overflow-scrolling:touch;margin-bottom:0}
 .pinrow{display:flex;gap:8px}
 .pinrow input{flex:1;min-width:0;font-size:1.25rem;letter-spacing:.25em;font-weight:700;font-variant-numeric:tabular-nums}
 .pinrow input::placeholder{letter-spacing:normal;font-size:.95rem;font-weight:500;color:#9ca3af}
@@ -43437,6 +43444,7 @@ body.embed .toast.show{transform:translate(-50%,0)}
   .modal{padding:10px}
   .dlgbox{padding:18px 16px}
   .optgrid{grid-template-columns:minmax(0,1fr)}
+  .optgrid .opt{padding:10px 14px;gap:12px}
   .dlgbtns .btn{flex:1;min-height:48px}
   .pc-pin{font-size:2.4rem}
 }
@@ -43465,9 +43473,9 @@ body.embed .toast.show{transform:translate(-50%,0)}
       <form id="lgForm" novalidate>
         <div class="info" id="lgInfo" role="status"></div>
         <div class="field"><label class="lb" for="lgName">Your name</label>
-          <input type="text" id="lgName" maxlength="40" autocomplete="username" autocapitalize="words" spellcheck="false" enterkeyhint="next"></div>
+          <input type="text" id="lgName" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="next"></div>
         <div class="field"><label class="lb" for="lgPin">PIN</label>
-          <input type="password" id="lgPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" enterkeyhint="go"></div>
+          <input type="text" id="lgPin" class="pinmask" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" enterkeyhint="go"></div>
         <div class="err" id="lgErr" role="alert"></div>
         <button type="submit" class="btn pri big" id="lgBtn"><i class="fas fa-right-to-bracket"></i>Sign in</button>
       </form>
@@ -43666,7 +43674,11 @@ function pinProblem(p) {
   }
   return (same || up || down) ? 'Choose a PIN that is not a simple pattern like 1234 or 1111' : '';
 }
-// Generated PINs are held to a stricter bar: 3+ different digits, no wrap-around runs like 8901
+// Managers sign in to this page, so their PIN is 6 digits (the server enforces the same rule)
+var MGR_PIN_MSG = 'Managers need a 6-digit PIN';
+function mgrPinProblem(p) { return /^\\d{6}$/.test(p) ? pinProblem(p) : MGR_PIN_MSG; }
+// Generated PINs are held to a stricter bar: 3+ different digits, no wrap-around runs like 8901;
+// 6-digit ones need 4+ different digits and no repeated half like 358358
 function pinEasy(p) {
   var seen = {}, n = 0, up = true, down = true;
   for (var i = 0; i < p.length; i++) {
@@ -43678,31 +43690,38 @@ function pinEasy(p) {
       if ((a + 9) % 10 !== b) down = false;
     }
   }
+  if (p.length >= 6 && (n < 4 || p.slice(0, 3) === p.slice(3))) return true;
   return n < 3 || up || down;
 }
-function genPin() {
+function genPin(len) {
+  len = len === 6 ? 6 : 4;
   try {
-    var u = new Uint32Array(1);
+    var u = new Uint32Array(1), mod = len === 6 ? 1000000 : 10000;
+    var cap = Math.floor(4294967296 / mod) * mod;
     for (var tries = 0; tries < 500; tries++) {
       window.crypto.getRandomValues(u);
-      if (u[0] >= 4294960000) continue;
-      var p = String(u[0] % 10000);
-      while (p.length < 4) p = '0' + p;
+      if (u[0] >= cap) continue;
+      var p = String(u[0] % mod);
+      while (p.length < len) p = '0' + p;
       if (!pinProblem(p) && !pinEasy(p)) return p;
     }
   } catch (e) {}
   return '';
 }
-function pinFieldHtml(label) {
+var PIN_HINT_ANY = '4–6 digits · managers need 6. Avoid easy ones like 1234 or 1111.';
+var PIN_HINT_MGR = '6 digits for a manager. Avoid easy ones like 123456 or 111111.';
+function pinFieldHtml(label, six, hint) {
   return '<div class="field"><label class="lb" for="fPin">' + esc(label) + '</label>' +
-    '<div class="pinrow"><input type="text" id="fPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" placeholder="4–6 digits" enterkeyhint="done">' +
+    '<div class="pinrow"><input type="text" id="fPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" placeholder="' + (six ? '6 digits' : '4–6 digits') + '" enterkeyhint="done">' +
     '<button type="button" class="btn icon" data-a="eye" aria-label="Hide PIN" title="Hide PIN"><i class="fas fa-eye-slash"></i></button>' +
     '<button type="button" class="btn" data-a="gen"><i class="fas fa-dice"></i>Generate</button></div>' +
-    '<p class="hint">4 to 6 digits. Avoid easy ones like 1234 or 1111.</p></div>';
+    '<p class="hint" id="fPinHint"' + (hint ? ' data-fixed="1"' : '') + '>' + esc(hint || (six ? PIN_HINT_MGR : PIN_HINT_ANY)) + '</p></div>';
 }
-function wirePin() {
+// needSix(): true while the PIN being typed must be 6 digits (a manager)
+function wirePin(needSix) {
   var box = el('dlgBox'), input = el('fPin');
   var eye = box.querySelector('[data-a="eye"]'), gen = box.querySelector('[data-a="gen"]');
+  function six() { try { return !!(needSix && needSix()); } catch (e) { return false; } }
   function show(visible) {
     input.type = visible ? 'text' : 'password';
     eye.innerHTML = '<i class="fas ' + (visible ? 'fa-eye-slash' : 'fa-eye') + '"></i>';
@@ -43712,14 +43731,25 @@ function wirePin() {
   input.addEventListener('input', function () {
     var v = input.value.replace(/\\D/g, '').slice(0, 6);
     if (v !== input.value) input.value = v;
+    if (input.dataset.gen && input.value !== input.dataset.gen) delete input.dataset.gen;
   });
   eye.onclick = function () { show(input.type !== 'text'); };
-  gen.onclick = function () {
-    var p = genPin();
+  function generate() {
+    var p = genPin(six() ? 6 : 4);
     if (!p) { el('fErr').textContent = 'Could not make a PIN on this device. Type one instead.'; return; }
     input.value = p;
+    input.dataset.gen = p;
     show(true);
     el('fErr').textContent = '';
+  }
+  gen.onclick = generate;
+  // Called when the Manager tick changes: hint + placeholder follow, and a generated PIN that is now too short is remade
+  return function () {
+    var s = six();
+    input.placeholder = s ? '6 digits' : '4–6 digits';
+    var h = el('fPinHint');
+    if (h && !h.dataset.fixed) h.textContent = s ? PIN_HINT_MGR : PIN_HINT_ANY;
+    if (s && input.dataset.gen && input.value === input.dataset.gen && input.value.length < 6) generate();
   };
 }
 
@@ -43730,7 +43760,10 @@ function openDlg(html, escClose) {
   DLG.open = true; DLG.esc = !!escClose; DLG.pinCard = false; DLG.after = null; DLG.onEnter = null;
   el('dlg').classList.remove('hidden');
   el('dlg').scrollTop = 0;
+  box.scrollTop = 0;
   document.body.classList.add('noscroll');
+  // Embedded in the dashboard: bring the whole frame on screen so the dialog (centred in the frame) is fully visible
+  if (EMBED) { try { window.frameElement && window.frameElement.scrollIntoView({ block: 'start' }); } catch (e) {} }
   var c = box.querySelector('[data-a="cancel"]');
   if (c) c.onclick = function () { closeDlg(); };
 }
@@ -43850,7 +43883,8 @@ async function signIn(ev) {
   }
   setBusy(btn, true, 'Signing in…');
   var r;
-  try { r = await api('POST', '/api/staff/auth/login', { name: name, pin: pin }); }
+  // purpose 'manage': the server keeps this sign-in short (1 hour at most, gone when the browser closes)
+  try { r = await api('POST', '/api/staff/auth/login', { name: name, pin: pin, purpose: 'manage' }); }
   finally { setBusy(btn, false); }
   el('lgPin').value = '';
   if (!r.ok) {
@@ -43871,6 +43905,8 @@ async function signOut(btn) {
 }
 
 // ---------- settings ----------
+// A phone still running an old copy of the Ops app may not show the sign-in screen until the app is reopened
+var REOPEN_TIP = 'If a phone doesn’t show the sign-in screen, close the Ops app fully and open it again.';
 function hoursLabel(v) {
   for (var i = 0; i < HOURS.length; i++) if (HOURS[i].v === v) return HOURS[i].short;
   return plural(v, 'hour');
@@ -43885,7 +43921,7 @@ function renderSettings() {
   el('reqState').innerHTML = on
     ? '<span class="stl on"><i class="fas fa-lock"></i>On</span>Every phone needs a name and PIN.'
     : '<span class="stl off"><i class="fas fa-lock-open"></i>Off</span>Anyone who opens the Ops app can use every tab. Create accounts, then turn this on.';
-  el('reqTip').textContent = on ? '' : (readyCount()
+  el('reqTip').textContent = on ? REOPEN_TIP : (readyCount()
     ? 'Staff can already sign in from the Ops app (Sign in, at the top) so they are ready when you turn this on.'
     : 'Add a staff account with at least one tab first.');
   var hrs = Math.round(Number(st.session_hours)) || 12;
@@ -43903,7 +43939,7 @@ async function onReqChange() {
   if (want && !readyCount()) { el('setErr').textContent = 'Create staff accounts first'; return; }
   var ok = await ask(want ? {
     title: 'Require sign-in on the Ops app?', icon: 'fa-lock', ok: 'Turn on',
-    html: 'Every phone will be asked for a name and PIN within a minute. Make sure your staff have their PINs.'
+    html: 'Every phone will be asked for a name and PIN within a minute. Make sure your staff have their PINs. ' + esc(REOPEN_TIP)
   } : {
     title: 'Turn off sign-in?', icon: 'fa-lock-open', ok: 'Turn off', danger: true,
     html: 'Anyone who opens the Ops app will be able to use every tab again, without a name or PIN.'
@@ -43973,12 +44009,12 @@ function rowHtml(a) {
   h += '<div class="a-access">' + accessChips(a) + '</div>';
   h += '<div class="a-status"><span class="st ' + st.cls + '">' + esc(st.txt) + '</span>' +
     (a.locked ? '<span class="sub">Too many wrong PINs</span>' : '') +
-    '<span class="sub">' + (n ? plural(n, 'phone') + ' signed in' : 'Not signed in') + '</span></div>';
+    '<span class="sub">' + (n ? plural(n, 'device') + ' signed in' : 'Not signed in') + '</span></div>';
   h += '<div class="a-seen"><span><span class="lbm muted">Last sign-in: </span>' + (a.last_login_at ? esc(rel(a.last_login_at) || '—') : '<span class="muted">Never</span>') + '</span>' +
     (n && a.last_seen_at ? '<span class="sub">Last active ' + esc(rel(a.last_seen_at)) + '</span>' : '') + '</div>';
   var b = actBtn('edit', id, 'fa-pen', 'Edit') + actBtn('pin', id, 'fa-key', 'New PIN');
   if (a.locked) b += actBtn('unlock', id, 'fa-lock-open', 'Unlock', 'warnb');
-  if (n) b += actBtn('signout', id, 'fa-right-from-bracket', n > 1 ? 'Sign out phones' : 'Sign out phone');
+  if (n) b += actBtn('signout', id, 'fa-right-from-bracket', 'Sign out devices');
   if (!me) {
     b += on ? actBtn('disable', id, 'fa-ban', 'Disable') : actBtn('enable', id, 'fa-circle-check', 'Enable', 'okb');
     b += actBtn('delete', id, 'fa-trash-can', 'Delete', 'danger');
@@ -43992,7 +44028,7 @@ function renderList() {
   var signed = list.filter(function (a) { return Number(a.sessions) > 0; }).length;
   el('accCount').textContent = String(list.length);
   el('accCount').classList.toggle('hidden', !list.length);
-  el('accSum').textContent = list.length ? plural(active, 'active account') + ' · ' + signed + ' signed in on a phone now' : '';
+  el('accSum').textContent = list.length ? plural(active, 'active account') + ' · ' + signed + ' signed in now' : '';
   var findIn = el('findIn');
   if (list.length < 8) findIn.value = '';
   el('findWrap').classList.toggle('hidden', list.length < 8);
@@ -44024,9 +44060,13 @@ function renderMain() {
 
 // ---------- add / edit ----------
 function accessKey(all, tabs) { return all ? '*' : tabs.slice().sort().join(','); }
+// An existing account whose PIN is shorter than 6 digits needs a new 6-digit PIN to become a manager
+// (pin_digits comes from the server; a missing value means an older account with a 4-digit PIN)
+function shortPin(a) { return !!a && !(Number(a.pin_digits) >= 6); }
 function openAccountDlg(a) {
   var isNew = !a, me = isMe(a);
   var all = !isNew && yes(a.all), tabs = isNew ? [] : tabsOf(a), mgr = !isNew && yes(a.is_manager);
+  var promoPin = !isNew && !mgr && !me && shortPin(a);
   var h = '<h3 id="dlgTitle"><i class="fas ' + (isNew ? 'fa-user-plus' : 'fa-user-pen') + '"></i>' + (isNew ? 'Add staff account' : 'Edit ' + esc(a.name)) + '</h3>';
   h += '<div class="field"><label class="lb" for="fName">Name</label>' +
     '<input type="text" id="fName" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="next" value="' + (isNew ? '' : esc(a.name)) + '">' +
@@ -44038,7 +44078,9 @@ function openAccountDlg(a) {
     }).join('') + '</div></div>';
   h += '<div class="field"><label class="opt"><input type="checkbox" id="fMgr"' + (mgr ? ' checked' : '') + (me ? ' disabled' : '') + '>' +
     '<span><b>Manager</b> — can manage staff accounts' + (me ? '<small>You can’t remove your own manager access.</small>' : '<small>Opens this page from the Ops app. Tabs above still apply.</small>') + '</span></label></div>';
-  if (isNew) h += pinFieldHtml('PIN');
+  if (isNew) h += pinFieldHtml('PIN', false);
+  if (promoPin) h += '<div id="fPromote" class="hidden">' + pinFieldHtml('New 6-digit PIN', true,
+    'Managers need a 6-digit PIN. This replaces ' + normName(a.name) + '’s PIN and signs them out on their devices.') + '</div>';
   h += '<div class="err" id="fErr" role="alert"></div>';
   h += '<div class="dlgbtns"><button type="button" class="btn" data-a="cancel">Cancel</button>' +
     '<button type="button" class="btn pri" id="fSave">' + (isNew ? '<i class="fas fa-user-plus"></i>Create account' : '<i class="fas fa-floppy-disk"></i>Save changes') + '</button></div>';
@@ -44064,12 +44106,25 @@ function openAccountDlg(a) {
     applyAll();
   });
   boxes.forEach(function (b) { b.addEventListener('change', paint); });
-  el('fMgr').addEventListener('change', paint);
+  var fMgr = el('fMgr'), pinSync = null;
+  // The PIN field is in use: always when adding, and when editing only while it is shown for a promotion
+  function pinOn() { return !!el('fPin') && (isNew || (promoPin && fMgr.checked)); }
+  if (isNew) pinSync = wirePin(function () { return fMgr.checked; });
+  if (promoPin) wirePin(function () { return true; });
+  fMgr.addEventListener('change', function () {
+    try {
+      if (promoPin) {
+        el('fPromote').classList.toggle('hidden', !fMgr.checked);
+        el('fErr').textContent = '';
+      }
+      if (pinSync) pinSync();
+    } catch (e) {}
+    paint();
+  });
   applyAll();
-  if (isNew) wirePin();
   el('fSave').onclick = function () { saveAccount(a); };
   DLG.onEnter = function (t) {
-    if (t.id === 'fName' && el('fPin') && !el('fPin').value) { el('fPin').focus(); return; }
+    if (t.id === 'fName' && pinOn() && !el('fPin').value) { el('fPin').focus(); return; }
     saveAccount(a);
   };
   try { el('fName').focus(); } catch (e) {}
@@ -44086,10 +44141,10 @@ async function saveAccount(a) {
   var mgr = el('fMgr').checked;
   if (!all && !tabs.length && !mgr) { err.textContent = 'Choose at least one tab, or make them a manager.'; return; }
   var access = all ? '*' : tabs;
-  var method, url, body, pin = '';
+  var method, url, body, pin = '', pp;
   if (isNew) {
     pin = String(el('fPin').value || '').trim();
-    var pp = pinProblem(pin);
+    pp = mgr ? mgrPinProblem(pin) : pinProblem(pin);
     if (pp) { err.textContent = pp; el('fPin').focus(); return; }
     method = 'POST'; url = '/api/staff/team';
     body = { name: name, pin: pin, access: access, is_manager: mgr };
@@ -44098,6 +44153,14 @@ async function saveAccount(a) {
     if (name !== normName(a.name)) body.name = name;
     if (accessKey(all, tabs) !== accessKey(yes(a.all), tabsOf(a))) body.access = access;
     if (mgr !== yes(a.is_manager)) body.is_manager = mgr;
+    // Making someone with a short PIN a manager: their new 6-digit PIN goes in the same request
+    var promo = el('fPromote');
+    if (body.is_manager === true && promo && !promo.classList.contains('hidden')) {
+      pin = String(el('fPin').value || '').trim();
+      pp = mgrPinProblem(pin);
+      if (pp) { err.textContent = pp; el('fPin').focus(); return; }
+      body.pin = pin;
+    }
     if (!Object.keys(body).length) { closeDlg(); return; }
     method = 'PUT'; url = '/api/staff/team/' + encodeURIComponent(a.staff_id);
   }
@@ -44107,8 +44170,8 @@ async function saveAccount(a) {
   finally { setBusy(btn, false); }
   if (authLost(r)) return;
   if (!r.ok) { err.textContent = errText(r, isNew ? 'Could not create the account' : 'Could not save the changes'); return; }
-  if (isNew) {
-    var acct = r.data.account || {};
+  if (isNew || body.pin) {
+    var acct = (r.data && r.data.account) || {};
     showPinCard(acct.name || name, pin, null);
   } else {
     closeDlg();
@@ -44119,18 +44182,18 @@ async function saveAccount(a) {
 
 // ---------- PINs ----------
 function openPinDlg(a) {
-  var me = isMe(a);
+  var me = isMe(a), six = yes(a.is_manager);
   var h = '<h3 id="dlgTitle"><i class="fas fa-key"></i>New PIN for ' + esc(a.name) + '</h3>' +
     '<p class="sm dlgtxt">' + (me
-      ? 'You will be signed out here and on your phones. Then sign in again with the new PIN.'
-      : esc(a.name) + ' is signed out on every phone and signs in again with the new PIN.') +
+      ? 'You will be signed out here and on your other devices. Then sign in again with the new PIN.'
+      : esc(a.name) + ' is signed out on every device and signs in again with the new PIN.') +
     (a.locked ? ' This also unlocks the account.' : '') + '</p>' +
-    pinFieldHtml('New PIN') +
+    pinFieldHtml(six ? 'New 6-digit PIN' : 'New PIN', six) +
     '<div class="err" id="fErr" role="alert"></div>' +
     '<div class="dlgbtns"><button type="button" class="btn" data-a="cancel">Cancel</button>' +
     '<button type="button" class="btn pri" id="fSave"><i class="fas fa-key"></i>Set new PIN</button></div>';
   openDlg(h, true);
-  wirePin();
+  wirePin(function () { return six; });
   el('fSave').onclick = function () { savePin(a); };
   DLG.onEnter = function () { savePin(a); };
   try { el('fPin').focus(); } catch (e) {}
@@ -44140,7 +44203,7 @@ async function savePin(a) {
   if (!btn || btn.disabled) return;
   err.textContent = '';
   var pin = String(el('fPin').value || '').trim();
-  var pp = pinProblem(pin);
+  var pp = yes(a.is_manager) ? mgrPinProblem(pin) : pinProblem(pin);
   if (pp) { err.textContent = pp; el('fPin').focus(); return; }
   var me = isMe(a);
   setBusy(btn, true, 'Saving…');
@@ -44228,7 +44291,7 @@ async function onListClick(e) {
   else if (act === 'unlock') rowCall(btn, 'POST', base + '/unlock', {}, a.name + ' can sign in again.', 'Could not unlock');
   else if (act === 'signout') {
     if (!(await ask({ title: 'Sign out ' + a.name + '?', icon: 'fa-right-from-bracket', ok: 'Sign out',
-      html: who + ' is signed out on ' + (n === 1 ? '1 phone' : n + ' phones') + ' and needs their PIN to sign in again.' + (me ? ' This signs you out here too.' : '') }))) return;
+      html: who + ' is signed out on ' + plural(n, 'device') + ' and needs their PIN to sign in again.' + (me ? ' This signs you out here too.' : '') }))) return;
     rowCall(btn, 'POST', base + '/signout', {}, a.name + ' is signed out.', 'Could not sign out');
   } else if (act === 'disable') {
     if (!(await ask({ title: 'Disable ' + a.name + '?', icon: 'fa-ban', ok: 'Disable', danger: true,
@@ -44267,6 +44330,10 @@ async function onListClick(e) {
     var v = this.value.replace(/\\D/g, '').slice(0, 6);
     if (v !== this.value) this.value = v;
   });
+  // Browsers that can't draw a text field as dots get a password field, so the PIN is never shown in clear
+  try {
+    if (!(window.CSS && CSS.supports && CSS.supports('-webkit-text-security', 'disc'))) el('lgPin').type = 'password';
+  } catch (e) {}
   el('whoOut').onclick = function () { signOut(this); };
   el('dnOut').onclick = function () { signOut(this); };
   el('erRetry').onclick = function () { load(); };
@@ -59732,7 +59799,7 @@ app.get('/admin/dashboard', (c) => {
                             </details>
                             <details class="bg-gray-50 p-4 rounded-lg">
                                 <summary class="font-bold text-gray-800 cursor-pointer">How do I add staff users?</summary>
-                                <p class="text-gray-700 mt-2 text-sm">Settings → User Management → Add New User. Assign role and permissions.</p>
+                                <p class="text-gray-700 mt-2 text-sm">User Management → Add staff: give each person a name, a PIN and the Ops app tabs they can use.</p>
                             </details>
                             <details class="bg-gray-50 p-4 rounded-lg">
                                 <summary class="font-bold text-gray-800 cursor-pointer">What about offline access?</summary>
@@ -61704,7 +61771,7 @@ app.get('/admin/dashboard', (c) => {
                                 <i class="fas fa-users-cog w-5 text-gray-600"></i>
                                 <span class="font-medium text-gray-700">User Management</span>
                             </div>
-                            <input type="checkbox" data-menu="users" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                            <input type="checkbox" data-menu="opsstaff" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
                         </label>
                     </div>
                 </div>
@@ -62982,7 +63049,7 @@ app.get('/admin/dashboard', (c) => {
                 </a>
             </div>
             <iframe id="opsStaffFrame" data-src="/admin/ops-staff?embed=1" title="User management"
-                    style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
+                    style="width:100%;height:calc(100vh - 24px);min-height:520px;border:0;border-radius:12px;background:transparent;"></iframe>
         </div>
     </div>
 
@@ -73092,13 +73159,22 @@ app.get('/admin/dashboard', (c) => {
       // ========== MENU VISIBILITY SETTINGS ==========
       
       const MENU_VISIBILITY_KEY = 'admin_menu_visibility';
-      
+
+      // User Management used to be the sidebar item 'users'; it is now 'opsstaff'. A choice saved under the old key still applies.
+      function menuVisCompat(settings) {
+        if (settings && typeof settings === 'object' && settings.users !== undefined) {
+          if (settings.opsstaff === undefined) settings.opsstaff = settings.users;
+          delete settings.users;
+        }
+        return settings;
+      }
+
       // Load menu visibility settings
       function loadMenuVisibilitySettings() {
         const savedSettings = localStorage.getItem(MENU_VISIBILITY_KEY);
         if (savedSettings) {
           try {
-            const settings = JSON.parse(savedSettings);
+            const settings = menuVisCompat(JSON.parse(savedSettings));
             
             // Update checkboxes
             document.querySelectorAll('.menu-visibility-toggle').forEach(checkbox => {
@@ -73133,12 +73209,17 @@ app.get('/admin/dashboard', (c) => {
       // Apply menu visibility based on settings
       function applyMenuVisibility(settings = null) {
         if (!settings) {
-          const saved = localStorage.getItem(MENU_VISIBILITY_KEY);
-          if (saved) {
-            settings = JSON.parse(saved);
+          try {
+            const saved = localStorage.getItem(MENU_VISIBILITY_KEY);
+            if (saved) {
+              settings = JSON.parse(saved);
+            }
+          } catch (e) {
+            settings = null;
           }
         }
-        
+
+        settings = menuVisCompat(settings);
         if (!settings) return;
         
         // Apply visibility to each menu item
@@ -73171,6 +73252,8 @@ app.get('/admin/dashboard', (c) => {
       });
 
       function logout() {
+        // Also end the Ops manager sign-in made in User Management, so the next person at this PC gets the PIN prompt
+        try { fetch('/api/staff/auth/logout', { method: 'POST', keepalive: true, credentials: 'same-origin' }).catch(() => {}); } catch (e) {}
         localStorage.removeItem('admin_user');
         localStorage.removeItem('admin_token');
         window.location.href = '/admin/login';
