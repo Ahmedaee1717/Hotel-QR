@@ -43260,7 +43260,7 @@ app.get('/admin/ops-staff', (c) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="robots" content="noindex">
-<title>Staff app access</title>
+<title>User Management</title>
 <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -43427,7 +43427,7 @@ body.embed .toast.show{transform:translate(-50%,0)}
 </head>
 <body>
 <header class="top">
-  <h1><i class="fas fa-id-badge"></i>Staff app access</h1>
+  <h1><i class="fas fa-users-cog"></i>User Management</h1>
   <a href="/admin/dashboard" id="backLink"><i class="fas fa-arrow-left"></i> Dashboard</a>
 </header>
 <div class="wrap">
@@ -57741,11 +57741,8 @@ app.get('/admin/dashboard', (c) => {
                     <button data-tab="feedback" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-comments w-5"></i><span>Feedback</span>
                     </button>
-                    <button data-tab="users" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
-                        <i class="fas fa-users-cog w-5"></i><span>User Management</span>
-                    </button>
                     <button data-tab="opsstaff" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
-                        <i class="fas fa-id-badge w-5"></i><span>Staff App Access</span>
+                        <i class="fas fa-users-cog w-5"></i><span>User Management</span>
                     </button>
                 </div>
                 
@@ -62953,21 +62950,21 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
-    <!-- Staff App Access: name + PIN accounts for the Ops app (embedded page, signs in with an Ops manager account) -->
+    <!-- User Management: name + PIN accounts for the Ops staff app (embedded page, signs in with an Ops manager account) -->
     <div id="opsstaffTab" class="tab-content hidden">
         <div class="bg-white border-2 border-indigo-200 rounded-lg p-4 mb-6">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div>
                     <h3 class="text-xl font-bold">
-                        <i class="fas fa-id-badge mr-2 text-indigo-600"></i>Staff App Access
+                        <i class="fas fa-users-cog mr-2 text-indigo-600"></i>User Management
                     </h3>
-                    <p class="text-sm text-gray-600">Who can sign in to the Ops app with a name and PIN, which tabs each person sees (Chats, Beach, Restaurant), and whether sign-in is required. Changes need an Ops manager account.</p>
+                    <p class="text-sm text-gray-600">Who can use the Ops staff app and which tabs each person sees. Staff sign in with their name and a PIN.</p>
                 </div>
                 <a href="/admin/ops-staff" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:underline whitespace-nowrap">
                     <i class="fas fa-up-right-from-square mr-1"></i>Open full screen
                 </a>
             </div>
-            <iframe id="opsStaffFrame" data-src="/admin/ops-staff?embed=1" title="Staff app access"
+            <iframe id="opsStaffFrame" data-src="/admin/ops-staff?embed=1" title="User management"
                     style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
         </div>
     </div>
@@ -64990,6 +64987,10 @@ app.get('/admin/dashboard', (c) => {
       }
       
       function showTab(tab, clickedButton) {
+        if (tab === 'users') {
+          tab = 'opsstaff';
+          clickedButton = document.querySelector('.sidebar-btn[data-tab="opsstaff"]') || clickedButton;
+        }
         currentTab = tab;
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => btn.classList.remove('tab-active'));
@@ -65010,7 +65011,6 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'mainrestaurant') loadRestaurantSetupFrame();
         if (tab === 'opsstaff') lazyFrame('opsStaffFrame');
         if (tab === 'chatbot') chatbotSub(window.__cbSub || 'agent');
-        if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
           console.log('📊 Analytics tab clicked!', {
