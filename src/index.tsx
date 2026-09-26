@@ -43823,6 +43823,7 @@ function showLogin(info) {
     return;
   }
   closeDlg();
+  try { localStorage.removeItem('opsManageSignin'); } catch (e) {}
   S = { accounts: [], settings: {}, me: null };
   el('lgInfo').textContent = info || '';
   el('lgErr').textContent = '';
@@ -43900,7 +43901,8 @@ async function signIn(ev) {
     return;
   }
   // Lets the dashboard's Logout end this sign-in (and only this kind) on a shared PC
-  if (!FROM_APP) { try { localStorage.setItem('opsManageSignin', '1'); } catch (e) {} }
+  // (holds the sign-in's end time; the Ops app's own sign-in clears it)
+  if (!FROM_APP) { try { localStorage.setItem('opsManageSignin', String(Date.now() + 3600000)); } catch (e) {} }
   el('lgInfo').textContent = '';
   load();
 }
@@ -44024,7 +44026,8 @@ function rowHtml(a) {
     (n && a.last_seen_at ? '<span class="sub">Last active ' + esc(rel(a.last_seen_at)) + '</span>' : '') + '</div>';
   var b = actBtn('edit', id, 'fa-pen', 'Edit') + actBtn('pin', id, 'fa-key', 'New PIN');
   if (a.locked) b += actBtn('unlock', id, 'fa-lock-open', 'Unlock', 'warnb');
-  if (n) b += actBtn('signout', id, 'fa-right-from-bracket', 'Sign out devices');
+  // Also offered with no live session: devices it signed in on before stay trusted until signed out
+  if (n || Number(a.devices) > 0) b += actBtn('signout', id, 'fa-right-from-bracket', 'Sign out devices');
   if (!me) {
     b += on ? actBtn('disable', id, 'fa-ban', 'Disable') : actBtn('enable', id, 'fa-circle-check', 'Enable', 'okb');
     b += actBtn('delete', id, 'fa-trash-can', 'Delete', 'danger');
@@ -44300,8 +44303,9 @@ async function onListClick(e) {
   else if (act === 'pin') openPinDlg(a);
   else if (act === 'unlock') rowCall(btn, 'POST', base + '/unlock', {}, a.name + ' can sign in again.', 'Could not unlock');
   else if (act === 'signout') {
+    var dn = Math.max(n, Number(a.devices) || 0);
     if (!(await ask({ title: 'Sign out ' + a.name + '?', icon: 'fa-right-from-bracket', ok: 'Sign out',
-      html: who + ' is signed out on ' + plural(n, 'device') + ' and needs their PIN to sign in again.' + (me ? ' This signs you out here too.' : '') }))) return;
+      html: who + ' is signed out on ' + plural(dn, 'device') + ' and needs their PIN to sign in again. Use this for a lost or shared phone.' + (me ? ' This signs you out here too.' : '') }))) return;
     rowCall(btn, 'POST', base + '/signout', {}, a.name + ' is signed out.', 'Could not sign out');
   } else if (act === 'disable') {
     if (!(await ask({ title: 'Disable ' + a.name + '?', icon: 'fa-ban', ok: 'Disable', danger: true,
@@ -54693,6 +54697,7 @@ app.get('/staff/app', (c) => {
             if(!r){ opsRenderPin(); opsLgErr('No connection — try again'); return; }
             if(r.ok && j && j.success!==false && j.account){
                 OPS_ME=j.account; OPS_MODE='account'; opsMeAt=Date.now(); opsGen++; opsMeRetry=false;
+                try{ localStorage.removeItem('opsManageSignin'); }catch(e){}
                 opsRemember(opsName() || name);
                 opsHideLogin();
                 opsRenderPin();
@@ -54802,7 +54807,6 @@ app.get('/staff/app', (c) => {
                 if(opsPin || (ni && String(ni.value||'').trim())) return false;
             }
             if(typeof rstPick!=='undefined' && rstPick) return false;
-            if(open('rstPad')) return false;
             if(['rstRoom','bchSearch','bchRoom'].some(function(id){ var el=document.getElementById(id); return !!el && String(el.value||'').trim()!==''; })) return false;
             var ae=document.activeElement;
             if(ae && ae!==document.body){
@@ -73387,8 +73391,9 @@ app.get('/admin/dashboard', (c) => {
         // Also end the Ops manager sign-in made in User Management, so the next person at this PC gets the
         // PIN prompt; an Ops app shift sign-in in the same browser is left alone.
         try {
-          if (localStorage.getItem('opsManageSignin') === '1') {
-            localStorage.removeItem('opsManageSignin');
+          const until = Number(localStorage.getItem('opsManageSignin')) || 0;
+          localStorage.removeItem('opsManageSignin');
+          if (until > Date.now()) {
             fetch('/api/staff/auth/logout', { method: 'POST', keepalive: true, credentials: 'same-origin' }).catch(() => {});
           }
         } catch (e) {}
@@ -95967,11 +95972,13 @@ const OPS_LOCK_SQL = `
   RETURNING locked_until`
 
 // Trusted device: the same reservation-before-PIN-work, on the (device, account) row.
+// The account is resolved inside the statement so it costs the same for every name.
 const OPS_DEV_ATTEMPT_SQL = `
   UPDATE ops_devices SET
     fails = CASE WHEN locked_until IS NOT NULL AND locked_until > datetime('now') THEN fails ELSE fails + 1 END
-  WHERE token_hash = ? AND staff_id = ?
-  RETURNING fails, lock_count, locked_until,
+  WHERE token_hash = ?
+    AND staff_id = (SELECT staff_id FROM ops_staff WHERE property_id = ? AND name_key = ? AND is_active = 1)
+  RETURNING staff_id, fails, lock_count, locked_until,
     (locked_until IS NOT NULL AND locked_until > datetime('now')) AS locked`
 
 // A trusted device's 1st lock is 15 minutes; the next one ends the trust (the name lock applies from then on).
@@ -96324,17 +96331,21 @@ app.post('/api/staff/auth/login', async (c) => {
     const nKey = 'n:' + OPS_PID + ':' + nameKey
     const devToken = opsCookieToken(c, OPS_DEV_COOKIE)
     const devTh = devToken ? await opsSha256Hex('dev:' + devToken) : ''
-    const found: any = await DB.prepare(`
-      SELECT staff_id, name, access, is_manager, is_active, pin_hash FROM ops_staff
-      WHERE property_id = ? AND name_key = ?
-    `).bind(OPS_PID, nameKey).first()
-    const acct: any = found && found.is_active ? found : null
-    const isMgr = !!(found && found.is_manager)
-
     // Reserve the attempt before any PIN work, so parallel requests can't get
     // more than OPS_NAME_FAILS guesses verified: on this device's own row when the
-    // account signed in here before, otherwise on the name.
-    const dev: any = acct && devTh ? await DB.prepare(OPS_DEV_ATTEMPT_SQL).bind(devTh, acct.staff_id).first() : null
+    // account signed in here before, otherwise on the name. The device step runs
+    // whenever a device cookie is sent, whatever the name, so timing tells nothing.
+    const got: any[] = await Promise.all([
+      DB.prepare(`
+        SELECT staff_id, name, access, is_manager, is_active, pin_hash FROM ops_staff
+        WHERE property_id = ? AND name_key = ?
+      `).bind(OPS_PID, nameKey).first(),
+      devTh ? DB.prepare(OPS_DEV_ATTEMPT_SQL).bind(devTh, OPS_PID, nameKey).first() : Promise.resolve(null)
+    ])
+    const found: any = got[0]
+    const acct: any = found && found.is_active ? found : null
+    const isMgr = !!(found && found.is_manager)
+    const dev: any = acct && got[1] && Number(got[1].staff_id) === Number(acct.staff_id) ? got[1] : null
     if (dev) {
       if (dev.locked) return opsLocked(c, dev.locked_until, false)
       const dFails = Number(dev.fails) || 1
@@ -96399,19 +96410,24 @@ async function opsSignedIn(c: any, b: any, acct: any, nKey: string, devToken: st
   const devTh = await opsSha256Hex('dev:' + dev)
   const expMs = Date.now() + hours * 3600000
   const expires = opsSqlTime(expMs)
-  await DB.batch([
-    DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind(nKey),
+  // Every write is conditional on the account still being active with the PIN
+  // that was just verified, so a PIN reset or disable landing mid-sign-in wins.
+  const still = `EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND is_active = 1 AND pin_hash = ?)`
+  const res: any[] = await DB.batch([
     DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ? AND expires_at <= datetime('now')`).bind(acct.staff_id),
     DB.prepare(`
       INSERT INTO ops_sessions (token_hash, staff_id, property_id, expires_at, last_seen_at, ip, user_agent)
-      VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
-    `).bind(th, acct.staff_id, OPS_PID, expires, ip || null, String(c.req.header('User-Agent') || '').slice(0, 200) || null),
-    DB.prepare(`UPDATE ops_staff SET last_login_at = datetime('now') WHERE staff_id = ?`).bind(acct.staff_id),
+      SELECT ?, ?, ?, ?, datetime('now'), ?, ? WHERE ${still}
+    `).bind(th, acct.staff_id, OPS_PID, expires, ip || null, String(c.req.header('User-Agent') || '').slice(0, 200) || null, acct.staff_id, acct.pin_hash),
+    DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ? AND ${still}`).bind(nKey, acct.staff_id, acct.pin_hash),
+    DB.prepare(`UPDATE ops_staff SET last_login_at = datetime('now') WHERE staff_id = ? AND is_active = 1 AND pin_hash = ?`).bind(acct.staff_id, acct.pin_hash),
     DB.prepare(`
-      INSERT INTO ops_devices (token_hash, staff_id, last_ok_at) VALUES (?, ?, datetime('now'))
+      INSERT INTO ops_devices (token_hash, staff_id, last_ok_at) SELECT ?, ?, datetime('now') WHERE ${still}
       ON CONFLICT(token_hash, staff_id) DO UPDATE SET fails = 0, lock_count = 0, locked_until = NULL, last_ok_at = datetime('now')
-    `).bind(devTh, acct.staff_id)
+    `).bind(devTh, acct.staff_id, acct.staff_id, acct.pin_hash)
   ])
+  const made = res && res[1] && res[1].meta ? Number(res[1].meta.changes) || 0 : 0
+  if (!made) return opsErr(c, 401, 'wrong_credentials', 'Wrong name or PIN')
   opsBackground(c, DB.batch([
     DB.prepare(`DELETE FROM ops_login_attempts WHERE updated_at < datetime('now', '-30 days') AND (locked_until IS NULL OR locked_until < datetime('now'))`),
     DB.prepare(`DELETE FROM ops_sessions WHERE expires_at < datetime('now', '-30 days')`),
@@ -96469,7 +96485,8 @@ app.get('/api/staff/auth/me', async (c) => {
 })
 
 // ── Staff account management (manager session only, enforced by opsGate) ──
-function opsTeamRow(r: any, sess: any, lockedUntil: any) {
+// lockedUntil: the later of the name's lock and any of the account's trusted-device locks.
+function opsTeamRow(r: any, sess: any, lockedUntil: any, devices: number = 0) {
   return {
     ...opsView(r),
     is_active: r.is_active ? 1 : 0,
@@ -96477,6 +96494,7 @@ function opsTeamRow(r: any, sess: any, lockedUntil: any) {
     last_login_at: opsIso(r.last_login_at),
     created_at: opsIso(r.created_at),
     sessions: sess ? Number(sess.n) || 0 : 0,
+    devices,
     last_seen_at: sess ? opsIso(sess.seen) : null,
     locked: !!lockedUntil,
     locked_until: lockedUntil ? opsIso(lockedUntil) : null,
@@ -96528,14 +96546,26 @@ app.get('/api/staff/team', async (c) => {
         FROM ops_sessions WHERE property_id = ? GROUP BY staff_id
       `).bind(pid),
       DB.prepare(`SELECT key, locked_until FROM ops_login_attempts WHERE key LIKE ? AND locked_until > datetime('now')`).bind('n:' + pid + ':%'),
-      DB.prepare(OPS_SETTINGS_SQL)
+      DB.prepare(OPS_SETTINGS_SQL),
+      DB.prepare(`
+        SELECT d.staff_id, COUNT(*) AS n, MAX(CASE WHEN d.locked_until > datetime('now') THEN d.locked_until END) AS lu
+        FROM ops_devices d JOIN ops_staff a ON a.staff_id = d.staff_id
+        WHERE a.property_id = ? GROUP BY d.staff_id
+      `).bind(pid)
     ])
     const sess = new Map<number, any>()
     for (const s of res[1].results || []) sess.set(Number(s.staff_id), s)
     const locks = new Map<string, any>()
     for (const l of res[2].results || []) locks.set(String(l.key), l.locked_until)
-    const accounts = (res[0].results || []).map((r: any) =>
-      opsTeamRow(r, sess.get(Number(r.staff_id)), locks.get('n:' + pid + ':' + r.name_key)))
+    const devs = new Map<number, any>()
+    for (const d of res[4].results || []) devs.set(Number(d.staff_id), d)
+    const accounts = (res[0].results || []).map((r: any) => {
+      const d = devs.get(Number(r.staff_id))
+      const nameLock = locks.get('n:' + pid + ':' + r.name_key) || null
+      const devLock = d && d.lu ? d.lu : null
+      const lock = nameLock && devLock ? (String(nameLock) > String(devLock) ? nameLock : devLock) : (nameLock || devLock)
+      return opsTeamRow(r, sess.get(Number(r.staff_id)), lock, d ? Number(d.n) || 0 : 0)
+    })
     opsCfg = opsCfgFrom(res[3].results || [])
     c.header('Cache-Control', 'no-store')
     return c.json({
