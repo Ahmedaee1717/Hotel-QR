@@ -95690,7 +95690,7 @@ const OPS_COOKIE = '__Host-ops_sid'
 const OPS_CACHE_MS = 30000
 const OPS_SESSION_HOURS = [12, 24, 168, 720]
 const OPS_NAME_FAILS = 5
-const OPS_IP_FAILS = 30
+const OPS_IP_FAILS = 50
 const OPS_LOCK_FOREVER = '9999-12-31 00:00:00'
 // Verified against when the name is unknown or disabled, so that costs the same time as a wrong PIN.
 const OPS_DUMMY_HASH = 'pbkdf2h$100000$b3BzLWR1bW15LXNhbHQhIQ==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
@@ -95731,12 +95731,13 @@ const OPS_LOCK_SQL = `
   WHERE key = ? AND (locked_until IS NULL OR locked_until <= datetime('now'))
   RETURNING locked_until`
 
-// Wrong tries per network address in a 15-minute window; too many locks it for an hour.
+// Wrong tries per network address in a 15-minute window; too many locks it for 15 minutes.
+// Kept loose: every phone on the hotel Wi-Fi shares one address, and the per-name lock is the real guard.
 const OPS_IP_SQL = `
   INSERT INTO ops_login_attempts (key, fails, window_start, updated_at) VALUES (?, 1, datetime('now'), datetime('now'))
   ON CONFLICT(key) DO UPDATE SET
     fails = CASE WHEN window_start IS NULL OR window_start <= datetime('now', '-15 minutes') THEN 1 ELSE fails + 1 END,
-    locked_until = CASE WHEN window_start > datetime('now', '-15 minutes') AND fails + 1 >= ? THEN datetime('now', '+60 minutes') ELSE locked_until END,
+    locked_until = CASE WHEN window_start > datetime('now', '-15 minutes') AND fails + 1 >= ? THEN datetime('now', '+15 minutes') ELSE locked_until END,
     window_start = CASE WHEN window_start IS NULL OR window_start <= datetime('now', '-15 minutes') THEN datetime('now') ELSE window_start END,
     updated_at = datetime('now')`
 
