@@ -43887,9 +43887,11 @@ async function signIn(ev) {
     return;
   }
   setBusy(btn, true, 'Signing in…');
-  var r;
-  // purpose 'manage': the server keeps this sign-in short (1 hour at most, gone when the browser closes)
-  try { r = await api('POST', '/api/staff/auth/login', { name: name, pin: pin, purpose: 'manage' }); }
+  var r, body = { name: name, pin: pin };
+  // purpose 'manage': the server keeps this sign-in short (1 hour at most, gone when the browser closes).
+  // Not from the Ops app: there the same cookie is the phone's own shift sign-in.
+  if (!FROM_APP) body.purpose = 'manage';
+  try { r = await api('POST', '/api/staff/auth/login', body); }
   finally { setBusy(btn, false); }
   el('lgPin').value = '';
   if (!r.ok) {
@@ -43897,6 +43899,8 @@ async function signIn(ev) {
     try { el('lgPin').focus(); } catch (e) {}
     return;
   }
+  // Lets the dashboard's Logout end this sign-in (and only this kind) on a shared PC
+  if (!FROM_APP) { try { localStorage.setItem('opsManageSignin', '1'); } catch (e) {} }
   el('lgInfo').textContent = '';
   load();
 }
@@ -43905,6 +43909,7 @@ async function signOut(btn) {
   var r;
   try { r = await api('POST', '/api/staff/auth/logout', {}); }
   finally { setBusy(btn, false); }
+  try { localStorage.removeItem('opsManageSignin'); } catch (e) {}
   if (r.status === 0) { toast(errText(r), 'err'); return; }
   showLogin('You are signed out.');
 }
@@ -54385,6 +54390,8 @@ app.get('/staff/app', (c) => {
                 var on=document.querySelector('.tab.on') || document.querySelector('.tab');
                 if(on && typeof on.onclick==='function') on.onclick();
             }
+            var rt=opsResumeTake();
+            if(rt && rt.dataset.tab!=='chats' && typeof rt.onclick==='function') rt.onclick();
             opsChip();
             try{ bchWhoLabel(); }catch(e){}
             try{ rstWhoLabel(); }catch(e){}
@@ -54415,6 +54422,32 @@ app.get('/staff/app', (c) => {
             if(bt && typeof bt.onclick==='function') bt.onclick();
         }catch(e){ console.error('beach return', e); }
     }
+    // A self-update reload comes back to the same tab, day and slot
+    var opsResumeState=null;
+    try{
+        var opsRs=JSON.parse(sessionStorage.getItem('opsResume')||'null');
+        sessionStorage.removeItem('opsResume');
+        if(opsRs && opsRs.at && Math.abs(Date.now()-opsRs.at)<600000) opsResumeState=opsRs;
+    }catch(e){}
+    function opsResumeSave(){
+        try{
+            var on=document.querySelector('.tab.on');
+            sessionStorage.setItem('opsResume', JSON.stringify({ at:Date.now(), tab:on?on.dataset.tab:'',
+                bch:{ date:bchDateStr, slot:bchSlot }, rst:{ date:rstDateStr, slot:rstSlotAuto?null:rstSlot } }));
+        }catch(e){}
+    }
+    function opsResumeTake(){
+        var rs=opsResumeState; opsResumeState=null;
+        try{
+            if(!rs || ['chats','beach','rest'].indexOf(rs.tab)<0 || !opsCan(rs.tab)) return null;
+            if(rs.tab==='beach' && rs.bch) opsBeachSet(rs.bch);
+            if(rs.tab==='rest' && rs.rst){
+                if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(rs.rst.date||''))) rstDateStr=String(rs.rst.date);
+                if(rs.rst.slot!=null && rs.rst.slot!==''){ rstSlot=rs.rst.slot; rstSlotAuto=false; } else rstSlotAuto=true;
+            }
+            return document.querySelector('.tab[data-tab="'+rs.tab+'"]');
+        }catch(e){ return null; }
+    }
     // Signed in: show only this account's tabs, open the first one (Chats first when allowed)
     function opsApplyAccess(){
         try{
@@ -54431,6 +54464,7 @@ app.get('/staff/app', (c) => {
             var target=null;
             allowed.forEach(function(t){ if(t.classList.contains('on')) target=t; });
             if(!target) target=allowed[0] || null;
+            var rt=opsResumeTake(); if(rt) target=rt;
             var ret=opsBeachRet; opsBeachRet=null;
             if(ret && opsCan('beach')){
                 var bt=document.querySelector('.tab[data-tab="beach"]');
@@ -54455,14 +54489,23 @@ app.get('/staff/app', (c) => {
             try{ rstWhoLabel(); }catch(e){}
         }catch(e){ console.error('ops access', e); }
     }
+    // "Abd El Rahman Ali" → "Abd El Rahman", "El Sayed Omar" → "El Sayed", "Mona Adel" → "Mona"
+    function opsFirstName(n){
+        try{
+            var w=String(n||'').split(' ').filter(Boolean), out=[];
+            var joiner=/^(abd|abdel|abdul|abdal|abu|abo|el|al|ibn|bin|bint)$/i;
+            for(var i=0;i<w.length;i++){ out.push(w[i]); if(!joiner.test(w[i])) break; }
+            return out.join(' ') || String(n||'');
+        }catch(e){ return String(n||''); }
+    }
     function opsChip(){
         try{
             var b=document.getElementById('opsMeBtn'); if(!b) return;
             document.body.classList.toggle('ops-signed', OPS_MODE==='account' && !!OPS_ME);
             if(OPS_MODE==='account' && OPS_ME){
                 b.classList.remove('si');
-                // First word only, so the chip fits a phone header; the full name is in the account sheet
-                b.textContent='👤 '+(opsName().split(' ')[0] || opsName());
+                // First name only, so the chip fits a phone header; the full name is in the account sheet
+                b.textContent='👤 '+opsFirstName(opsName());
                 b.title='Signed in as '+opsName();
                 b.setAttribute('aria-label', 'Signed in as '+opsName());
                 b.hidden=false;
@@ -54759,6 +54802,8 @@ app.get('/staff/app', (c) => {
                 if(opsPin || (ni && String(ni.value||'').trim())) return false;
             }
             if(typeof rstPick!=='undefined' && rstPick) return false;
+            if(open('rstPad')) return false;
+            if(['rstRoom','bchSearch','bchRoom'].some(function(id){ var el=document.getElementById(id); return !!el && String(el.value||'').trim()!==''; })) return false;
             var ae=document.activeElement;
             if(ae && ae!==document.body){
                 var tn=String(ae.tagName||'').toUpperCase();
@@ -54781,6 +54826,7 @@ app.get('/staff/app', (c) => {
                 sessionStorage.setItem('opsReloadAt', String(now));
                 if(sessionStorage.getItem('opsReloadAt')!==String(now)) return false;
             }catch(e){ return false; }
+            opsResumeSave();
             location.reload();
             return true;
         }catch(e){ return false; }
@@ -56709,10 +56755,11 @@ app.get('/staff/app', (c) => {
                 var isForeign = tr && tr.lang && tr.lang!=='unknown' && tr.lang!==STAFF_LANG;
                 if(role==='user' && isForeign) foreign=tr.lang;
                 var shown = isForeign ? tr.text : m.content;
+                var ln = isForeign ? esc(LANGNAME[tr.lang]||tr.lang).replace(/"/g,'&quot;') : '';
                 var html = '<div class="b '+role+'"><span class="rl">'+label+
-                    (isForeign?'<span class="langflag">'+(LANGNAME[tr.lang]||tr.lang)+'</span>':'')+'</span>'+esc(shown);
+                    (isForeign?'<span class="langflag">'+ln+'</span>':'')+'</span>'+esc(shown);
                 if(isForeign){
-                    html += '<span class="xl" data-orig="'+esc(m.content).replace(/"/g,'&quot;')+'" data-ln="'+(LANGNAME[tr.lang]||tr.lang)+'" data-showing="0" onclick="toggleOriginal(this)">Original ('+(LANGNAME[tr.lang]||tr.lang)+') — tap to show</span>';
+                    html += '<span class="xl" data-orig="'+esc(m.content).replace(/"/g,'&quot;')+'" data-ln="'+ln+'" data-showing="0" onclick="toggleOriginal(this)">Original ('+ln+') — tap to show</span>';
                 }
                 return html+'</div>';
             }).join('');
@@ -73337,8 +73384,14 @@ app.get('/admin/dashboard', (c) => {
       });
 
       function logout() {
-        // Also end the Ops manager sign-in made in User Management, so the next person at this PC gets the PIN prompt
-        try { fetch('/api/staff/auth/logout', { method: 'POST', keepalive: true, credentials: 'same-origin' }).catch(() => {}); } catch (e) {}
+        // Also end the Ops manager sign-in made in User Management, so the next person at this PC gets the
+        // PIN prompt; an Ops app shift sign-in in the same browser is left alone.
+        try {
+          if (localStorage.getItem('opsManageSignin') === '1') {
+            localStorage.removeItem('opsManageSignin');
+            fetch('/api/staff/auth/logout', { method: 'POST', keepalive: true, credentials: 'same-origin' }).catch(() => {});
+          }
+        } catch (e) {}
         localStorage.removeItem('admin_user');
         localStorage.removeItem('admin_token');
         window.location.href = '/admin/login';
@@ -95868,6 +95921,13 @@ const OPS_MANAGER_LOCK_MS = 24 * 3600000
 const OPS_MANAGER_PIN_DIGITS = 6
 // Verified against when the name is unknown or disabled, so that costs the same time as a wrong PIN.
 const OPS_DUMMY_HASH = 'pbkdf2h$100000$b3BzLWR1bW15LXNhbHQhIQ==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+// A phone or browser that has signed in to an account before is trusted for it
+// (ops_devices): wrong tries by someone else on the name don't lock it out. It
+// only skips the name lock — the PIN is still checked, with its own small limit.
+const OPS_DEV_COOKIE = '__Host-ops_dev'
+const OPS_DEV_DAYS = 180
+// During a D1 fault a cached session is still honoured, but only this long after it was last confirmed.
+const OPS_STALE_MS = 5 * 60000
 
 // Exact paths only: everything else under /api/staff/ (the native ring
 // service, the op-ring cron, the guest site, the legacy scanners) stays open.
@@ -95904,6 +95964,20 @@ const OPS_LOCK_SQL = `
                         ELSE datetime('now', '+15 minutes') END,
     updated_at = datetime('now')
   WHERE key = ? AND (locked_until IS NULL OR locked_until <= datetime('now'))
+  RETURNING locked_until`
+
+// Trusted device: the same reservation-before-PIN-work, on the (device, account) row.
+const OPS_DEV_ATTEMPT_SQL = `
+  UPDATE ops_devices SET
+    fails = CASE WHEN locked_until IS NOT NULL AND locked_until > datetime('now') THEN fails ELSE fails + 1 END
+  WHERE token_hash = ? AND staff_id = ?
+  RETURNING fails, lock_count, locked_until,
+    (locked_until IS NOT NULL AND locked_until > datetime('now')) AS locked`
+
+// A trusted device's 1st lock is 15 minutes; the next one ends the trust (the name lock applies from then on).
+const OPS_DEV_LOCK_SQL = `
+  UPDATE ops_devices SET lock_count = lock_count + 1, fails = 0, locked_until = datetime('now', '+15 minutes')
+  WHERE token_hash = ? AND staff_id = ? AND lock_count = 0 AND (locked_until IS NULL OR locked_until <= datetime('now'))
   RETURNING locked_until`
 
 // Wrong tries per network address in a 15-minute window; too many locks it for 15 minutes.
@@ -96042,12 +96116,12 @@ function opsMinutesLeft(until: any): number {
   return isNaN(t) ? 1 : Math.max(1, Math.ceil((t - Date.now()) / 60000))
 }
 
-function opsCookieToken(c: any): string {
+function opsCookieToken(c: any, cookieName: string = OPS_COOKIE): string {
   const raw = String(c.req.header('Cookie') || '')
   const parts = raw.split(';')
   for (let i = 0; i < parts.length; i++) {
     const eq = parts[i].indexOf('=')
-    if (eq > 0 && parts[i].slice(0, eq).trim() === OPS_COOKIE) {
+    if (eq > 0 && parts[i].slice(0, eq).trim() === cookieName) {
       const v = parts[i].slice(eq + 1).trim()
       if (/^[A-Za-z0-9_-]{43}$/.test(v)) return v
     }
@@ -96116,8 +96190,9 @@ async function opsSession(c: any): Promise<any> {
   } catch (e) {
     // D1 hiccup: answer from the stale entry for this token rather than failing
     // (a token never becomes valid again once it isn't, and `at` is left alone
-    // so the next call tries D1 again).
-    if (!hit) throw e
+    // so the next call tries D1 again). Too old an entry could hide a revocation
+    // made through another isolate, so then the lookup fails instead.
+    if (!hit || now - hit.at > OPS_STALE_MS) throw e
     console.error('ops session lookup (using the cached entry)', e)
     return hit.acct && hit.exp > now ? hit.acct : null
   }
@@ -96245,23 +96320,37 @@ app.post('/api/staff/auth/login', async (c) => {
       return c.json({ success: false, error: 'too_many_attempts', minutes_left: m, message: 'Too many wrong tries from this network. Try again in ' + m + ' min.' }, 429)
     }
 
-    // Reserve the attempt before any PIN work, so parallel requests can't
-    // get more than OPS_NAME_FAILS guesses verified.
     const nameKey = name.toLowerCase()
     const nKey = 'n:' + OPS_PID + ':' + nameKey
-    // The account is read alongside the reservation (no PIN work yet): whether the
-    // name belongs to a manager decides how long its 3rd+ lock lasts.
-    const got: any[] = await Promise.all([
-      DB.prepare(OPS_ATTEMPT_SQL).bind(nKey).first(),
-      DB.prepare(`
-        SELECT staff_id, name, access, is_manager, is_active, pin_hash FROM ops_staff
-        WHERE property_id = ? AND name_key = ?
-      `).bind(OPS_PID, nameKey).first()
-    ])
-    const slot: any = got[0]
-    const found: any = got[1]
+    const devToken = opsCookieToken(c, OPS_DEV_COOKIE)
+    const devTh = devToken ? await opsSha256Hex('dev:' + devToken) : ''
+    const found: any = await DB.prepare(`
+      SELECT staff_id, name, access, is_manager, is_active, pin_hash FROM ops_staff
+      WHERE property_id = ? AND name_key = ?
+    `).bind(OPS_PID, nameKey).first()
     const acct: any = found && found.is_active ? found : null
     const isMgr = !!(found && found.is_manager)
+
+    // Reserve the attempt before any PIN work, so parallel requests can't get
+    // more than OPS_NAME_FAILS guesses verified: on this device's own row when the
+    // account signed in here before, otherwise on the name.
+    const dev: any = acct && devTh ? await DB.prepare(OPS_DEV_ATTEMPT_SQL).bind(devTh, acct.staff_id).first() : null
+    if (dev) {
+      if (dev.locked) return opsLocked(c, dev.locked_until, false)
+      const dFails = Number(dev.fails) || 1
+      if (dFails <= OPS_NAME_FAILS && await opsVerifyPin(pepper, pin, acct.pin_hash)) {
+        return opsSignedIn(c, b, acct, nKey, devToken, ip)
+      }
+      if (dFails <= OPS_NAME_FAILS) await DB.prepare(OPS_IP_SQL).bind(ipKey, OPS_IP_FAILS).run()
+      if (dFails < OPS_NAME_FAILS) return opsErr(c, 401, 'wrong_credentials', 'Wrong name or PIN')
+      const l: any = await DB.prepare(OPS_DEV_LOCK_SQL).bind(devTh, acct.staff_id).first()
+      if (l) return opsLocked(c, l.locked_until, true)
+      // Locked here once already: this device stops being trusted, so its next tries count on the name.
+      await DB.prepare(`DELETE FROM ops_devices WHERE token_hash = ? AND staff_id = ? AND lock_count >= 1 AND (locked_until IS NULL OR locked_until <= datetime('now'))`).bind(devTh, acct.staff_id).run()
+      return opsErr(c, 401, 'wrong_credentials', 'Wrong name or PIN')
+    }
+
+    const slot: any = await DB.prepare(OPS_ATTEMPT_SQL).bind(nKey).first()
     if (slot && slot.locked) {
       let until = slot.locked_until
       // A manager's name is never locked for more than 24 hours: a longer lock
@@ -96288,39 +96377,53 @@ app.post('/api/staff/auth/login', async (c) => {
       }
       return opsErr(c, 401, 'wrong_credentials', 'Wrong name or PIN')
     }
-
-    // purpose 'manage' (the manager page, often on a shared PC): at most 1 hour,
-    // and a browser-session cookie. The Ops app keeps normal sessions.
-    const manage = b.purpose === 'manage'
-    const cfg = await opsConfig(c.env)
-    const hours = manage ? Math.min(cfg.hours, 1) : cfg.hours
-    const token = b64urlBytes(crypto.getRandomValues(new Uint8Array(32)).buffer)
-    const th = await opsSha256Hex(token)
-    const expMs = Date.now() + hours * 3600000
-    const expires = opsSqlTime(expMs)
-    await DB.batch([
-      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind(nKey),
-      DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ? AND expires_at <= datetime('now')`).bind(acct.staff_id),
-      DB.prepare(`
-        INSERT INTO ops_sessions (token_hash, staff_id, property_id, expires_at, last_seen_at, ip, user_agent)
-        VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
-      `).bind(th, acct.staff_id, OPS_PID, expires, ip || null, String(c.req.header('User-Agent') || '').slice(0, 200) || null),
-      DB.prepare(`UPDATE ops_staff SET last_login_at = datetime('now') WHERE staff_id = ?`).bind(acct.staff_id)
-    ])
-    opsBackground(c, DB.batch([
-      DB.prepare(`DELETE FROM ops_login_attempts WHERE updated_at < datetime('now', '-30 days') AND (locked_until IS NULL OR locked_until < datetime('now'))`),
-      DB.prepare(`DELETE FROM ops_sessions WHERE expires_at < datetime('now', '-30 days')`)
-    ]))
-    const me = { ...opsView(acct), property_id: OPS_PID, expires_at: opsIso(expires) }
-    opsSessions.set(th, { acct: me, at: Date.now(), exp: expMs })
-    opsSetCookie(c, token, manage ? null : hours * 3600)
-    c.header('Cache-Control', 'no-store')
-    return c.json({ success: true, account: opsMe(me) })
+    return opsSignedIn(c, b, acct, nKey, devToken, ip)
   } catch (e) {
     console.error('ops login', e)
     return opsErr(c, 500, 'server_error', 'Could not sign in — try again')
   }
 })
+
+// Right PIN: new session, the name's wrong-try count (and any lock someone else
+// caused) cleared, and this device trusted for the account from now on.
+async function opsSignedIn(c: any, b: any, acct: any, nKey: string, devToken: string, ip: string) {
+  const DB = c.env.DB
+  // purpose 'manage' (the manager page, often on a shared PC): at most 1 hour,
+  // and a browser-session cookie. The Ops app keeps normal sessions.
+  const manage = b.purpose === 'manage'
+  const cfg = await opsConfig(c.env)
+  const hours = manage ? Math.min(cfg.hours, 1) : cfg.hours
+  const token = b64urlBytes(crypto.getRandomValues(new Uint8Array(32)).buffer)
+  const th = await opsSha256Hex(token)
+  const dev = devToken || b64urlBytes(crypto.getRandomValues(new Uint8Array(32)).buffer)
+  const devTh = await opsSha256Hex('dev:' + dev)
+  const expMs = Date.now() + hours * 3600000
+  const expires = opsSqlTime(expMs)
+  await DB.batch([
+    DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind(nKey),
+    DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ? AND expires_at <= datetime('now')`).bind(acct.staff_id),
+    DB.prepare(`
+      INSERT INTO ops_sessions (token_hash, staff_id, property_id, expires_at, last_seen_at, ip, user_agent)
+      VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
+    `).bind(th, acct.staff_id, OPS_PID, expires, ip || null, String(c.req.header('User-Agent') || '').slice(0, 200) || null),
+    DB.prepare(`UPDATE ops_staff SET last_login_at = datetime('now') WHERE staff_id = ?`).bind(acct.staff_id),
+    DB.prepare(`
+      INSERT INTO ops_devices (token_hash, staff_id, last_ok_at) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(token_hash, staff_id) DO UPDATE SET fails = 0, lock_count = 0, locked_until = NULL, last_ok_at = datetime('now')
+    `).bind(devTh, acct.staff_id)
+  ])
+  opsBackground(c, DB.batch([
+    DB.prepare(`DELETE FROM ops_login_attempts WHERE updated_at < datetime('now', '-30 days') AND (locked_until IS NULL OR locked_until < datetime('now'))`),
+    DB.prepare(`DELETE FROM ops_sessions WHERE expires_at < datetime('now', '-30 days')`),
+    DB.prepare(`DELETE FROM ops_devices WHERE COALESCE(last_ok_at, created_at) < datetime('now', '-${OPS_DEV_DAYS} days')`)
+  ]))
+  const me = { ...opsView(acct), property_id: OPS_PID, expires_at: opsIso(expires) }
+  opsSessions.set(th, { acct: me, at: Date.now(), exp: expMs })
+  opsSetCookie(c, token, manage ? null : hours * 3600)
+  c.header('Set-Cookie', OPS_DEV_COOKIE + '=' + dev + '; Path=/; Max-Age=' + (OPS_DEV_DAYS * 86400) + '; HttpOnly; Secure; SameSite=Lax', { append: true })
+  c.header('Cache-Control', 'no-store')
+  return c.json({ success: true, account: opsMe(me) })
+}
 
 app.post('/api/staff/auth/logout', async (c) => {
   try {
@@ -96569,10 +96672,18 @@ app.put('/api/staff/team/:id', async (c) => {
         DELETE FROM ops_login_attempts WHERE key = ?
           AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND pin_hash = ?)
       `).bind('n:' + pid + ':' + nameKey, id, hash))
+      stmts.push(DB.prepare(`
+        DELETE FROM ops_devices WHERE staff_id = ?
+          AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND pin_hash = ?)
+      `).bind(id, id, hash))
     }
     if (!isActive && row.is_active) {
       stmts.push(DB.prepare(`
         DELETE FROM ops_sessions WHERE staff_id = ?
+          AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND is_active = 0)
+      `).bind(id, id))
+      stmts.push(DB.prepare(`
+        DELETE FROM ops_devices WHERE staff_id = ?
           AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND is_active = 0)
       `).bind(id, id))
     }
@@ -96625,7 +96736,8 @@ app.post('/api/staff/team/:id/pin', async (c) => {
     await DB.batch([
       DB.prepare(`UPDATE ops_staff SET pin_hash = ?, pin_digits = ?, updated_at = datetime('now') WHERE staff_id = ?`).bind(hash, b.pin.length, id),
       DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ?`).bind(id),
-      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind('n:' + pid + ':' + row.name_key)
+      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind('n:' + pid + ':' + row.name_key),
+      DB.prepare(`DELETE FROM ops_devices WHERE staff_id = ?`).bind(id)
     ])
     opsForget(id)
     return c.json({ success: true, pin_digits: b.pin.length })
@@ -96643,7 +96755,10 @@ app.post('/api/staff/team/:id/unlock', async (c) => {
   try {
     const row: any = await opsStaffRow(DB, opsStaffId(c), pid)
     if (!row) return opsErr(c, 404, 'not_found', 'That account no longer exists')
-    await DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind('n:' + pid + ':' + row.name_key).run()
+    await DB.batch([
+      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind('n:' + pid + ':' + row.name_key),
+      DB.prepare(`UPDATE ops_devices SET fails = 0, lock_count = 0, locked_until = NULL WHERE staff_id = ?`).bind(row.staff_id)
+    ])
     return c.json({ success: true })
   } catch (e) {
     console.error('ops team unlock', e)
@@ -96660,9 +96775,14 @@ app.post('/api/staff/team/:id/signout', async (c) => {
     const id = opsStaffId(c)
     const row: any = await opsStaffRow(DB, id, pid)
     if (!row) return opsErr(c, 404, 'not_found', 'That account no longer exists')
-    const res: any = await DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ?`).bind(id).run()
+    // Also ends the devices' trust (a lost phone must not skip the name lock)
+    const res: any[] = await DB.batch([
+      DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ?`).bind(id),
+      DB.prepare(`DELETE FROM ops_devices WHERE staff_id = ?`).bind(id)
+    ])
     opsForget(id)
-    return c.json({ success: true, signed_out: (res && res.meta && res.meta.changes) || 0 })
+    const s0 = res && res[0]
+    return c.json({ success: true, signed_out: (s0 && s0.meta && s0.meta.changes) || 0 })
   } catch (e) {
     console.error('ops team signout', e)
     return opsErr(c, 500, 'server_error', 'Could not sign the phones out')
@@ -96688,7 +96808,8 @@ app.delete('/api/staff/team/:id', async (c) => {
                OR EXISTS (SELECT 1 FROM ops_staff o WHERE o.property_id = ? AND o.is_manager = 1 AND o.is_active = 1 AND o.staff_id != ?))
       `).bind(id, pid, pid, id),
       DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ? AND NOT EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ?)`).bind(id, id),
-      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ? AND NOT EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ?)`).bind('n:' + pid + ':' + row.name_key, id)
+      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ? AND NOT EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ?)`).bind('n:' + pid + ':' + row.name_key, id),
+      DB.prepare(`DELETE FROM ops_devices WHERE staff_id = ? AND NOT EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ?)`).bind(id, id)
     ])
     const del = res && res[0]
     if (!del || !del.meta || !del.meta.changes) {
@@ -96876,6 +96997,13 @@ async function cacheKey(text: string, target: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// The model reports the source language; it is guest-influenced text, so only a
+// language-code shape is ever passed on or stored.
+function staffLangCode(v: any): string {
+  const s = String(v || '').trim().toLowerCase()
+  return /^[a-z]{2,3}(-[a-z]{2,4})?$/.test(s) ? s : 'unknown'
+}
+
 app.post('/api/staff/translate', async (c) => {
   const { DB } = c.env
   try {
@@ -96891,7 +97019,7 @@ app.post('/api/staff/translate', async (c) => {
     const hits = await translationCacheLookup(DB, keyed.map(k => k._key))
     for (const it of keyed) {
       const hit = hits.get(it._key)
-      if (hit) results.push({ id: it.id, lang: hit.src_lang, text: hit.translated })
+      if (hit) results.push({ id: it.id, lang: staffLangCode(hit.src_lang), text: hit.translated })
       else todo.push(it)
     }
 
@@ -96931,12 +97059,13 @@ app.post('/api/staff/translate', async (c) => {
             if (!src) continue
             // Reject misaligned results instead of caching a wrong translation
             if (String(out.src || '') !== String(src.text).slice(0, 12)) continue
-            results.push({ id: src.id, lang: out.lang || 'unknown', text: out.text || src.text })
+            const lang = staffLangCode(out.lang)
+            results.push({ id: src.id, lang, text: out.text || src.text })
             writes.push(DB.prepare(`
                 INSERT INTO staff_translations (cache_key, src_lang, target_lang, translated)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(cache_key) DO UPDATE SET translated = excluded.translated, src_lang = excluded.src_lang
-              `).bind(src._key, out.lang || 'unknown', target, out.text || src.text))
+              `).bind(src._key, lang, target, out.text || src.text))
           }
           if (writes.length) { try { await DB.batch(writes) } catch (e) {} }
           // anything the model skipped falls back to the original
