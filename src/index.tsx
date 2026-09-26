@@ -52836,12 +52836,57 @@ app.get('/staff/app', (c) => {
         #ringBar .rb-txt{flex:1;font-weight:700;font-size:.9rem;color:#fff}
         #ringBar button{background:#fff;color:#7d0a20;border:none;border-radius:999px;padding:12px 20px;font-weight:800;font-size:.8rem;cursor:pointer}
         @keyframes ringPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+
+        /* ── Staff sign-in ── */
+        header h1{flex-shrink:0;white-space:nowrap}
+        .hbtns{display:flex;align-items:center;gap:8px;min-width:0}
+        #bellBtn{flex-shrink:0}
+        .ops-me{flex-shrink:1;min-width:0;max-width:44vw;overflow:hidden;text-overflow:ellipsis;font-family:inherit}
+        @media(max-width:399px){.ops-me.si .t{display:none} body.ops-signed #bellBtn.on #bellTxt{display:none}}
+        .ops-none{line-height:1.6}
+        .ops-none i{display:block;font-size:1.6rem;color:var(--gold2);margin-bottom:10px}
+        .ops-none button{margin-top:14px}
+        body.ops-lock{overflow:hidden}
+        /* z 899: above the name dialog (895), below the ring bar (900) so Acknowledge stays tappable */
+        #opsLogin{position:fixed;inset:0;z-index:899;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:radial-gradient(120% 60% at 50% 0%,rgba(212,175,55,.16),transparent 62%),var(--ink)}
+        #opsLogin.open{display:block}
+        .ops-lg{min-height:100%;display:flex;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 20px calc(96px + env(safe-area-inset-bottom))}
+        .ops-card{width:100%;max-width:360px}
+        .ops-brand{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:700;text-align:center;line-height:1.1}
+        .ops-brand span{color:var(--gold2)}
+        .ops-lead{text-align:center;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:8px 0 22px}
+        .ops-in{width:100%;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.4);border-radius:14px;padding:14px 16px;color:var(--txt);font-size:1.05rem;font-weight:600;font-family:inherit}
+        .ops-in:focus{outline:none;border-color:var(--gold)}
+        .ops-in::placeholder{color:rgba(246,240,227,.38);font-weight:500}
+        .ops-recent{display:flex;gap:6px;margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+        .ops-recent::-webkit-scrollbar{display:none}
+        .ops-recent:empty{display:none}
+        .ops-rc{flex-shrink:0;max-width:62vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid rgba(212,175,55,.4);background:rgba(212,175,55,.1);color:var(--gold2);border-radius:999px;padding:8px 14px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit}
+        .ops-rc:active{background:rgba(212,175,55,.28)}
+        .ops-dots{display:flex;justify-content:center;gap:14px;margin:22px 0 8px}
+        .ops-dots i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(212,175,55,.7);transition:background .12s,border-color .12s}
+        .ops-dots i.opt{border-style:dashed;opacity:.5}
+        .ops-dots i.on{background:var(--gold);border-color:var(--gold);border-style:solid;opacity:1}
+        .ops-dots.shake{animation:opsShake .38s}
+        @keyframes opsShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+        .ops-err{min-height:2.5em;font-size:.8rem;line-height:1.4;color:#fda4af;text-align:center;font-weight:600}
+        .ops-pad button.go{font-size:.9rem;font-weight:800;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;border-color:transparent}
+        .ops-pad button.go:disabled{opacity:.6;cursor:default}
+        .ops-cancel{display:block;margin:18px auto 0;background:none;border:none;color:var(--dim);font-size:.8rem;font-weight:600;text-decoration:underline;cursor:pointer;font-family:inherit;padding:8px 14px}
+        #opsMe{position:fixed;inset:0;z-index:896;background:rgba(8,4,6,.72);display:none;align-items:flex-end}
+        #opsMe.open{display:flex}
+        #opsMe .bk-facts div{grid-column:1 / -1}
+        #opsMe .ops-err{min-height:0;margin-top:8px}
+        @media(min-width:820px){#opsMe{align-items:center;justify-content:center}}
     </style>
 </head>
 <body>
     <header>
         <h1>Old Palace <span>Ops</span></h1>
-        <button class="bell" id="bellBtn"><i class="fas fa-bell"></i> <span id="bellTxt">Enable alerts</span></button>
+        <div class="hbtns">
+            <button type="button" class="bell ops-me" id="opsMeBtn" data-oact="me" hidden></button>
+            <button class="bell" id="bellBtn"><i class="fas fa-bell"></i> <span id="bellTxt">Enable alerts</span></button>
+        </div>
     </header>
     <div id="watchdog" class="wd">
         <span class="dot"></span>
@@ -52855,6 +52900,7 @@ app.get('/staff/app', (c) => {
             <button class="tab" data-tab="beach"><i class="fas fa-umbrella-beach"></i> Beach</button>
             <button class="tab" data-tab="rest"><i class="fas fa-utensils"></i> Restaurant</button>
         </div>
+        <div id="opsNone" class="empty ops-none" style="display:none"></div>
         <div id="listChats"><div class="empty">Loading…</div></div>
 
         <!-- BEACH: live map + arrivals, built for phone and tablet -->
@@ -53023,12 +53069,575 @@ app.get('/staff/app', (c) => {
         </div>
     </div>
     <div class="toast" id="toast"></div>
+    <!-- Signed-in account: who is on this phone, switch user, manage accounts (managers) -->
+    <div id="opsMe" role="dialog" aria-modal="true" aria-labelledby="opsMeName">
+        <div class="bk-panel">
+            <h3 id="opsMeName"></h3>
+            <div class="sub" id="opsMeUntil"></div>
+            <div class="bk-facts"><div><small>Access</small><b id="opsMeAccess"></b></div></div>
+            <button type="button" class="bk-cta" id="opsMeSwitch" data-oact="switch"><i class="fas fa-right-left"></i> Switch user</button>
+            <button type="button" class="bk-sec" id="opsMeManage" data-oact="manage"><i class="fas fa-id-badge"></i> Manage staff accounts</button>
+            <button type="button" class="bk-sec" data-oact="me-close">Close</button>
+            <div class="ops-err" id="opsMeErr" role="alert"></div>
+        </div>
+    </div>
+    <!-- Staff sign-in: name + PIN -->
+    <div id="opsLogin" role="dialog" aria-modal="true" aria-labelledby="opsLgTitle">
+        <div class="ops-lg">
+            <div class="ops-card">
+                <div class="ops-brand" id="opsLgTitle">Old Palace <span>·</span> Ops</div>
+                <div class="ops-lead">Sign in with your name and PIN</div>
+                <input id="opsName" class="ops-in" type="text" maxlength="40" placeholder="Your name" aria-label="Your name" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="next">
+                <div class="ops-recent" id="opsRecent" aria-label="Recent names"></div>
+                <div class="ops-dots" id="opsDots" role="img" aria-label="PIN"></div>
+                <div class="ops-err" id="opsErr" role="alert"></div>
+                <div class="rst-pad open ops-pad" id="opsPad">
+                    <button type="button" data-oact="key" data-k="1">1</button>
+                    <button type="button" data-oact="key" data-k="2">2</button>
+                    <button type="button" data-oact="key" data-k="3">3</button>
+                    <button type="button" data-oact="key" data-k="4">4</button>
+                    <button type="button" data-oact="key" data-k="5">5</button>
+                    <button type="button" data-oact="key" data-k="6">6</button>
+                    <button type="button" data-oact="key" data-k="7">7</button>
+                    <button type="button" data-oact="key" data-k="8">8</button>
+                    <button type="button" data-oact="key" data-k="9">9</button>
+                    <button type="button" class="fn" data-oact="key" data-k="del" aria-label="Delete">⌫</button>
+                    <button type="button" data-oact="key" data-k="0">0</button>
+                    <button type="button" class="go" id="opsGo" data-oact="go">✓ Sign in</button>
+                </div>
+                <button type="button" class="ops-cancel" id="opsCancel" data-oact="cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
     <div id="ringBar">
         <div class="rb-txt"><i class="fas fa-bell"></i> Guest waiting — respond now</div>
         <button onclick="stopRing()">Acknowledge</button>
     </div>
 
     <script>
+    // ── Staff sign-in: a name + PIN account decides which tabs this phone can use ──
+    // OPS_MODE is '' until /api/staff/auth/me answers, then 'legacy' (sign-in not required and
+    // nobody signed in: the app works as it always has), 'account' (signed in) or 'login'
+    // (sign-in required, waiting on the overlay: no data loads).
+    var OPS_ME = null, OPS_MODE = '', opsBeachRet = null;
+    var opsPin = '', opsBusy = false, opsLgOpt = false, opsMeAt = 0, opsRefreshing = false, opsDeniedAt = 0, opsSwitching = false;
+    var opsGen = 0;  // bumped on every sign-in: answers to requests sent before it are stale
+    var OPS_TAB_NAME = {chats:'Chats', beach:'Beach', rest:'Restaurant'};
+    // Coming back from the manager page (or a sign-in redirect) without ?app= / ?rst=: restore them
+    (function(){
+        try{
+            var bk=null;
+            try{ bk=sessionStorage.getItem('opsBack'); sessionStorage.removeItem('opsBack'); }catch(e){}
+            if(location.search) return;
+            if(!bk){
+                try{
+                    var rb=JSON.parse(sessionStorage.getItem('opsBeachReturn')||'null');
+                    var q=(rb && typeof rb.back==='string') ? rb.back.indexOf('?') : -1;
+                    if(q>=0) bk=rb.back.slice(q);
+                }catch(e){}
+            }
+            if(bk && bk.charAt(0)==='?' && bk.length>1 && window.history && history.replaceState) history.replaceState(history.state, '', location.pathname+bk+location.hash);
+        }catch(e){}
+    })();
+    // Every /api/staff/ call: 401 login_required -> sign-in overlay; 403 no_access -> toast.
+    // The caller always gets the original Response.
+    (function(){
+        try{
+            var nativeFetch=window.fetch;
+            if(typeof nativeFetch!=='function') return;
+            window.fetch=function(input){
+                var p;
+                try{ p=nativeFetch.apply(window, arguments); }catch(e){ return Promise.reject(e); }
+                try{
+                    var u=typeof input==='string' ? input : ((input && (input.url || input.href)) || '');
+                    if(!opsGated(u)) return p;
+                    var gen=opsGen;
+                    return p.then(function(r){
+                        try{
+                            if(r && (r.status===401 || r.status===403)){
+                                var st=r.status;
+                                r.clone().json().then(function(j){ if(gen===opsGen) opsDenied(st, j); }).catch(function(){});
+                            }
+                        }catch(e){}
+                        return r;
+                    });
+                }catch(e){ return p; }
+            };
+        }catch(e){}
+    })();
+    function opsGated(u){
+        try{
+            var s=String(u||'');
+            if(s.charAt(0)!=='/' || s.charAt(1)==='/'){
+                var p=new URL(s, location.href);
+                if(p.origin!==location.origin) return false;
+                s=p.pathname;
+            }
+            return s.indexOf('/api/staff/')===0 && s.indexOf('/api/staff/auth/')!==0;
+        }catch(e){ return false; }
+    }
+    function opsDenied(st, j){
+        try{
+            var err=j && j.error;
+            if(st===401 && err==='login_required'){ opsShowLogin(false); return; }
+            if(st===403 && err==='no_access'){
+                var now=Date.now();
+                if(now-opsDeniedAt>8000){ opsDeniedAt=now; toast('Not allowed for your account'); }
+                if(OPS_ME && now-opsMeAt>20000) opsRefresh();
+            }
+        }catch(e){}
+    }
+    function opsCan(tab){
+        try{
+            if(!OPS_ME) return true;
+            if(OPS_ME.all===true || OPS_ME.all===1) return true;
+            return Array.isArray(OPS_ME.tabs) && OPS_ME.tabs.indexOf(tab)>=0;
+        }catch(e){ return true; }
+    }
+    function opsLive(){ return OPS_MODE==='legacy' || (OPS_MODE==='account' && !!OPS_ME); }
+    function opsIsMgr(){ return !!OPS_ME && (OPS_ME.is_manager===1 || OPS_ME.is_manager===true || OPS_ME.is_manager==='1'); }
+    function opsName(){ return OPS_ME ? String(OPS_ME.name||'').trim() : ''; }
+    function opsAccessText(){
+        try{
+            if(!OPS_ME) return '';
+            if(OPS_ME.all===true || OPS_ME.all===1) return 'Everything';
+            var t=(Array.isArray(OPS_ME.tabs) ? OPS_ME.tabs : []).map(function(k){ return OPS_TAB_NAME[k] || k; });
+            return t.length ? t.join(' · ') : 'No tabs';
+        }catch(e){ return ''; }
+    }
+    function opsAccessKey(a){
+        try{ return a ? String(a.staff_id)+'|'+((a.all===true || a.all===1) ? '*' : (Array.isArray(a.tabs) ? a.tabs.join(',') : '')) : ''; }catch(e){ return ''; }
+    }
+    function opsUntil(s){
+        try{
+            if(!s) return '';
+            var iso=String(s).trim();
+            if(iso.indexOf('T')<0) iso=iso.replace(' ','T');
+            if(!/(Z|[+-][0-9]{2}:?[0-9]{2})$/i.test(iso)) iso+='Z';
+            var d=new Date(iso);
+            if(isNaN(d.getTime())) return '';
+            var hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+            var now=new Date(), tmr=new Date(now.getTime()+86400000);
+            if(d.toDateString()===now.toDateString()) return hm;
+            if(d.toDateString()===tmr.toDateString()) return 'tomorrow '+hm;
+            return d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})+' '+hm;
+        }catch(e){ return ''; }
+    }
+
+    async function opsBoot(){
+        var j=null, sw=false;
+        try{ sw=!!sessionStorage.getItem('opsSwitch'); sessionStorage.removeItem('opsSwitch'); }catch(e){}
+        try{
+            var ctl=null, tm=null;
+            try{ if(window.AbortController){ ctl=new AbortController(); tm=setTimeout(function(){ try{ ctl.abort(); }catch(x){} }, 8000); } }catch(e){}
+            try{
+                var r=await fetch('/api/staff/auth/me', ctl ? {cache:'no-store', signal:ctl.signal} : {cache:'no-store'});
+                if(r.ok) j=await r.json();
+            }finally{ if(tm) clearTimeout(tm); }
+        }catch(e){ j=null; }
+        try{
+            opsMeAt=Date.now();
+            if(j && j.account){ OPS_ME=j.account; OPS_MODE='account'; opsGen++; opsHideLogin(); opsApplyAccess(); }
+            else if(j && j.login_required){ opsShowLogin(false); }
+            else{ var waiting=OPS_MODE==='login'; opsLegacy(); if(sw || waiting) opsShowLogin(true); }
+        }catch(e){
+            console.error('ops boot', e);
+            try{ if(!OPS_MODE) opsLegacy(); }catch(x){}
+        }
+    }
+    // Sign-in not required and nobody signed in: every tab, the name dialog, the "Sign in" chip
+    function opsLegacy(){
+        try{
+            OPS_ME=null; OPS_MODE='legacy';
+            opsShowTabs();
+            var none=document.getElementById('opsNone'); if(none) none.style.display='none';
+            // Coming back from "no tabs" or from the sign-in wait, no pane is showing: reopen the active tab
+            var shown=['listChats','listBeach','listRest'].some(function(id){ var el=document.getElementById(id); return !!el && el.style.display!=='none'; });
+            if(!shown){
+                var on=document.querySelector('.tab.on') || document.querySelector('.tab');
+                if(on && typeof on.onclick==='function') on.onclick();
+            }
+            opsChip();
+            try{ bchWhoLabel(); }catch(e){}
+            try{ rstWhoLabel(); }catch(e){}
+            loadAll(); loadWatchdog();
+            var ret=opsBeachRet; opsBeachRet=null;
+            if(ret) opsBeachGo(ret);
+        }catch(e){ console.error('ops legacy', e); }
+    }
+    function opsShowTabs(){
+        try{
+            var n=0;
+            document.querySelectorAll('.tab').forEach(function(t){ var can=opsCan(t.dataset.tab); t.style.display = can ? '' : 'none'; if(can) n++; });
+            var bar=document.querySelector('.tabs'); if(bar) bar.style.display = n>1 ? '' : 'none';
+            var ok=opsCan('chats');
+            ['bellBtn','watchdog'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display = ok ? '' : 'none'; });
+        }catch(e){ console.error('ops tabs', e); }
+    }
+    function opsBeachSet(ret){
+        try{
+            if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(ret.date||''))) bchDateStr=String(ret.date);
+            if(ret.slot==='all' || ret.slot==='half_day_am' || ret.slot==='half_day_pm') bchSlot=ret.slot;
+        }catch(e){}
+    }
+    function opsBeachGo(ret){
+        try{
+            opsBeachSet(ret);
+            var bt=document.querySelector('.tab[data-tab="beach"]');
+            if(bt && typeof bt.onclick==='function') bt.onclick();
+        }catch(e){ console.error('beach return', e); }
+    }
+    // Signed in: show only this account's tabs, open the first one (Chats first when allowed)
+    function opsApplyAccess(){
+        try{
+            if(!OPS_ME) return;
+            var chatsOk=opsCan('chats');
+            opsShowTabs();
+            if(!chatsOk){
+                try{ var ch=document.getElementById('chat'); if(ch) ch.classList.remove('open'); cur=null; }catch(e){}
+                chats=[];
+                var lc=document.getElementById('listChats'); if(lc) lc.innerHTML='';
+                var dc=document.getElementById('dotChats'); if(dc) dc.classList.remove('show');
+            }
+            var allowed=[].slice.call(document.querySelectorAll('.tab')).filter(function(t){ return opsCan(t.dataset.tab); });
+            var target=null;
+            allowed.forEach(function(t){ if(t.classList.contains('on')) target=t; });
+            if(!target) target=allowed[0] || null;
+            var ret=opsBeachRet; opsBeachRet=null;
+            if(ret && opsCan('beach')){
+                var bt=document.querySelector('.tab[data-tab="beach"]');
+                if(bt){ opsBeachSet(ret); target=bt; }
+            }
+            var none=document.getElementById('opsNone');
+            if(target && typeof target.onclick==='function'){
+                if(none) none.style.display='none';
+                target.onclick();
+            }else{
+                ['listChats','listBeach','listRest'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+                try{ if(typeof rstTab==='function') rstTab(false); }catch(e){}
+                if(none){
+                    none.innerHTML='<i class="fas fa-lock"></i>Your account has no Ops tabs yet.<br>'+
+                        (opsIsMgr() ? '<button type="button" class="bch-print" data-oact="manage"><i class="fas fa-id-badge"></i> Manage staff accounts</button>' : 'Ask a manager to give you access.');
+                    none.style.display='';
+                }
+            }
+            if(chatsOk){ loadAll(); loadWatchdog(); }
+            opsChip();
+            try{ bchWhoLabel(); }catch(e){}
+            try{ rstWhoLabel(); }catch(e){}
+        }catch(e){ console.error('ops access', e); }
+    }
+    function opsChip(){
+        try{
+            var b=document.getElementById('opsMeBtn'); if(!b) return;
+            document.body.classList.toggle('ops-signed', OPS_MODE==='account' && !!OPS_ME);
+            if(OPS_MODE==='account' && OPS_ME){
+                b.classList.remove('si');
+                b.textContent='👤 '+opsName();
+                b.title='Signed in as '+opsName();
+                b.setAttribute('aria-label', 'Signed in as '+opsName());
+                b.hidden=false;
+            }else if(OPS_MODE==='legacy'){
+                b.classList.add('si');
+                b.innerHTML='<i class="fas fa-right-to-bracket"></i><span class="t"> Sign in</span>';
+                b.title='Sign in with your name and PIN';
+                b.setAttribute('aria-label', 'Sign in');
+                b.hidden=false;
+            }else b.hidden=true;
+        }catch(e){}
+    }
+    // Re-read the account: access changed by a manager, session ended, sign-in switched on
+    async function opsRefresh(){
+        if(opsRefreshing) return;
+        opsRefreshing=true; opsMeAt=Date.now();
+        var gen=opsGen;
+        try{
+            var r=await fetch('/api/staff/auth/me',{cache:'no-store'});
+            var j=r.ok ? await r.json() : null;
+            if(!j || j.success===false || gen!==opsGen || opsBusy) return;
+            if(j.account){
+                var before=opsAccessKey(OPS_ME);
+                OPS_ME=j.account;
+                if(OPS_MODE!=='account'){ OPS_MODE='account'; opsGen++; opsHideLogin(); opsApplyAccess(); }
+                else if(before!==opsAccessKey(OPS_ME)) opsApplyAccess();
+                else{
+                    opsChip();
+                    try{ bchWhoLabel(); }catch(e){}
+                    try{ rstWhoLabel(); }catch(e){}
+                }
+            }else if(j.login_required){
+                opsShowLogin(false);
+            }else if(OPS_MODE==='account'){
+                opsCloseMe();
+                opsLegacy();
+                toast('You are signed out on this phone');
+            }else if(OPS_MODE==='login'){
+                // A manager switched sign-in off while this phone waited: the overlay becomes optional
+                opsLegacy();
+                opsShowLogin(true);
+            }
+        }catch(e){}
+        finally{ opsRefreshing=false; }
+    }
+    // Views that show guest data close while the phone waits for someone to sign in
+    function opsHush(){
+        try{ var ch=document.getElementById('chat'); if(ch) ch.classList.remove('open'); cur=null; }catch(e){}
+        try{ closeSheet(); }catch(e){}
+        try{ closeScanner(); }catch(e){}
+        try{ if(typeof rstTab==='function') rstTab(false); }catch(e){}
+        try{ bchWhoClose(false); }catch(e){}
+        try{ opsCloseMe(); }catch(e){}
+        try{
+            chats=[];
+            var lc=document.getElementById('listChats'); if(lc) lc.innerHTML='';
+            var dc=document.getElementById('dotChats'); if(dc) dc.classList.remove('show');
+            ['listChats','listBeach','listRest','opsNone'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+        }catch(e){}
+    }
+
+    // ── Sign-in overlay ──
+    // optional=true: the "Sign in" chip while sign-in is not required (Cancel shown).
+    // optional=false: the server requires a sign-in (no Cancel, nothing loads until then).
+    function opsShowLogin(optional){
+        try{
+            var ov=document.getElementById('opsLogin'); if(!ov) return;
+            var wasOpen=ov.classList.contains('open');
+            if(!optional){
+                if(OPS_MODE!=='login' || OPS_ME){ OPS_ME=null; OPS_MODE='login'; opsHush(); }
+                opsLgOpt=false;
+            }else if(OPS_MODE!=='login'){
+                opsLgOpt=true;
+            }
+            var cb=document.getElementById('opsCancel'); if(cb) cb.style.display = opsLgOpt ? '' : 'none';
+            opsChip();
+            if(wasOpen) return;
+            opsPin=''; opsBusy=false;
+            opsLgErr('');
+            opsRenderRecent();
+            opsRenderPin();
+            try{ var ae=document.activeElement; if(ae && ae!==document.body && !ov.contains(ae) && ae.blur) ae.blur(); }catch(e){}
+            ov.classList.add('open');
+            document.body.classList.add('ops-lock');
+        }catch(e){ console.error('ops login', e); }
+    }
+    function opsHideLogin(){
+        try{
+            var ov=document.getElementById('opsLogin'); if(ov) ov.classList.remove('open');
+            document.body.classList.remove('ops-lock');
+            opsPin=''; opsLgOpt=false;
+            var ni=document.getElementById('opsName'); if(ni){ ni.value=''; try{ ni.blur(); }catch(x){} }
+            opsLgErr('');
+        }catch(e){}
+    }
+    function opsLgErr(t){ try{ var e=document.getElementById('opsErr'); if(e) e.textContent=t||''; }catch(x){} }
+    function opsRenderPin(){
+        try{
+            var d=document.getElementById('opsDots');
+            if(d){
+                var h='';
+                for(var i=0;i<6;i++) h+='<i class="'+(i<opsPin.length ? 'on' : '')+(i>=4 ? ' opt' : '')+'"></i>';
+                d.innerHTML=h;
+                d.setAttribute('aria-label', 'PIN, '+opsPin.length+' of 4 to 6 digits entered');
+            }
+            var g=document.getElementById('opsGo');
+            if(g){
+                g.disabled=opsBusy;
+                g.innerHTML = opsBusy ? '<i class="fas fa-spinner fa-spin"></i>' : '✓ Sign in';
+            }
+        }catch(e){}
+    }
+    function opsShake(){
+        try{
+            var d=document.getElementById('opsDots'); if(!d) return;
+            d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
+            if(navigator.vibrate) navigator.vibrate(160);
+        }catch(e){}
+    }
+    function opsRecentNames(){
+        try{
+            var a=JSON.parse(localStorage.getItem('opsRecentNames')||'[]');
+            return Array.isArray(a) ? a.filter(function(x){ return typeof x==='string' && x.trim(); }).slice(0,6) : [];
+        }catch(e){ return []; }
+    }
+    function opsRemember(n){
+        try{
+            n=String(n||'').trim(); if(!n) return;
+            var k=n.toLowerCase();
+            var a=[n].concat(opsRecentNames().filter(function(x){ return x.trim().toLowerCase()!==k; })).slice(0,6);
+            localStorage.setItem('opsRecentNames', JSON.stringify(a));
+        }catch(e){}
+    }
+    function opsRenderRecent(){
+        try{
+            var box=document.getElementById('opsRecent'); if(!box) return;
+            box.innerHTML=opsRecentNames().map(function(n, i){
+                return '<button type="button" class="ops-rc" data-oact="recent" data-i="'+i+'">'+esc(n)+'</button>';
+            }).join('');
+        }catch(e){}
+    }
+    function opsPickName(i){
+        try{
+            var n=opsRecentNames()[parseInt(i,10)];
+            var ni=document.getElementById('opsName');
+            if(!n || !ni) return;
+            ni.value=n;
+            try{ ni.blur(); }catch(x){}
+            opsLgErr('');
+        }catch(e){}
+    }
+    function opsKey(k){
+        try{
+            if(opsBusy) return;
+            if(k==='del') opsPin=opsPin.slice(0,-1);
+            else if(/^[0-9]$/.test(String(k)) && opsPin.length<6) opsPin+=String(k);
+            else return;
+            opsLgErr('');
+            opsRenderPin();
+        }catch(e){}
+    }
+    async function opsSubmit(){
+        if(opsBusy) return;
+        try{
+            var ni=document.getElementById('opsName');
+            var name=String((ni && ni.value) || '').trim();
+            if(!name){ opsLgErr('Type your name first'); try{ ni.focus(); }catch(x){} return; }
+            if(opsPin.length<4){ opsLgErr('Enter your PIN (4 to 6 digits)'); opsShake(); return; }
+            var pin=opsPin;
+            opsBusy=true; opsLgErr(''); opsRenderPin();
+            var r=null, j=null;
+            try{
+                r=await fetch('/api/staff/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name, pin:pin}),cache:'no-store'});
+                try{ j=await r.json(); }catch(x){}
+            }catch(e){ r=null; }
+            opsBusy=false;
+            if(!r){ opsRenderPin(); opsLgErr('No connection — try again'); return; }
+            if(r.ok && j && j.success!==false && j.account){
+                OPS_ME=j.account; OPS_MODE='account'; opsMeAt=Date.now(); opsGen++;
+                opsRemember(opsName() || name);
+                opsHideLogin();
+                opsRenderPin();
+                opsApplyAccess();
+                return;
+            }
+            opsPin='';
+            opsRenderPin();
+            var msg=(j && j.message) ? String(j.message) : '';
+            if(!msg){
+                var err=j && j.error;
+                msg = err==='not_configured' ? 'Sign-in is not set up yet — ask a manager'
+                    : (r.status===401 ? 'Wrong name or PIN'
+                    : (r.status===429 ? 'Too many wrong tries — try again later'
+                    : 'Could not sign in (error '+r.status+') — try again'));
+            }
+            opsLgErr(msg);
+            opsShake();
+        }catch(e){
+            opsBusy=false; opsPin=''; opsRenderPin();
+            opsLgErr('Could not sign in — try again');
+            console.error('ops sign-in', e);
+        }
+    }
+
+    // ── Account sheet ──
+    function opsOpenMe(){
+        try{
+            if(!OPS_ME) return;
+            var s=document.getElementById('opsMe'); if(!s) return;
+            var set=function(id, t){ var el=document.getElementById(id); if(el) el.textContent=t; };
+            set('opsMeName', opsName());
+            var u=opsUntil(OPS_ME.expires_at);
+            set('opsMeUntil', u ? 'Signed in until '+u : 'Signed in on this phone');
+            set('opsMeAccess', opsAccessText());
+            set('opsMeErr', '');
+            var m=document.getElementById('opsMeManage'); if(m) m.style.display = opsIsMgr() ? '' : 'none';
+            var sb=document.getElementById('opsMeSwitch');
+            if(sb){ sb.disabled=false; sb.innerHTML='<i class="fas fa-right-left"></i> Switch user'; }
+            try{ closeSheet(); }catch(e){}
+            s.classList.add('open');
+        }catch(e){ console.error('ops account', e); }
+    }
+    function opsCloseMe(){ try{ var s=document.getElementById('opsMe'); if(s) s.classList.remove('open'); }catch(e){} }
+    function opsChipTap(){
+        try{
+            if(OPS_ME) opsOpenMe();
+            else if(OPS_MODE==='legacy') opsShowLogin(true);
+        }catch(e){}
+    }
+    async function opsSwitch(){
+        if(opsSwitching) return;
+        opsSwitching=true;
+        var sb=document.getElementById('opsMeSwitch');
+        try{
+            if(sb){ sb.disabled=true; sb.innerHTML='<i class="fas fa-spinner fa-spin"></i> Signing out…'; }
+            var ok=false;
+            try{
+                var r=await fetch('/api/staff/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',cache:'no-store'});
+                ok=r.ok;
+            }catch(e){}
+            if(ok){
+                try{ sessionStorage.setItem('opsSwitch','1'); }catch(e){}
+                location.reload();
+                return;
+            }
+            if(sb){ sb.disabled=false; sb.innerHTML='<i class="fas fa-right-left"></i> Switch user'; }
+            var er=document.getElementById('opsMeErr'); if(er) er.textContent='Could not sign out — check the connection and try again';
+        }catch(e){ console.error('ops switch', e); }
+        opsSwitching=false;
+    }
+    function opsManage(){
+        try{ sessionStorage.setItem('opsBack', location.search||''); }catch(e){}
+        location.href='/admin/ops-staff?from=app';
+    }
+    // Chats feed: the 15 s poll, returning to the app, and a periodic re-read of the account
+    function opsTick(){
+        try{
+            if(document.visibilityState!=='visible') return;
+            var age=Date.now()-opsMeAt;
+            if((OPS_MODE==='account' && age>300000) || (OPS_MODE==='login' && age>60000)) opsRefresh();
+            if(opsLive() && opsCan('chats')){ loadAll(); loadWatchdog(); if(cur) loadMsgs(); }
+        }catch(e){}
+    }
+
+    (function(){
+        try{
+            document.addEventListener('click', function(e){
+                var t=null;
+                try{ t=(e.target && e.target.closest) ? e.target.closest('[data-oact]') : null; }catch(x){}
+                try{
+                    if(!t){ if(e.target && e.target.id==='opsMe') opsCloseMe(); return; }
+                    if(t.disabled) return;
+                    var a=t.getAttribute('data-oact');
+                    if(a==='key') opsKey(t.getAttribute('data-k'));
+                    else if(a==='go') opsSubmit();
+                    else if(a==='recent') opsPickName(t.getAttribute('data-i'));
+                    else if(a==='cancel'){ if(opsLgOpt) opsHideLogin(); }
+                    else if(a==='me') opsChipTap();
+                    else if(a==='switch') opsSwitch();
+                    else if(a==='manage') opsManage();
+                    else if(a==='me-close') opsCloseMe();
+                }catch(err){ console.error('ops action', err); }
+            });
+            document.addEventListener('keydown', function(e){
+                try{
+                    var ov=document.getElementById('opsLogin');
+                    if(!ov || !ov.classList.contains('open')){ if(e.key==='Escape') opsCloseMe(); return; }
+                    var ae=document.activeElement;
+                    if(ae && ae.id==='opsName'){
+                        if(e.key==='Enter'){ e.preventDefault(); try{ ae.blur(); }catch(x){} if(opsPin.length>=4) opsSubmit(); }
+                        return;
+                    }
+                    if(e.ctrlKey || e.metaKey || e.altKey) return;
+                    if(/^[0-9]$/.test(e.key)){ e.preventDefault(); opsKey(e.key); }
+                    else if(e.key==='Backspace'){ e.preventDefault(); opsKey('del'); }
+                    else if(e.key==='Enter'){ e.preventDefault(); opsSubmit(); }
+                    else if(e.key==='Escape' && opsLgOpt) opsHideLogin();
+                }catch(err){}
+            });
+            var ni=document.getElementById('opsName');
+            if(ni) ni.addEventListener('input', function(){ opsLgErr(''); });
+        }catch(e){ console.error('ops init', e); }
+    })();
+
     var PROPERTY_ID = '1';
     var VAPID_PUBLIC = '${VAPID_PUBLIC_KEY}';
     var cur = null, chats = [], lastSeenChat = localStorage.getItem('seenChat') || '';
@@ -53046,6 +53655,7 @@ app.get('/staff/app', (c) => {
     }
     function startRing(){
         if(ringing) return;
+        if(OPS_ME && !opsCan('chats')) return;
         ringing=true;
         document.getElementById('ringBar').classList.add('show');
         try{ initRing().play().catch(function(){}); }catch(e){}
@@ -53065,7 +53675,13 @@ app.get('/staff/app', (c) => {
     async function ackAll(){
         try{ await fetch('/api/staff/ack-feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1})}); }catch(e){}
         try{
-            if(chats[0]) await fetch('/api/staff/ack-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1,session_id:chats[0].session_id})});
+            var sid = chats[0] ? chats[0].session_id : '';
+            // No inbox on this phone (waiting on sign-in, or no Chats access): ack what is ringing
+            if(!sid){
+                var rs = await fetch('/api/staff/ring-state?property_id='+encodeURIComponent(PROPERTY_ID),{cache:'no-store'}).then(function(r){return r.json()});
+                sid = (rs && rs.session_id) || '';
+            }
+            if(sid) await fetch('/api/staff/ack-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1,session_id:sid})});
         }catch(e){}
     }
     // Unlock audio on the first tap (mobile autoplay policy)
@@ -53177,6 +53793,7 @@ app.get('/staff/app', (c) => {
     }
     document.querySelectorAll('.tab').forEach(function(t){
         t.onclick=function(){
+            if(!opsCan(t.dataset.tab)) return;
             document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on')});
             t.classList.add('on');
             var which = t.dataset.tab;
@@ -53285,8 +53902,9 @@ app.get('/staff/app', (c) => {
         return {cls:'wait', txt:'Waiting'};
     }
 
-    // ── Attendant name: asked once per device, sent with every check-in ──
+    // ── Attendant name: the signed-in account, else asked once per device; sent with every check-in ──
     function bchGetName(){
+        if(OPS_ME && OPS_ME.name) return opsName();
         var n='';
         try{ n=localStorage.getItem('beachStaffName')||''; }catch(e){}
         return String(n||bchNameMem||'').trim();
@@ -53302,9 +53920,10 @@ app.get('/staff/app', (c) => {
         if(t) t.textContent = n ? n : 'Tap to set your name';
         if(t && t.parentNode) t.parentNode.title = n ? 'Check-ins are recorded as '+n : '';
         var em=t && t.parentNode ? t.parentNode.querySelector('em') : null;
-        if(em) em.style.display = n ? '' : 'none';
+        if(em){ em.style.display = n ? '' : 'none'; em.textContent = OPS_ME ? 'Switch' : 'Change'; }
     }
     window.bchAskName=function(then){
+        if(OPS_ME && OPS_ME.name){ if(typeof then==='function') then(opsName()); else opsOpenMe(); return; }
         bchPendingName = (typeof then==='function') ? then : null;
         try{ closeSheet(); }catch(e){}
         var d=document.getElementById('bchWho'), i=document.getElementById('bchWhoInput');
@@ -53755,15 +54374,13 @@ app.get('/staff/app', (c) => {
         }catch(e){ console.error('beach init', e); }
         // Back from the printable arrivals list: reopen the Beach tab on the same day and slot.
         // The tab's handler is called directly (no synthetic click) so the first real tap
-        // still unlocks the ring audio.
+        // still unlocks the ring audio. Until the sign-in state is known it waits for opsBoot.
         try{
             var ret=null;
             try{ ret=JSON.parse(sessionStorage.getItem('opsBeachReturn')||'null'); sessionStorage.removeItem('opsBeachReturn'); }catch(e){}
             if(ret && ret.at && Date.now()-ret.at < 6*3600*1000){
-                if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(ret.date||''))) bchDateStr=String(ret.date);
-                if(ret.slot==='all' || ret.slot==='half_day_am' || ret.slot==='half_day_pm') bchSlot=ret.slot;
-                var bt=document.querySelector('.tab[data-tab="beach"]');
-                if(bt && typeof bt.onclick==='function') bt.onclick();
+                if(OPS_MODE==='legacy' || (OPS_MODE==='account' && opsCan('beach'))) opsBeachGo(ret);
+                else if(OPS_MODE!=='account') opsBeachRet=ret;
             }
         }catch(e){ console.error('beach return', e); }
         window.addEventListener('pageshow', function(ev){
@@ -53939,6 +54556,7 @@ app.get('/staff/app', (c) => {
         }catch(e){}
     }
     function rstAskName(then){
+        if(OPS_ME && OPS_ME.name){ if(typeof then==='function') then(opsName()); else opsOpenMe(); return; }
         var done=function(n){ rstWhoRestore(); rstWhoLabel(); if(typeof then==='function') then(n); };
         try{
             var d=document.getElementById('bchWho'), h=document.getElementById('bchWhoTitle'), p=d ? d.querySelector('p') : null;
@@ -53960,7 +54578,7 @@ app.get('/staff/app', (c) => {
         var n=rstGetName();
         t.textContent = n ? n : 'Tap to set your name';
         var em=t.parentNode ? t.parentNode.querySelector('em') : null;
-        if(em) em.style.display = n ? '' : 'none';
+        if(em){ em.style.display = n ? '' : 'none'; em.textContent = OPS_ME ? 'Switch' : 'Change'; }
     }
 
     // ── Data helpers ──
@@ -54884,7 +55502,7 @@ app.get('/staff/app', (c) => {
     async function loadMsgs(){
         if(!cur) return;
         try{
-            var d = await fetch('/api/admin/chatbot/messages/'+cur.session_id+'?property_id='+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
+            var d = await fetch('/api/staff/chat/messages/'+encodeURIComponent(cur.session_id)+'?property_id='+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
             var msgs = d.messages||[];
             render(msgs);
             await translateMsgs(msgs);
@@ -54917,7 +55535,8 @@ app.get('/staff/app', (c) => {
     }
     window.takeOver=async function(){
         if(!cur) return;
-        await sendMsg('Hello, this is the front desk. How may I help you?');
+        var sent = await sendMsg('Hello, this is the front desk. How may I help you?');
+        if(!sent || !cur) return;
         cur.is_ai_paused=1;
         document.getElementById('chatSub').textContent=(cur.room_number?'Room '+cur.room_number+' · ':'')+'You are handling this chat';
         renderTakeover();
@@ -54925,7 +55544,9 @@ app.get('/staff/app', (c) => {
     window.endTakeover=async function(){
         if(!cur) return;
         try{
-            await fetch('/api/admin/chatbot/end-takeover',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id})});
+            var r = await fetch('/api/staff/chat/end-takeover',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id})});
+            if(!r.ok){ if(r.status!==401 && r.status!==403) toast('Failed'); return; }
+            if(!cur) return;
             cur.is_ai_paused=0;
             document.getElementById('chatSub').textContent=(cur.room_number?'Room '+cur.room_number+' · ':'')+'AI is handling this chat';
             renderTakeover();
@@ -54949,10 +55570,17 @@ app.get('/staff/app', (c) => {
                     if(t.results && t.results[0] && t.results[0].text) outText = t.results[0].text;
                 }catch(e){}
             }
-            await fetch('/api/admin/chatbot/send-message',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id,message:outText,admin_id:'frontdesk'})});
+            var sr = await fetch('/api/staff/chat/send',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id,message:outText,admin_id:'frontdesk'})});
+            if(!sr.ok){
+                if(typeof preset!=='string' && !input.value) input.value=text;
+                if(sr.status!==401 && sr.status!==403) toast('Failed to send');
+                return;
+            }
+            if(!cur) return;
             cur.is_ai_paused=1;
             renderTakeover();
             await loadMsgs();
+            return true;
         }catch(e){ toast('Failed to send'); }
     };
     document.getElementById('msgInput').addEventListener('keydown',function(e){ if(e.key==='Enter') sendMsg(); });
@@ -54964,16 +55592,18 @@ app.get('/staff/app', (c) => {
         }).then(function(s){ markBell(!!s); }).catch(function(){});
         navigator.serviceWorker.addEventListener('message',function(ev){
             if(!ev.data) return;
-            if(ev.data.type==='refresh'){ loadAll(); if(cur) loadMsgs(); }
-            if(ev.data.type==='ring'){ loadAll(); startRing(); }
+            // A phone waiting on sign-in still rings; one signed in without Chats does not
+            var feed = opsLive() && opsCan('chats');
+            if(ev.data.type==='refresh'){ if(feed){ loadAll(); if(cur) loadMsgs(); } }
+            if(ev.data.type==='ring'){ if(!OPS_ME || opsCan('chats')){ if(feed) loadAll(); startRing(); } }
             if(ev.data.type==='stopring'){ stopRing(true); }
         });
     }
 
     setStaffLang(STAFF_LANG);
-    loadAll(); loadWatchdog();
-    setInterval(function(){ if(document.visibilityState==='visible'){ loadAll(); loadWatchdog(); if(cur) loadMsgs(); } }, 15000);
-    document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'){ loadAll(); loadWatchdog(); if(cur) loadMsgs(); } });
+    opsBoot();
+    setInterval(opsTick, 15000);
+    document.addEventListener('visibilitychange', opsTick);
     </script>
 </body>
 </html>
