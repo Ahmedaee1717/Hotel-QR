@@ -5204,190 +5204,719 @@ app.post('/api/track-page-view', async (c) => {
   }
 })
 
-// Get analytics data
-app.get('/api/admin/analytics', requirePermission('analytics_view'), async (c) => {
-  const { DB } = c.env
-  const property_id = c.req.query('property_id') || '1'
-  const dateRange = c.req.query('range') || 'today' // today, yesterday, 7days, 30days, custom
-  const startDate = c.req.query('start_date')
-  const endDate = c.req.query('end_date')
+// Guest-app tracker: the /hotel/:slug page batches visits, section opens, chat opens and
+// language switches here with sendBeacon (JSON sent as text/plain, so no CORS preflight).
+// Public like the two legacy trackers above: always 204 at once, rows are written after the reply.
+const GE_EVENTS = ['visit', 'open', 'chat_open', 'lang', 'home']
+const GE_SOURCES = ['qr', 'app-android', 'app-ios', 'link', 'direct']
+const GE_ID = /^[a-z0-9-]{8,40}$/i
+const GE_TARGET = /^[\w:.\-\/ %]+$/
+const GE_LANG = /^[a-z]{2,3}(-[a-z]{2,4})?$/
+const GE_BOT_UA = /bot|crawl|spider|headless|preview|lighthouse/i
 
-  console.log('📊 Analytics API called:', { property_id, dateRange, startDate, endDate })
+function geLang(v: any): string | null {
+  const s = typeof v === 'string' ? v.trim().toLowerCase() : ''
+  return GE_LANG.test(s) ? s : null
+}
+
+app.post('/api/t', async (c) => {
+  try {
+    if (GE_BOT_UA.test(c.req.header('User-Agent') || '')) return c.body(null, 204)
+    const raw = await c.req.text()
+    if (!raw || raw.length > 16000) return c.body(null, 204)
+    const b = JSON.parse(raw)
+    if (!b || !Number.isInteger(b.pid) || b.pid <= 0 || !Array.isArray(b.ev)) return c.body(null, 204)
+    if (typeof b.vid !== 'string' || !GE_ID.test(b.vid) || typeof b.sid !== 'string' || !GE_ID.test(b.sid)) return c.body(null, 204)
+    const staff = b.staff === 1 || b.staff === true ? 1 : 0
+    const now = Date.now()
+    const insert = c.env.DB.prepare(`
+      INSERT INTO guest_events (property_id, day, hour, ts, visitor_id, session_id, event, target, lang, source, is_new, staff)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    const stmts: any[] = []
+    for (const e of b.ev.slice(0, 30)) {
+      if (!Array.isArray(e) || GE_EVENTS.indexOf(e[0]) < 0) continue
+      const target = typeof e[1] === 'string' && e[1].length <= 80 && GE_TARGET.test(e[1]) ? e[1] : null
+      const source = GE_SOURCES.indexOf(e[3]) >= 0 ? e[3] : null
+      const isNew = e[4] === 1 || e[4] === true ? 1 : 0
+      const ms = typeof e[5] === 'number' && e[5] >= now - 86400000 && e[5] <= now + 300000 ? e[5] : now
+      const at = anCairoParts(ms)
+      stmts.push(insert.bind(b.pid, at.day, at.hour, anUtcStamp(ms), b.vid, b.sid, e[0], target, geLang(e[2]), source, isNew, staff))
+    }
+    if (stmts.length) {
+      c.executionCtx.waitUntil(c.env.DB.batch(stmts).catch((err: any) => console.error('guest tracker insert failed', err)))
+    }
+  } catch (e) { /* malformed beacons are dropped silently */ }
+  return c.body(null, 204)
+})
+
+// ── Admin Analytics (/admin/analytics) ───────────────────────────────────────
+// Every report day is a Cairo day. UTC timestamp columns are compared against the UTC
+// instants of the range's Cairo midnights and bucketed here, never with SQLite date('now').
+
+const AN_RANGES: [string, number][] = [['today', 1], ['7d', 7], ['30d', 30], ['90d', 90]]
+// Staff trials and QA sessions never reach a report.
+const AN_CHAT_REAL = "c.session_id LIKE 'guest-%' AND lower(coalesce(c.guest_name, '')) NOT LIKE '%test%'"
+const AN_BEACH_REAL = "lower(coalesce(guest_name, '')) NOT LIKE '%test%' AND coalesce(guest_name, '') NOT IN ('Te', 'Tet', 'Fdfg') AND substr(coalesce(guest_name, ''), 1, 2) <> 'ZZ'"
+const AN_RST_REAL = "lower(coalesce(rb.guest_name, '') || ' ' || coalesce(rb.room_number, '')) NOT LIKE '%test%' AND coalesce(rb.guest_name, '') NOT IN ('Te', 'Tet') AND substr(coalesce(rb.guest_name, ''), 1, 2) <> 'ZZ' AND substr(coalesce(rb.room_number, ''), 1, 2) <> 'ZZ'"
+const AN_BOT_UA_SQL = ['bot', 'crawl', 'spider', 'headless', 'preview', 'lighthouse']
+  .map((w) => "lower(coalesce(user_agent, '')) NOT LIKE '%" + w + "%'").join(' AND ')
+const AN_SECTION_LABELS: Record<string, string> = {
+  restaurants: 'Restaurants', beach: 'Beach', 'room-service': 'Room service', map: 'Resort map', events: 'Events',
+  spa: 'Spa', info: 'Info pages', feedback: 'Feedback', chat: 'AI chat'
+}
+const AN_BEACH_SLOT_LABELS: Record<string, string> = { half_day_am: 'Morning', half_day_pm: 'Afternoon', full_day: 'Full day' }
+
+let anCairoFmt: Intl.DateTimeFormat | null = null
+// Cairo calendar day and hour of a UTC instant (DST aware).
+function anCairoParts(ms: number): { day: string, hour: number } {
+  if (!anCairoFmt) {
+    anCairoFmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Cairo', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit'
+    })
+  }
+  const p = anCairoFmt.formatToParts(new Date(ms))
+  const g = (t: string) => (p.find((x: any) => x.type === t) || { value: '' }).value
+  return { day: g('year') + '-' + g('month') + '-' + g('day'), hour: Number(g('hour')) % 24 }
+}
+
+// UTC instant at which Cairo day `ymd` begins. Egypt is UTC+3 in summer and UTC+2 in winter,
+// and both switches happen at local midnight, so the day starts at one of these two instants.
+function anCairoDayStartMs(ymd: string): number {
+  const base = Date.parse(ymd + 'T00:00:00Z')
+  const summer = base - 3 * 3600000
+  return anCairoParts(summer).day === ymd ? summer : base - 2 * 3600000
+}
+
+// D1's CURRENT_TIMESTAMP format ('YYYY-MM-DD HH:MM:SS', UTC).
+function anUtcStamp(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+function anMs(utc: any): number | null {
+  if (!utc) return null
+  const s = String(utc)
+  const t = Date.parse(s.indexOf('T') > 0 ? s : s.replace(' ', 'T') + 'Z')
+  return isNaN(t) ? null : t
+}
+
+function anIso(utc: any): string | null {
+  const t = anMs(utc)
+  return t === null ? null : new Date(t).toISOString().slice(0, 19) + 'Z'
+}
+
+// Cairo offsets are whole hours, so the UTC hour decides the Cairo day and hour; one Intl call per hour.
+function anCairoOfUtc(utc: any, cache: Map<string, { day: string, hour: number }>): { day: string, hour: number } | null {
+  if (!utc) return null
+  const key = String(utc).slice(0, 13)
+  let v = cache.get(key)
+  if (!v) {
+    const t = Date.parse(key.replace(' ', 'T') + ':00:00Z')
+    if (isNaN(t)) return null
+    v = anCairoParts(t)
+    cache.set(key, v)
+  }
+  return v
+}
+
+function anResolveRange(range: any, from: any, to: any, today: string):
+  { key: string, from: string, to: string, days: number, prev_from: string, prev_to: string } | { error: string } {
+  let key: string, days: number
+  if (from || to) {
+    if (!isBeachYmd(from) || !isBeachYmd(to) || from > to) return { error: 'from and to must be YYYY-MM-DD dates with from <= to' }
+    days = rstDayIdx(to) - rstDayIdx(from) + 1
+    if (days > 366) return { error: 'A custom range can span at most 366 days' }
+    key = 'custom'
+  } else {
+    key = range ? String(range) : '7d'
+    const preset = AN_RANGES.find((r) => r[0] === key)
+    if (!preset) return { error: 'range must be today, 7d, 30d or 90d' }
+    days = preset[1]
+    to = today
+    from = addDaysYmd(today, 1 - days)
+  }
+  return { key, from, to, days, prev_from: addDaysYmd(from, -days), prev_to: addDaysYmd(from, -1) }
+}
+
+// Linear-interpolated quantile of an ascending list.
+function anQuantile(sorted: number[], q: number): number | null {
+  if (!sorted.length) return null
+  const pos = (sorted.length - 1) * q
+  const lo = Math.floor(pos), hi = Math.ceil(pos)
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo)
+}
+
+function anRound1(n: number | null): number | null {
+  return n === null || !isFinite(n) ? null : Math.round(n * 10) / 10
+}
+
+function anPct(part: number, whole: number): number | null {
+  return whole > 0 ? Math.round(part * 1000 / whole) / 10 : null
+}
+
+// Legacy page_views (page_type, page_id) and tracker targets ('type:id') share one key space.
+function anOpenKey(type: any, id: any): { venue: boolean, key: string, label: string } | null {
+  const raw = String(type == null ? '' : type).trim()
+  const t = raw.toLowerCase()
+  const section = (key: string) => ({ venue: false, key, label: AN_SECTION_LABELS[key] })
+  if (!t) return null
+  if (t === 'offering') return id ? { venue: true, key: 'offering:' + id, label: String(id) } : null
+  if (t === 'restaurant' || t === 'restaurants') return section('restaurants')
+  if (t === 'beach' || t === 'beach-booking') return section('beach')
+  if (t === 'room-service') return section('room-service')
+  if (t === 'live-map') return section('map')
+  if (t === 'event' || t === 'events') return section('events')
+  if (t === 'spa' || t === 'info' || t === 'feedback') return section(t)
+  if (t === 'service' || t === 'activities' || t === 'activity' || t === 'v') return null
+  return { venue: false, key: t, label: raw }
+}
+
+// Chat topics: keyword classes over the guest's own messages (EN + Egyptian/MSA Arabic + basic RU/DE).
+// Arabic keywords are written normalised (see anTokens). A keyword of 4+ letters also matches longer
+// words that start with it; a phrase matches consecutive words.
+const AN_TOPICS: { key: string, label: string, words: string[] }[] = [
+  { key: 'dining', label: 'Restaurants & bars', words: [
+    'restaurant', 'breakfast', 'lunch', 'dinner', 'bar', 'bars', 'menu', 'food', 'eat', 'drink', 'buffet', 'coffee',
+    'cafe', 'meal', 'dining', 'dine', 'snack', 'pizza', 'a la carte', 'room service',
+    'مطعم', 'مطاعم', 'فطار', 'فطور', 'غدا', 'عشا', 'بار', 'منيو', 'اكل', 'بوفيه', 'قهوه', 'مشروب', 'عصير', 'حلويات',
+    'ресторан', 'завтрак', 'обед', 'ужин', 'бар', 'меню', 'еда', 'кафе', 'напит',
+    'frühstück', 'mittagessen', 'abendessen', 'speisekarte', 'essen', 'getränk'] },
+  { key: 'room', label: 'Room & housekeeping', words: [
+    'room', 'rooms', 'towel', 'housekeeping', 'clean', 'wifi', 'wi fi', 'internet', 'password', 'ac', 'a c',
+    'air condition', 'aircon', 'pillow', 'blanket', 'shower', 'minibar', 'fridge', 'kettle', 'bathroom', 'toilet',
+    'غرفه', 'غرفت', 'اوضه', 'اوضت', 'فوط', 'فوطه', 'بشكير', 'واي فاي', 'وايفاي', 'نت', 'انترنت', 'تكييف', 'تنظيف',
+    'نضافه', 'نظافه', 'مخده', 'مخدات', 'بطانيه',
+    'номер', 'полотенц', 'уборк', 'вайфай', 'интернет', 'кондиционер', 'подушк',
+    'zimmer', 'handt', 'reinigung', 'wlan', 'klimaanlage', 'kissen', 'dusche'] },
+  { key: 'beach_pool', label: 'Beach & pool', words: [
+    'beach', 'pool', 'sunbed', 'lounger', 'umbrella', 'swim', 'sea', 'snorkel',
+    'شاطي', 'شط', 'بيتش', 'بحر', 'حمام سباحه', 'سباحه', 'بسين', 'بيسين', 'شمسيه', 'شازلونج',
+    'пляж', 'бассейн', 'лежак', 'море', 'зонт',
+    'strand', 'schwimmbad', 'liege', 'meer', 'sonnenschirm'] },
+  { key: 'spa', label: 'Spa', words: [
+    'spa', 'massage', 'sauna', 'hammam', 'jacuzzi', 'wellness',
+    'سبا', 'مساج', 'ساونا', 'جاكوزي', 'تدليك',
+    'спа', 'массаж', 'сауна'] },
+  { key: 'transport', label: 'Taxi & transfers', words: [
+    'taxi', 'airport', 'transfer', 'uber', 'bus', 'shuttle', 'limo', 'driver',
+    'تاكسي', 'مطار', 'توصيل', 'اوبر', 'باص', 'ليموزين',
+    'такси', 'аэропорт', 'трансфер', 'автобус',
+    'flughafen'] },
+  { key: 'checkout', label: 'Check-in & check-out', words: [
+    'checkout', 'check out', 'checkin', 'check in', 'late checkout', 'departure', 'arrival',
+    'تشيك اوت', 'تشيك ان', 'خروج', 'مغادره',
+    'выезд', 'заезд', 'выселен', 'заселен',
+    'auschecken', 'einchecken', 'abreise', 'anreise'] },
+  { key: 'complaint', label: 'Complaints', words: [
+    'complain', 'dirty', 'broken', 'bad', 'noisy', 'noise', 'not working', 'smell', 'rude', 'problem', 'disappoint',
+    'terrible', 'awful', 'worst', 'unacceptable',
+    'شكوي', 'شكوه', 'شكاوي', 'وسخ', 'وسخه', 'مكسور', 'بايظ', 'عطلان', 'معطل', 'ازعاج', 'دوشه', 'مشكله', 'مشاكل', 'زفت',
+    'жалоб', 'грязн', 'сломан', 'шум', 'шумн', 'плохо', 'проблем', 'ужасн',
+    'beschwerde', 'schmutzig', 'kaputt', 'laut', 'schlecht'] }
+]
+const AN_AR_PREFIXES = ['وال', 'بال', 'فال', 'كال', 'لل', 'ال', 'و', 'ف', 'ب', 'ل', 'ك']
+
+function anTokens(text: string): string[] {
+  return text.toLowerCase()
+    .replace(/[ً-ْٰـ]/g, '')
+    .replace(/[إأآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/ء/g, '')
+    .split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+}
+
+function anWordHit(token: string, kw: string): boolean {
+  return token === kw || (kw.length >= 4 && token.startsWith(kw))
+}
+
+let anTopicWords: Map<string, string[]> | null = null
+let anTopicPhrases: { parts: string[], topic: string }[] = []
+function anChatTopics(text: string): string[] {
+  if (!anTopicWords) {
+    anTopicWords = new Map()
+    for (const t of AN_TOPICS) {
+      for (const kw of t.words) {
+        if (kw.indexOf(' ') >= 0) { anTopicPhrases.push({ parts: kw.split(' '), topic: t.key }); continue }
+        const list = anTopicWords.get(kw)
+        if (list) list.push(t.key); else anTopicWords.set(kw, [t.key])
+      }
+    }
+  }
+  const tokens = anTokens(text)
+  const variants = tokens.map((t) => {
+    const out = [t]
+    for (const p of AN_AR_PREFIXES) if (t.startsWith(p) && t.length - p.length >= 2) out.push(t.slice(p.length))
+    return out
+  })
+  const hits = new Set<string>()
+  const seen = new Set<string>()
+  for (const vs of variants) {
+    for (const v of vs) {
+      if (seen.has(v)) continue
+      seen.add(v)
+      // The word itself, or any 4+ letter start of it (keywords of 4+ letters match longer words)
+      for (let len = v.length; len >= 1; len--) {
+        if (len < v.length && len < 4) break
+        const topicsOf = anTopicWords.get(len === v.length ? v : v.slice(0, len))
+        if (topicsOf) for (const k of topicsOf) hits.add(k)
+      }
+    }
+  }
+  for (const ph of anTopicPhrases) {
+    if (hits.has(ph.topic)) continue
+    for (let i = 0; i + ph.parts.length <= tokens.length; i++) {
+      let ok = true
+      for (let j = 0; j < ph.parts.length && ok; j++) {
+        const vs = variants[i + j]
+        ok = j === ph.parts.length - 1 ? vs.some((v) => anWordHit(v, ph.parts[j])) : vs.indexOf(ph.parts[j]) >= 0
+      }
+      if (ok) { hits.add(ph.topic); break }
+    }
+  }
+  return AN_TOPICS.filter((t) => hits.has(t.key)).map((t) => t.key)
+}
+
+// Language of a chat from the script the guest wrote in (only when the site language is unknown).
+function anScriptLang(text: string): string | null {
+  const n: Record<string, number> = { ar: 0, ru: 0, el: 0, he: 0, zh: 0, latin: 0 }
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) || 0
+    if ((cp >= 0x0600 && cp <= 0x06FF) || (cp >= 0x0750 && cp <= 0x077F) || (cp >= 0xFB50 && cp <= 0xFEFF)) n.ar++
+    else if (cp >= 0x0400 && cp <= 0x04FF) n.ru++
+    else if (cp >= 0x0370 && cp <= 0x03FF) n.el++
+    else if (cp >= 0x0590 && cp <= 0x05FF) n.he++
+    else if ((cp >= 0x3040 && cp <= 0x30FF) || (cp >= 0x3400 && cp <= 0x9FFF) || (cp >= 0xAC00 && cp <= 0xD7AF)) n.zh++
+    else if ((cp >= 0x41 && cp <= 0x5A) || (cp >= 0x61 && cp <= 0x7A) || (cp >= 0xC0 && cp <= 0x24F)) n.latin++
+  }
+  let best: string | null = null
+  for (const k of Object.keys(n)) if (n[k] > 0 && (best === null || n[k] > n[best])) best = k
+  return best
+}
+
+// AI reply times (seconds) in one conversation's messages, oldest first: each guest message is
+// paired with the first assistant message after it.
+function anAiReplySeconds(msgs: any[]): number[] {
+  const out: number[] = []
+  let lastUser: number | null = null
+  for (const m of msgs) {
+    if (m.role === 'user') lastUser = anMs(m.created_at)
+    else if (m.role === 'assistant' && lastUser !== null) {
+      const t = anMs(m.created_at)
+      if (t !== null && t >= lastUser) out.push((t - lastUser) / 1000)
+      lastUser = null
+    }
+  }
+  return out
+}
+
+function anSorted<T>(m: Map<string, T>, score: (v: T) => number): T[] {
+  return Array.from(m.values()).sort((a, b) => score(b) - score(a))
+}
+
+// escalation_log.detail holds WaSender's raw JSON reply or a plain note; keep only the readable message.
+function anErrorText(detail: any): string | null {
+  const s = String(detail == null ? '' : detail).trim()
+  if (!s) return null
+  try {
+    const j = JSON.parse(s)
+    const msg = j && (j.message || j.error)
+    if (typeof msg === 'string' && msg.trim()) return msg.trim().slice(0, 200)
+  } catch (e) { /* not JSON */ }
+  return s.slice(0, 200)
+}
+
+app.get('/api/admin/analytics/overview', requirePermission('analytics_view'), async (c) => {
+  const { DB } = c.env
+  c.header('Cache-Control', 'no-store')
+  const pid = rstId(c.req.header('X-Property-ID') || c.req.query('property_id') || '1')
+  if (!pid) return c.json({ success: false, error: 'Invalid property' }, 400)
+  const today = attCairoDate()
+  const r = anResolveRange(c.req.query('range'), c.req.query('from'), c.req.query('to'), today)
+  if ('error' in r) return c.json({ success: false, error: r.error }, 400)
+
+  const fromUtc = anUtcStamp(anCairoDayStartMs(r.from))
+  const toUtc = anUtcStamp(anCairoDayStartMs(addDaysYmd(r.to, 1)))
+  const prevFromUtc = anUtcStamp(anCairoDayStartMs(r.prev_from))
+  const weekAgoUtc = anUtcStamp(Date.now() - 7 * 86400000)
+  const firstTracked = `(SELECT day FROM guest_events WHERE property_id = ? AND staff = 0 ORDER BY day LIMIT 1)`
+  const visitWhere = `property_id = ? AND staff = 0 AND event = 'visit' AND day >= ? AND day <= ?`
 
   try {
-    // Calculate date ranges
-    let currentStartDate, currentEndDate, previousStartDate, previousEndDate
-    
-    if (dateRange === 'custom' && startDate && endDate) {
-      currentStartDate = startDate
-      currentEndDate = endDate
-      // Calculate previous period of same length
-      const daysDiff = Math.floor((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
-      previousEndDate = startDate
-      previousStartDate = new Date(new Date(startDate) - daysDiff * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    } else if (dateRange === 'today') {
-      currentStartDate = "date('now')"
-      currentEndDate = "date('now')"
-      previousStartDate = "date('now', '-1 day')"
-      previousEndDate = "date('now', '-1 day')"
-    } else if (dateRange === 'yesterday') {
-      currentStartDate = "date('now', '-1 day')"
-      currentEndDate = "date('now', '-1 day')"
-      previousStartDate = "date('now', '-2 days')"
-      previousEndDate = "date('now', '-2 days')"
-    } else if (dateRange === '7days') {
-      currentStartDate = "date('now', '-6 days')"
-      currentEndDate = "date('now')"
-      previousStartDate = "date('now', '-13 days')"
-      previousEndDate = "date('now', '-7 days')"
-    } else if (dateRange === '30days') {
-      currentStartDate = "date('now', '-29 days')"
-      currentEndDate = "date('now')"
-      previousStartDate = "date('now', '-59 days')"
-      previousEndDate = "date('now', '-30 days')"
+    // Status check of the WhatsApp channel (cached 10 min by whatsappHealth; never a send).
+    const waCheck = whatsappHealth(c.env, DB)
+    try { c.executionCtx.waitUntil(waCheck.catch(() => {})) } catch (e) {}
+    const waTimeout = new Promise<null>((res) => setTimeout(() => res(null), 3000))
+
+    const [res, wa]: [any[], any] = await Promise.all([DB.batch([
+      DB.prepare(`
+        SELECT ${firstTracked} AS tracking_started,
+          (SELECT MIN(first_ack_at) FROM chatbot_conversations WHERE property_id = ?) AS ack_since,
+          (SELECT beach_booking_enabled FROM beach_settings WHERE property_id = ? LIMIT 1) AS beach_online,
+          (SELECT COUNT(*) FROM beach_spots WHERE property_id = ? AND is_active = 1) AS beach_spots,
+          (SELECT COUNT(*) FROM restaurant_settings rs JOIN hotel_offerings o ON o.offering_id = rs.offering_id
+            WHERE o.property_id = ?) AS rst_modules,
+          (SELECT MAX(rs.guest_booking_enabled) FROM restaurant_settings rs JOIN hotel_offerings o ON o.offering_id = rs.offering_id
+            WHERE o.property_id = ?) AS rst_online,
+          (SELECT COUNT(*) FROM escalation_log WHERE property_id = ? AND status = 'sent' AND sent_at >= ?) AS wa_sent_7d,
+          (SELECT COUNT(*) FROM escalation_log WHERE property_id = ? AND status = 'failed' AND sent_at >= ?) AS wa_failed_7d,
+          (SELECT MAX(sent_at) FROM escalation_log WHERE property_id = ? AND status = 'sent') AS wa_last_sent_at,
+          (SELECT MAX(sent_at) FROM escalation_log WHERE property_id = ? AND status = 'failed') AS wa_last_failed_at,
+          (SELECT detail FROM escalation_log WHERE property_id = ? AND status = 'failed' ORDER BY log_id DESC LIMIT 1) AS wa_last_error,
+          (SELECT COUNT(*) FROM escalation_contacts WHERE property_id = ? AND is_active = 1) AS wa_contacts,
+          (SELECT COUNT(*) FROM chatbot_conversations c WHERE c.property_id = ? AND EXISTS (
+            SELECT 1 FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id AND m.role = 'user'
+              AND m.created_at > datetime('now', '-20 minutes')
+              AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at))) AS unacked
+      `).bind(pid, pid, pid, pid, pid, pid, pid, weekAgoUtc, pid, weekAgoUtc, pid, pid, pid, pid, pid),
+      // Chats of the current and the previous period
+      DB.prepare(`
+        SELECT c.conversation_id AS id, c.started_at, c.room_number, c.admin_takeover_at, c.first_ack_at, c.site_lang, c.guest_lang
+        FROM chatbot_conversations c
+        WHERE c.property_id = ? AND c.started_at >= ? AND c.started_at < ? AND ${AN_CHAT_REAL}
+      `).bind(pid, prevFromUtc, toUtc),
+      DB.prepare(`
+        SELECT m.conversation_id AS id, m.role, m.created_at,
+          CASE WHEN m.role = 'user' AND c.started_at >= ? THEN substr(m.content, 1, 500) END AS content
+        FROM chatbot_conversations c JOIN chatbot_messages m ON m.conversation_id = c.conversation_id
+        WHERE c.property_id = ? AND c.started_at >= ? AND c.started_at < ? AND ${AN_CHAT_REAL}
+          AND m.role IN ('user', 'assistant', 'admin')
+        ORDER BY m.conversation_id, m.message_id
+      `).bind(fromUtc, pid, prevFromUtc, toUtc),
+      DB.prepare(`
+        SELECT f.detected_at, f.complaint_category AS category, f.sentiment_label AS sentiment, f.room_number AS room
+        FROM chat_feedback f LEFT JOIN chatbot_conversations c ON c.conversation_id = f.conversation_id
+        WHERE f.property_id = ? AND f.is_complaint = 1 AND f.detected_at >= ? AND f.detected_at < ?
+          AND (c.conversation_id IS NULL OR (${AN_CHAT_REAL}))
+        ORDER BY f.detected_at DESC
+      `).bind(pid, prevFromUtc, toUtc),
+      // Visits per day, then the two period totals (unique phones cannot be summed from days)
+      DB.prepare(`
+        SELECT day AS k, COUNT(*) AS visits, COUNT(DISTINCT visitor_id) AS devices, SUM(is_new) AS new_devices
+        FROM guest_events WHERE ${visitWhere} GROUP BY day
+        UNION ALL
+        SELECT CASE WHEN day >= ? THEN 'cur' ELSE 'prev' END, COUNT(*), COUNT(DISTINCT visitor_id), SUM(is_new)
+        FROM guest_events WHERE ${visitWhere} GROUP BY 1
+      `).bind(pid, r.from, r.to, r.from, pid, r.prev_from, r.to),
+      DB.prepare(`
+        SELECT 'hour' AS dim, CAST(hour AS TEXT) AS v, COUNT(*) AS n FROM guest_events WHERE ${visitWhere} GROUP BY hour
+        UNION ALL SELECT 'source', source, COUNT(*) FROM guest_events WHERE ${visitWhere} GROUP BY source
+        UNION ALL SELECT 'lang', lang, COUNT(*) FROM guest_events WHERE ${visitWhere} GROUP BY lang
+      `).bind(pid, r.from, r.to, pid, r.from, r.to, pid, r.from, r.to),
+      DB.prepare(`
+        SELECT day, event, target, COUNT(*) AS n FROM guest_events
+        WHERE property_id = ? AND staff = 0 AND event IN ('open', 'chat_open') AND day >= ? AND day <= ?
+        GROUP BY day, event, target
+      `).bind(pid, r.from, r.to),
+      // Legacy section opens, only needed for days before the tracker (view_date is the UTC date, a superset)
+      DB.prepare(`
+        SELECT substr(view_timestamp, 1, 13) AS h, page_type, page_id, COUNT(*) AS n FROM page_views
+        WHERE property_id = ? AND view_date >= ? AND view_date <= ? AND view_timestamp >= ? AND view_timestamp < ?
+          AND view_date < coalesce(${firstTracked}, '9999-12-31') AND ${AN_BOT_UA_SQL}
+        GROUP BY h, page_type, page_id
+      `).bind(pid, fromUtc.slice(0, 10), toUtc.slice(0, 10), fromUtc, toUtc, pid),
+      DB.prepare(`
+        SELECT 'offering' AS kind, CAST(offering_id AS TEXT) AS id, title_en AS name FROM hotel_offerings WHERE property_id = ?
+        UNION ALL SELECT 'section', lower(section_key), section_name_en FROM custom_sections WHERE property_id = ?
+      `).bind(pid, pid),
+      DB.prepare(`
+        SELECT booking_date AS d, slot_type AS slot, coalesce(booking_source, '') AS src, booking_status AS st,
+          COUNT(*) AS n, SUM(coalesce(num_guests, 0)) AS guests
+        FROM beach_bookings
+        WHERE property_id = ? AND booking_date >= ? AND booking_date <= ? AND ${AN_BEACH_REAL}
+        GROUP BY d, slot, src, st
+      `).bind(pid, r.prev_from, r.to),
+      DB.prepare(`
+        SELECT rb.booking_date AS d, rb.zone_id, z.name AS zone_name, z.display_order AS zone_order,
+          rb.slot_id, s.label AS slot_label, s.meal, s.start_time AS slot_start, coalesce(rb.source, '') AS src,
+          rb.status AS st, coalesce(rb.auto_released, 0) AS released, COUNT(*) AS n, SUM(coalesce(rb.party_size, 0)) AS covers
+        FROM restaurant_bookings rb
+        LEFT JOIN restaurant_zones z ON z.zone_id = rb.zone_id
+        LEFT JOIN restaurant_slots s ON s.slot_id = rb.slot_id
+        WHERE rb.property_id = ? AND rb.booking_date >= ? AND rb.booking_date <= ? AND ${AN_RST_REAL}
+        GROUP BY d, rb.zone_id, rb.slot_id, src, st, released
+      `).bind(pid, r.prev_from, r.to),
+      DB.prepare(`
+        SELECT device, app_version, ringing, CAST((julianday('now') - julianday(last_seen)) * 86400 AS INTEGER) AS seconds_ago
+        FROM staff_watchdog WHERE property_id = ? ORDER BY last_seen DESC LIMIT 20
+      `).bind(pid)
+    ]), Promise.race([waCheck.catch(() => null), waTimeout])])
+
+    const [metaR, convR, msgR, complaintR, visitR, dimR, openR, legacyR, nameR, beachR, rstR, phoneR] = res.map(rstRows)
+    const meta: any = metaR[0] || {}
+    const days: string[] = []
+    for (let i = 0; i < r.days; i++) days.push(addDaysYmd(r.from, i))
+    const hourCache = new Map<string, { day: string, hour: number }>()
+    const started: string | null = meta.tracking_started || null
+    const tracked = (day: string) => !!started && day >= started
+    const daily = new Map<string, any>()
+    for (const d of days) {
+      daily.set(d, { day: d, visits: tracked(d) ? 0 : null, devices: tracked(d) ? 0 : null, chats: 0, opens: 0, beach: 0, restaurant: 0 })
     }
 
-    // QR Scans for current period
-    const currentScans = await DB.prepare(`
-      SELECT COUNT(*) as count FROM qr_scans
-      WHERE property_id = ? AND scan_date BETWEEN ${currentStartDate} AND ${currentEndDate}
-    `).bind(property_id).first()
-
-    // QR Scans for previous period (for comparison)
-    const previousScans = await DB.prepare(`
-      SELECT COUNT(*) as count FROM qr_scans
-      WHERE property_id = ? AND scan_date BETWEEN ${previousStartDate} AND ${previousEndDate}
-    `).bind(property_id).first()
-
-    // Calculate percentage change
-    const scansChange = previousScans.count > 0 
-      ? ((currentScans.count - previousScans.count) / previousScans.count * 100).toFixed(1)
-      : currentScans.count > 0 ? 100 : 0
-
-    // Total activities count
-    const activities = await DB.prepare(`
-      SELECT COUNT(*) as count FROM activities a
-      JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
-      WHERE vp.property_id = ? AND a.status = 'active'
-    `).bind(property_id).first()
-
-    // Total vendors count
-    const vendors = await DB.prepare(`
-      SELECT COUNT(*) as count FROM vendor_properties vp
-      JOIN vendors v ON vp.vendor_id = v.vendor_id
-      WHERE vp.property_id = ? AND v.status = 'active'
-    `).bind(property_id).first()
-
-    // Active bookings for current period
-    const currentBookings = await DB.prepare(`
-      SELECT COUNT(*) as count FROM bookings
-      WHERE property_id = ? AND booking_status IN ('confirmed', 'pending')
-        AND booking_date BETWEEN ${currentStartDate} AND ${currentEndDate}
-    `).bind(property_id).first()
-
-    // Previous period bookings for comparison
-    const previousBookings = await DB.prepare(`
-      SELECT COUNT(*) as count FROM bookings
-      WHERE property_id = ? AND booking_status IN ('confirmed', 'pending')
-        AND booking_date BETWEEN ${previousStartDate} AND ${previousEndDate}
-    `).bind(property_id).first()
-
-    const bookingsChange = previousBookings.count > 0
-      ? ((currentBookings.count - previousBookings.count) / previousBookings.count * 100).toFixed(1)
-      : currentBookings.count > 0 ? 100 : 0
-
-    // Most popular activities (by bookings in current period)
-    const popularActivities = await DB.prepare(`
-      SELECT 
-        a.title_en,
-        a.activity_id,
-        COUNT(b.booking_id) as booking_count,
-        SUM(b.total_price) as total_revenue
-      FROM activities a
-      JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
-      LEFT JOIN bookings b ON a.activity_id = b.activity_id 
-        AND b.booking_date BETWEEN ${currentStartDate} AND ${currentEndDate}
-      WHERE vp.property_id = ?
-      GROUP BY a.activity_id
-      HAVING booking_count > 0
-      ORDER BY booking_count DESC
-      LIMIT 5
-    `).bind(property_id).all()
-
-    // Most viewed sections (from page_views table)
-    const popularSections = await DB.prepare(`
-      SELECT 
-        page_type as name,
-        COUNT(*) as views
-      FROM page_views
-      WHERE property_id = ? AND view_date BETWEEN ${currentStartDate} AND ${currentEndDate}
-      GROUP BY page_type
-      ORDER BY views DESC
-      LIMIT 5
-    `).bind(property_id).all()
-
-    // Add icons for sections
-    const sectionIcons = {
-      'activities': 'hiking',
-      'restaurants': 'utensils',
-      'spa': 'spa',
-      'events': 'calendar',
-      'rooms': 'bed',
-      'custom': 'layer-group'
+    // ── Guest app ──
+    let visits: any = { value: null, prev: null, devices: null, devices_prev: null, new_devices: null }
+    const hoursVisits = new Array(24).fill(0)
+    const sources: any[] = [], languages: any[] = []
+    // A range that ends before the tracker went live has no visit numbers at all (not zero)
+    const visitsTracked = tracked(r.to)
+    if (visitsTracked) {
+      const cur = visitR.find((x: any) => x.k === 'cur') || {}
+      const prev = visitR.find((x: any) => x.k === 'prev') || {}
+      const prevTracked = r.prev_from >= started
+      visits = {
+        value: Number(cur.visits || 0),
+        prev: prevTracked ? Number(prev.visits || 0) : null,
+        devices: Number(cur.devices || 0),
+        devices_prev: prevTracked ? Number(prev.devices || 0) : null,
+        new_devices: Number(cur.new_devices || 0)
+      }
+      for (const v of visitR) {
+        const row = daily.get(v.k)
+        if (row && row.visits !== null) { row.visits = Number(v.visits); row.devices = Number(v.devices) }
+      }
+      for (const d of dimR) {
+        if (d.dim === 'hour') { const h = Number(d.v); if (h >= 0 && h < 24) hoursVisits[h] += Number(d.n) }
+        else if (d.dim === 'source') sources.push({ key: d.v || 'unknown', visits: Number(d.n) })
+        else if (d.dim === 'lang') languages.push({ lang: d.v || 'unknown', visits: Number(d.n) })
+      }
+      sources.sort((a, b) => b.visits - a.visits)
+      languages.sort((a, b) => b.visits - a.visits)
     }
 
-    const sectionsWithIcons = (popularSections.results || []).map(s => ({
-      ...s,
-      icon: sectionIcons[s.name] || 'eye'
-    }))
+    const offeringNames = new Map<string, string>(), sectionNames = new Map<string, string>()
+    for (const n of nameR) (n.kind === 'offering' ? offeringNames : sectionNames).set(String(n.id), n.name)
+    const venues = new Map<string, any>(), sections = new Map<string, any>()
+    const countOpen = (k: { venue: boolean, key: string, label: string } | null, day: string, n: number) => {
+      if (!k) return
+      const row = daily.get(day)
+      if (row) row.opens += n
+      const list = k.venue ? venues : sections
+      const hit = list.get(k.key)
+      if (hit) { hit.opens += n; return }
+      if (k.venue) {
+        const id = k.key.slice('offering:'.length)
+        const m = /^H(\d+)$/i.exec(id)
+        venues.set(k.key, { key: k.key, name: (m && offeringNames.get(m[1])) || id, opens: n })
+      } else {
+        sections.set(k.key, { key: k.key, label: k.label || sectionNames.get(k.key) || k.key, opens: n })
+      }
+    }
+    for (const row of legacyR) {
+      const at = anCairoOfUtc(row.h, hourCache)
+      if (!at || tracked(at.day)) continue
+      countOpen(anOpenKey(row.page_type, row.page_id), at.day, Number(row.n))
+    }
+    for (const row of openR) {
+      if (row.event === 'chat_open') { countOpen({ venue: false, key: 'chat', label: AN_SECTION_LABELS.chat }, row.day, Number(row.n)); continue }
+      const t = String(row.target || '')
+      const i = t.indexOf(':')
+      countOpen(i > 0 ? anOpenKey(t.slice(0, i), t.slice(i + 1)) : anOpenKey(t, null), row.day, Number(row.n))
+    }
+    // A custom section's admin-given name beats the raw key the page sent
+    for (const s of sections.values()) if (!AN_SECTION_LABELS[s.key] && sectionNames.get(s.key)) s.label = sectionNames.get(s.key)
 
-    console.log('✅ Analytics data prepared:', {
-      totalScans: currentScans.count,
-      activeBookings: currentBookings.count,
-      totalActivities: activities.count,
-      totalVendors: vendors.count
-    })
+    // ── AI concierge ──
+    const msgsBy = new Map<number, any[]>()
+    for (const m of msgR) {
+      const list = msgsBy.get(m.id)
+      if (list) list.push(m); else msgsBy.set(m.id, [m])
+    }
+    // first_ack_at exists since the analytics release: a chat from before it that staff re-open
+    // later would get a late "first" ack, so only chats from the first recorded ack's Cairo day on count.
+    const ackSinceMs = meta.ack_since ? anMs(meta.ack_since) : null
+    const ackFrom = ackSinceMs === null ? null : anUtcStamp(anCairoDayStartMs(anCairoParts(ackSinceMs).day))
+    let chatsCur = 0, chatsPrev = 0, aiCur = 0, aiPrev = 0, guestMessages = 0, takeovers = 0, afterHours = 0, roomsLinked = 0
+    const aiLat: number[] = [], staffMin: number[] = [], ackMin: number[] = []
+    const hoursChats = new Array(24).fill(0)
+    const chatLangs = new Map<string, any>(), topics = new Map<string, number>()
+    for (const cv of convR) {
+      const msgs = msgsBy.get(cv.id) || []
+      let firstUser: number | null = null, firstAdmin: number | null = null
+      let users = 0, admins = 0
+      const text: string[] = []
+      for (const m of msgs) {
+        if (m.role === 'user') {
+          users++
+          if (firstUser === null) firstUser = anMs(m.created_at)
+          if (m.content) text.push(String(m.content))
+        } else if (m.role === 'admin') {
+          admins++
+          if (firstAdmin === null) firstAdmin = anMs(m.created_at)
+        }
+      }
+      const aiOnly = admins === 0 && !cv.admin_takeover_at
+      if (String(cv.started_at) < fromUtc) {
+        chatsPrev++
+        if (aiOnly) aiPrev++
+        continue
+      }
+      chatsCur++
+      if (aiOnly) aiCur++
+      guestMessages += users
+      for (const x of anAiReplySeconds(msgs)) aiLat.push(x)
+      if (!aiOnly) {
+        takeovers++
+        if (firstAdmin !== null && firstUser !== null && firstAdmin >= firstUser) staffMin.push((firstAdmin - firstUser) / 60000)
+      }
+      const ack = anMs(cv.first_ack_at)
+      if (ack !== null && firstUser !== null && ack >= firstUser && ackFrom && String(cv.started_at) >= ackFrom) {
+        ackMin.push((ack - firstUser) / 60000)
+      }
+      const at = firstUser !== null ? anCairoParts(firstUser) : anCairoOfUtc(cv.started_at, hourCache)
+      if (at) {
+        hoursChats[at.hour]++
+        if (at.hour >= 22 || at.hour < 7) afterHours++
+      }
+      const startDay = anCairoOfUtc(cv.started_at, hourCache)
+      const row = startDay && daily.get(startDay.day)
+      if (row) row.chats++
+      if (String(cv.room_number || '').trim()) roomsLinked++
+      const joined = text.join('\n')
+      const lang = (String(cv.site_lang || cv.guest_lang || '').trim().toLowerCase().split('-')[0]) || anScriptLang(joined) || 'unknown'
+      const hitLang = chatLangs.get(lang)
+      if (hitLang) hitLang.chats++; else chatLangs.set(lang, { lang, chats: 1 })
+      const found = anChatTopics(joined)
+      for (const k of (found.length ? found : ['other'])) topics.set(k, (topics.get(k) || 0) + 1)
+    }
+    aiLat.sort((a, b) => a - b)
+    staffMin.sort((a, b) => a - b)
+    ackMin.sort((a, b) => a - b)
+
+    const complaintsCur = complaintR.filter((f: any) => String(f.detected_at) >= fromUtc)
+
+    // ── Bookings (booking_date is already a Cairo date) ──
+    const isIn = (st: string) => st === 'checked_in' || st === 'completed'
+    const beach = { bookings: 0, prev: 0, guests: 0, checked_in: 0, no_show: 0, cancelled: 0 }
+    const beachSlots = new Map<string, any>(), beachSources = new Map<string, any>()
+    for (const b of beachR) {
+      const n = Number(b.n)
+      if (b.d < r.from) { if (b.st !== 'cancelled') beach.prev += n; continue }
+      if (b.st === 'cancelled') { beach.cancelled += n; continue }
+      beach.bookings += n
+      beach.guests += Number(b.guests || 0)
+      if (isIn(b.st)) beach.checked_in += n
+      if (b.st === 'no_show') beach.no_show += n
+      const row = daily.get(b.d)
+      if (row) row.beach += n
+      const slot = normBeachSlot(b.slot) || 'unknown'
+      const s = beachSlots.get(slot) || { key: slot, label: AN_BEACH_SLOT_LABELS[slot] || slot, bookings: 0, guests: 0 }
+      s.bookings += n
+      s.guests += Number(b.guests || 0)
+      beachSlots.set(slot, s)
+      const src = b.src || 'unknown'
+      const so = beachSources.get(src) || { key: src, bookings: 0 }
+      so.bookings += n
+      beachSources.set(src, so)
+    }
+    const rst = { bookings: 0, prev: 0, covers: 0, walk_ins: 0, checked_in: 0, no_show: 0, auto_released: 0 }
+    const rstZones = new Map<string, any>(), rstSlots = new Map<string, any>(), rstSources = new Map<string, any>()
+    for (const b of rstR) {
+      const n = Number(b.n), covers = Number(b.covers || 0)
+      if (b.st === 'cancelled') continue
+      if (b.d < r.from) { rst.prev += n; continue }
+      rst.bookings += n
+      rst.covers += covers
+      if (b.src === 'walk_in') rst.walk_ins += n
+      if (isIn(b.st)) rst.checked_in += n
+      if (b.st === 'no_show') rst.no_show += n
+      if (Number(b.released) === 1) rst.auto_released += n
+      const row = daily.get(b.d)
+      if (row) row.restaurant += n
+      const zk = String(b.zone_id == null ? 'none' : b.zone_id)
+      const z = rstZones.get(zk) || { key: zk, label: b.zone_name || 'No zone', bookings: 0, covers: 0, order: Number(b.zone_order || 0) }
+      z.bookings += n
+      z.covers += covers
+      rstZones.set(zk, z)
+      const sk = String(b.slot_id == null ? 'none' : b.slot_id)
+      const s = rstSlots.get(sk) || { key: sk, label: b.slot_label || b.meal || 'No slot', bookings: 0, covers: 0, start: String(b.slot_start || '99:99') }
+      s.bookings += n
+      s.covers += covers
+      rstSlots.set(sk, s)
+      const src = b.src || 'unknown'
+      const so = rstSources.get(src) || { key: src, bookings: 0 }
+      so.bookings += n
+      rstSources.set(src, so)
+    }
+
+    // ── Health ──
+    const waStates: Record<string, string> = { ready: 'ready', no_session: 'no_session', bad_key: 'bad_key', none: 'not_configured' }
+    const lastSent = meta.wa_last_sent_at || null, lastFailed = meta.wa_last_failed_at || null
+    const topics2 = AN_TOPICS.map((t) => ({ key: t.key, label: t.label, chats: topics.get(t.key) || 0 })).filter((t) => t.chats > 0)
+      .sort((a, b) => b.chats - a.chats)
+    if (topics.get('other')) topics2.push({ key: 'other', label: 'Other & greetings', chats: topics.get('other') || 0 })
 
     return c.json({
-      stats: {
-        totalScans: currentScans.count,
-        scansChange: scansChange,
-        scansPrevious: previousScans.count,
-        totalActivities: activities.count,
-        totalVendors: vendors.count,
-        activeBookings: currentBookings.count,
-        bookingsChange: bookingsChange,
-        bookingsPrevious: previousBookings.count
+      success: true,
+      range: {
+        key: r.key, from: r.from, to: r.to, days: r.days, prev_from: r.prev_from, prev_to: r.prev_to,
+        tz: 'Africa/Cairo', generated_at: new Date().toISOString()
       },
-      popularActivities: popularActivities.results || [],
-      popularSections: sectionsWithIcons,
-      dateRange: {
-        current: { start: currentStartDate, end: currentEndDate },
-        previous: { start: previousStartDate, end: previousEndDate }
+      tracking: { started, partial: !!started && r.from < started },
+      kpis: {
+        visits,
+        chats: { value: chatsCur, prev: chatsPrev, guest_messages: guestMessages },
+        ai_handled: { pct: anPct(aiCur, chatsCur), prev_pct: anPct(aiPrev, chatsPrev), n: chatsCur },
+        ai_reply: { median_s: anRound1(anQuantile(aiLat, 0.5)), p90_s: anRound1(anQuantile(aiLat, 0.9)), n: aiLat.length },
+        staff_reply: { takeovers, median_min: anRound1(anQuantile(staffMin, 0.5)), n: staffMin.length },
+        ack: { median_min: anRound1(anQuantile(ackMin, 0.5)), within5_pct: anPct(ackMin.filter((x) => x <= 5).length, ackMin.length), n: ackMin.length },
+        beach: { bookings: beach.bookings, prev: beach.prev, guests: beach.guests, checked_in: beach.checked_in, no_show: beach.no_show, cancelled: beach.cancelled },
+        restaurant: rst,
+        complaints: { value: complaintsCur.length, prev: complaintR.length - complaintsCur.length }
+      },
+      daily: days.map((d) => daily.get(d)),
+      hours: { visits: hoursVisits, chats: hoursChats },
+      app: {
+        venues: anSorted(venues, (v: any) => v.opens).slice(0, 10),
+        sections: anSorted(sections, (v: any) => v.opens),
+        sources,
+        languages,
+        new_vs_returning: visitsTracked
+          ? { new: visits.new_devices, returning: Math.max(0, visits.devices - visits.new_devices) }
+          : { new: null, returning: null }
+      },
+      chat: {
+        languages: anSorted(chatLangs, (v: any) => v.chats),
+        topics: topics2,
+        after_hours_pct: anPct(afterHours, chatsCur),
+        rooms_linked_pct: anPct(roomsLinked, chatsCur),
+        n: chatsCur,
+        recent_complaints: complaintsCur.slice(0, 5).map((f: any) => ({
+          at: anIso(f.detected_at), category: f.category || null, sentiment: f.sentiment || null, room: f.room || null
+        }))
+      },
+      beach: {
+        enabled: Number(meta.beach_spots || 0) > 0,
+        online_booking: Number(meta.beach_online) === 1,
+        by_slot: anSorted(beachSlots, (v: any) => v.bookings),
+        by_source: anSorted(beachSources, (v: any) => v.bookings)
+      },
+      restaurant: {
+        enabled: Number(meta.rst_modules || 0) > 0,
+        online_booking: Number(meta.rst_online) === 1,
+        by_zone: Array.from(rstZones.values()).sort((a, b) => a.order - b.order)
+          .map((z) => ({ key: z.key, label: z.label, bookings: z.bookings, covers: z.covers })),
+        by_slot: Array.from(rstSlots.values()).sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0))
+          .map((s) => ({ key: s.key, label: s.label, bookings: s.bookings, covers: s.covers })),
+        by_source: anSorted(rstSources, (v: any) => v.bookings)
+      },
+      health: {
+        whatsapp: {
+          state: (wa && waStates[wa.state]) || 'unknown',
+          sent_7d: Number(meta.wa_sent_7d || 0),
+          failed_7d: Number(meta.wa_failed_7d || 0),
+          last_sent_at: anIso(lastSent),
+          // Only while the latest attempt failed; an old error after later deliveries is history
+          last_error: lastFailed && (!lastSent || lastFailed > lastSent) ? anErrorText(meta.wa_last_error) : null,
+          contacts: Number(meta.wa_contacts || 0)
+        },
+        ops_phones: phoneR.map((p: any) => ({
+          device: p.device, app_version: p.app_version || null,
+          seconds_ago: p.seconds_ago == null ? null : Number(p.seconds_ago), ringing: Number(p.ringing) === 1
+        })),
+        unacked_chats: Number(meta.unacked || 0)
       }
     })
-  } catch (error) {
-    console.error('❌ Analytics API error:', error)
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      property_id,
-      dateRange
-    })
-    return c.json({ 
-      error: 'Internal server error', 
-      details: error.message,
-      stats: {
-        totalScans: 0,
-        scansChange: 0,
-        totalActivities: 0,
-        totalVendors: 0,
-        activeBookings: 0,
-        bookingsChange: 0
-      },
-      popularActivities: [],
-      popularSections: []
-    }, 500)
+  } catch (e: any) {
+    console.error('Analytics overview error:', e)
+    return c.json({ success: false, error: 'Could not build the analytics overview' }, 500)
   }
 })
 
@@ -12261,7 +12790,8 @@ app.post('/api/chatbot/chat', async (c) => {
   try {
     const body = await c.req.json()
     const { property_id, session_id, message, conversation_id, guest_context } = body
-    
+    const siteLang = geLang(body.site_lang)
+
     // Debug: Log received guest context
     console.log('🔍 Backend received guest_context:', guest_context ? 'YES' : 'NO')
     if (guest_context) {
@@ -12297,45 +12827,50 @@ app.post('/api/chatbot/chat', async (c) => {
     if (!convId) {
       // Create new conversation with guest info if available
       const convResult = await DB.prepare(`
-        INSERT INTO chatbot_conversations (property_id, session_id, guest_name, room_number)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO chatbot_conversations (property_id, session_id, guest_name, room_number, site_lang)
+        VALUES (?, ?, ?, ?, ?)
       `).bind(
-        property_id, 
+        property_id,
         session_id,
         guest_context?.guest_name || null,
-        guest_context?.room_number || null
+        guest_context?.room_number || null,
+        siteLang
       ).run()
       convId = convResult.meta.last_row_id
       // Instant staff alert: a brand-new guest conversation started
       try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {}
     } else {
-      // Update existing conversation with guest info if provided and not already set
-      if (guest_context?.guest_name || guest_context?.room_number) {
-        await DB.prepare(`
-          UPDATE chatbot_conversations
-          SET guest_name = COALESCE(guest_name, ?),
-              room_number = COALESCE(room_number, ?)
-          WHERE conversation_id = ? AND session_id = ? AND property_id = ?
-        `).bind(
-          guest_context?.guest_name || null,
-          guest_context?.room_number || null,
-          convId,
-          session_id,
-          property_id
-        ).run()
-      }
       // Check if admin has taken over (only for existing conversations)
+      let conv: any = null
       try {
-        const conv = await DB.prepare(`
-          SELECT is_ai_paused FROM chatbot_conversations
+        conv = await DB.prepare(`
+          SELECT is_ai_paused, site_lang FROM chatbot_conversations
           WHERE conversation_id = ? AND session_id = ? AND property_id = ?
         `).bind(convId, session_id, property_id).first()
-        
+
         if (conv && conv.is_ai_paused === 1) {
           isAIPaused = true
         }
       } catch (e) {
         console.log('is_ai_paused column not found, skipping check')
+      }
+      // Update existing conversation with guest info / site language if provided and not already set
+      const fillLang = siteLang && conv && !conv.site_lang ? siteLang : null
+      if (guest_context?.guest_name || guest_context?.room_number || fillLang) {
+        await DB.prepare(`
+          UPDATE chatbot_conversations
+          SET guest_name = COALESCE(guest_name, ?),
+              room_number = COALESCE(room_number, ?),
+              site_lang = COALESCE(site_lang, ?)
+          WHERE conversation_id = ? AND session_id = ? AND property_id = ?
+        `).bind(
+          guest_context?.guest_name || null,
+          guest_context?.room_number || null,
+          fillLang,
+          convId,
+          session_id,
+          property_id
+        ).run()
       }
     }
     
@@ -13771,9 +14306,23 @@ app.get('/api/admin/chatbot/analytics/stats', async (c) => {
       WHERE property_id = ? AND DATE(started_at) = ?
     `).bind(property_id, today).first()
     
-    // Average response time (placeholder - would need timestamps)
-    const avgResponseTime = 1.2
-    
+    // AI response time: median seconds from a guest message to the AI's reply, same window as the totals
+    const replies = await DB.prepare(`
+      SELECT m.conversation_id AS id, m.role, m.created_at FROM chatbot_messages m
+      JOIN chatbot_conversations c ON m.conversation_id = c.conversation_id
+      WHERE c.property_id = ? AND m.role IN ('user', 'assistant')
+      ORDER BY m.conversation_id, m.message_id
+    `).bind(property_id).all()
+    const byConv = new Map<number, any[]>()
+    for (const m of (replies.results || []) as any[]) {
+      const list = byConv.get(m.id)
+      if (list) list.push(m); else byConv.set(m.id, [m])
+    }
+    const seconds: number[] = []
+    for (const msgs of byConv.values()) for (const s of anAiReplySeconds(msgs)) seconds.push(s)
+    seconds.sort((a, b) => a - b)
+    const avgResponseTime = anRound1(anQuantile(seconds, 0.5))
+
     return c.json({
       success: true,
       stats: {
@@ -16311,10 +16860,14 @@ PLATFORM FEATURES YOU KNOW:
    - Important Information: Scroll to "Important Information" section (blue gradient card) → edit text (one line = one bullet point) → appears on guest confirmation pages
    - QR Codes: Automatically generated with 6-digit booking codes for each reservation. Staff scan at /staff/beach-check-in
 
-2. BEACH ANALYTICS:
-   - Access: Beach Booking Management → click "Open Dashboard" OR go directly to /admin/beach-analytics
-   - Features: Live occupancy by zone, peak hours heatmaps, revenue by zone, no-show tracking, AI-powered operational recommendations
-   - Real-time data showing current bookings, occupancy percentages, busiest times
+2. ANALYTICS:
+   - Access: Analytics tab in the Admin Dashboard sidebar ("Open full screen" opens /admin/analytics)
+   - Periods: Today, 7 days, 30 days or 90 days, all in Cairo time, compared with the previous period of the same length
+   - Guest app: visits and unique phones, busiest hours, most opened venues and sections, where visits come from (QR, Android app, iPhone app, link, direct), guest languages
+   - AI concierge: guest chats, share answered by the AI alone, AI reply time, front-desk response time, what guests ask about, chat languages, complaints flagged by the AI
+   - Bookings: beach and El Kasr restaurant bookings with guests/covers, check-ins, no-shows and walk-ins
+   - Health: warns when WhatsApp alerts to managers are not being delivered or an Ops phone stops checking in
+   - Download CSV exports the daily numbers
 
 3. RESTAURANT MANAGEMENT:
    - Add: Go to Offerings tab → click "Add New Offering" → select "Restaurant" → fill details (name, description, hours, menu)
@@ -16326,9 +16879,8 @@ PLATFORM FEATURES YOU KNOW:
    - Download: PNG (print quality) or SVG (vector for scaling)
    - Branding: Upload hotel logo, set foreground/background colors for branded QR codes
 
-5. ANALYTICS & REPORTS:
-   - View: Analytics tab in sidebar → see guest engagement, QR scans, popular services, trends
-   - Export: Click "Export Data" button to download CSV reports
+5. REPORTS:
+   - Analytics tab in the sidebar (see 2); "Download CSV" there exports the daily numbers
 
 6. SETTINGS & BRANDING:
    - Logo: Settings → Hotel Information → "Upload Logo" → appears throughout platform
@@ -16399,7 +16951,7 @@ Answer the admin's question about the GuestConnect platform:`
       } else if (msg.includes('zone') || msg.includes('overlay')) {
         fallbackResponse = 'To create beach zones:\n\n1. Go to Beach Booking Management tab\n2. Click "Design Beach Map" button\n3. Click the "Draw Zone" button\n4. Click and drag on the canvas to draw a zone area\n5. Name your zone (e.g., "Quiet Zone", "VIP Area")\n6. Choose a color for the zone\n7. Repeat for additional zones\n8. Click "Save Beach Layout"\n\nGuests will see these zones as colored overlays with a legend!'
       } else if (msg.includes('analytic')) {
-        fallbackResponse = 'To view analytics:\n\n1. For general analytics: Click "Analytics" tab in the sidebar\n2. For beach-specific analytics:\n   - Go to Beach Booking Management tab\n   - Click "Open Dashboard" in the Analytics card\n   - Or go directly to /admin/beach-analytics\n\nYou will see:\n- Live occupancy by zone\n- Peak hours heatmaps\n- Revenue by zone\n- No-show tracking\n- AI-powered recommendations'
+        fallbackResponse = 'To view analytics:\n\n1. Click the "Analytics" tab in the sidebar (or "Open full screen" for /admin/analytics)\n2. Pick a period: Today, 7 days, 30 days or 90 days (Cairo time)\n\nYou will see:\n- Guest app visits, unique phones and busiest hours\n- Most opened venues and sections\n- AI concierge chats, AI reply time and front-desk response time\n- What guests ask about and complaints flagged by the AI\n- Beach and El Kasr bookings, check-ins and no-shows\n\nUse "Download CSV" to export the daily numbers.'
       } else if (msg.includes('qr') && msg.includes('code')) {
         fallbackResponse = 'To create a QR code:\n\n1. Click the "QR Codes" tab in the sidebar\n2. Click "Create New QR Code" button\n3. Enter the destination URL\n4. Customize your QR code:\n   - Upload your hotel logo (center)\n   - Choose foreground color\n   - Choose background color\n   - Select frame style\n   - Adjust corner style\n5. Preview your QR code\n6. Download as PNG (for printing) or SVG (for scaling)'
       } else if (msg.includes('staff') || msg.includes('check') && msg.includes('in')) {
@@ -16505,262 +17057,6 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
   } catch (error) {
     console.error('Check-in error:', error)
     return c.json({ success: false, error: 'Check-in failed' }, 500)
-  }
-})
-
-// ==================== ANALYTICS API ENDPOINTS ====================
-
-// API: Analytics - Live Occupancy (Real-time)
-app.get('/api/analytics/beach/live-occupancy/:property_id', requirePermission('beach_analytics'), async (c) => {
-  const { DB } = c.env
-  const { property_id } = c.req.param()
-  const today = new Date().toISOString().split('T')[0]
-  
-  try {
-    // Get total spots by zone and type
-    const spots = await DB.prepare(`
-      SELECT bz.zone_name, bs.spot_type, COUNT(*) as total_spots
-      FROM beach_spots bs
-      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
-      WHERE bs.property_id = ? AND bs.is_active = 1
-      GROUP BY bz.zone_name, bs.spot_type
-    `).bind(property_id).all()
-    
-    // Get occupied spots for today
-    const occupied = await DB.prepare(`
-      SELECT bz.zone_name, bs.spot_type, COUNT(*) as occupied_spots
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
-      WHERE bb.property_id = ? 
-        AND bb.booking_date = ?
-        AND bb.booking_status IN ('confirmed', 'checked_in')
-      GROUP BY bz.zone_name, bs.spot_type
-    `).bind(property_id, today).all()
-    
-    // Calculate occupancy rates
-    const occupancyMap = {}
-    spots.results.forEach(spot => {
-      const key = spot.zone_name + '|' + spot.spot_type
-      occupancyMap[key] = {
-        zone_name: spot.zone_name,
-        spot_type: spot.spot_type,
-        total: spot.total_spots,
-        occupied: 0,
-        available: spot.total_spots,
-        occupancy_rate: 0
-      }
-    })
-    
-    occupied.results.forEach(occ => {
-      const key = occ.zone_name + '|' + occ.spot_type
-      if (occupancyMap[key]) {
-        occupancyMap[key].occupied = occ.occupied_spots
-        occupancyMap[key].available = occupancyMap[key].total - occ.occupied_spots
-        occupancyMap[key].occupancy_rate = Math.round((occ.occupied_spots / occupancyMap[key].total) * 100)
-      }
-    })
-    
-    return c.json({ 
-      success: true, 
-      date: today,
-      occupancy: Object.values(occupancyMap)
-    })
-  } catch (error) {
-    console.error('Live occupancy error:', error)
-    return c.json({ error: 'Failed to get live occupancy' }, 500)
-  }
-})
-
-// API: Analytics - Revenue by Zone
-app.get('/api/analytics/beach/revenue/:property_id', async (c) => {
-  const { DB } = c.env
-  const { property_id } = c.req.param()
-  const { start_date, end_date } = c.req.query()
-  
-  try {
-    const revenue = await DB.prepare(`
-      SELECT 
-        bz.zone_name,
-        bs.spot_type,
-        COUNT(*) as total_bookings,
-        SUM(bb.total_price) as total_revenue,
-        AVG(bb.total_price) as avg_price,
-        SUM(CASE WHEN bb.booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in_count
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
-      WHERE bb.property_id = ?
-        AND bb.booking_date BETWEEN ? AND ?
-        AND bb.booking_status != 'cancelled'
-      GROUP BY bz.zone_name, bs.spot_type
-      ORDER BY total_revenue DESC
-    `).bind(property_id, start_date, end_date).all()
-    
-    return c.json({ 
-      success: true, 
-      period: { start_date, end_date },
-      revenue: revenue.results || []
-    })
-  } catch (error) {
-    console.error('Revenue analytics error:', error)
-    return c.json({ error: 'Failed to get revenue data' }, 500)
-  }
-})
-
-// API: Analytics - Peak Hours Heatmap
-app.get('/api/analytics/beach/peak-hours/:property_id', async (c) => {
-  const { DB } = c.env
-  const { property_id } = c.req.param()
-  const { days } = c.req.query() // Number of days to analyze
-  
-  try {
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - (parseInt(days) || 30))
-    const startDateStr = startDate.toISOString().split('T')[0]
-    
-    // Get bookings by hour and day of week
-    const bookings = await DB.prepare(`
-      SELECT 
-        strftime('%w', booking_date) as day_of_week,
-        slot_type,
-        bz.zone_name,
-        COUNT(*) as booking_count
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
-      WHERE bb.property_id = ?
-        AND bb.booking_date >= ?
-        AND bb.booking_status != 'cancelled'
-      GROUP BY day_of_week, slot_type, bz.zone_name
-      ORDER BY day_of_week, slot_type
-    `).bind(property_id, startDateStr).all()
-    
-    return c.json({ 
-      success: true, 
-      analysis_period_days: days || 30,
-      heatmap_data: bookings.results || []
-    })
-  } catch (error) {
-    console.error('Peak hours error:', error)
-    return c.json({ error: 'Failed to get peak hours data' }, 500)
-  }
-})
-
-// API: Analytics - No-Show Tracking
-app.get('/api/analytics/beach/no-shows/:property_id', async (c) => {
-  const { DB } = c.env
-  const { property_id } = c.req.param()
-  const { start_date, end_date } = c.req.query()
-  
-  try {
-    // Find bookings that weren't checked in (no-shows)
-    const noShows = await DB.prepare(`
-      SELECT 
-        bb.*,
-        bs.spot_number,
-        bs.spot_type,
-        bz.zone_name
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
-      WHERE bb.property_id = ?
-        AND bb.booking_date BETWEEN ? AND ?
-        AND bb.booking_status = 'confirmed'
-        AND bb.checked_in_at IS NULL
-        AND bb.booking_date < date('now')
-      ORDER BY bb.booking_date DESC
-    `).bind(property_id, start_date, end_date).all()
-    
-    // Get no-show statistics by zone
-    const noShowStats = await DB.prepare(`
-      SELECT 
-        bz.zone_name,
-        COUNT(*) as no_show_count,
-        SUM(bb.total_price) as lost_revenue
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
-      WHERE bb.property_id = ?
-        AND bb.booking_date BETWEEN ? AND ?
-        AND bb.booking_status = 'confirmed'
-        AND bb.checked_in_at IS NULL
-        AND bb.booking_date < date('now')
-      GROUP BY bz.zone_name
-    `).bind(property_id, start_date, end_date).all()
-    
-    return c.json({ 
-      success: true, 
-      period: { start_date, end_date },
-      no_shows: noShows.results || [],
-      statistics: noShowStats.results || []
-    })
-  } catch (error) {
-    console.error('No-show tracking error:', error)
-    return c.json({ error: 'Failed to get no-show data' }, 500)
-  }
-})
-
-// API: Analytics - Comprehensive Dashboard Data
-app.get('/api/analytics/beach/dashboard/:property_id', async (c) => {
-  const { DB } = c.env
-  const { property_id } = c.req.param()
-  const today = new Date().toISOString().split('T')[0]
-  
-  try {
-    // Today's summary
-    const todaySummary = await DB.prepare(`
-      SELECT 
-        COUNT(*) as total_bookings,
-        SUM(CASE WHEN booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in,
-        SUM(CASE WHEN booking_status = 'confirmed' THEN 1 ELSE 0 END) as pending_checkin,
-        SUM(total_price) as total_revenue
-      FROM beach_bookings
-      WHERE property_id = ? AND booking_date = ?
-    `).bind(property_id, today).first()
-    
-    // This week's trend
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - 7)
-    const weekTrend = await DB.prepare(`
-      SELECT 
-        booking_date,
-        COUNT(*) as bookings,
-        SUM(total_price) as revenue
-      FROM beach_bookings
-      WHERE property_id = ? 
-        AND booking_date >= ?
-        AND booking_status != 'cancelled'
-      GROUP BY booking_date
-      ORDER BY booking_date
-    `).bind(property_id, weekStart.toISOString().split('T')[0]).all()
-    
-    // Zone performance
-    const zonePerformance = await DB.prepare(`
-      SELECT 
-        bz.zone_name,
-        COUNT(*) as bookings,
-        SUM(bb.total_price) as revenue,
-        AVG(bb.total_price) as avg_revenue,
-        SUM(CASE WHEN bb.booking_status = 'checked_in' THEN 1 ELSE 0 END) as utilization
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
-      WHERE bb.property_id = ?
-        AND bb.booking_date >= ?
-      GROUP BY bz.zone_name
-      ORDER BY revenue DESC
-    `).bind(property_id, weekStart.toISOString().split('T')[0]).all()
-    
-    return c.json({
-      success: true,
-      today: todaySummary,
-      week_trend: weekTrend.results || [],
-      zone_performance: zonePerformance.results || []
-    })
-  } catch (error) {
-    console.error('Dashboard data error:', error)
-    return c.json({ error: 'Failed to get dashboard data' }, 500)
   }
 })
 
@@ -45830,534 +46126,8 @@ app.get('/admin/beach-map-designer', (c) => {
   return c.redirect('/admin/beach-setup' + qs, 302)
 })
 
-// Beach Analytics Dashboard - Comprehensive analytics with AI insights
-app.get('/admin/beach-analytics', (c) => {
-  return c.html(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beach Analytics Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
-        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
-        .insight-card { border-left: 4px solid #3b82f6; }
-        .chart-container { position: relative; height: 300px; }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="max-w-7xl mx-auto p-4 md:p-6">
-        <!-- Header -->
-        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-800 flex items-center">
-                        <i class="fas fa-chart-line mr-3 text-blue-600"></i>
-                        Beach Analytics Dashboard
-                    </h1>
-                    <p class="text-gray-600 mt-2">Real-time insights and operational intelligence</p>
-                </div>
-                <div class="flex gap-3">
-                    <button onclick="refreshData()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
-                        <i class="fas fa-sync-alt mr-2"></i>Refresh
-                    </button>
-                    <button onclick="window.location.href='/admin/dashboard'" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium">
-                        <i class="fas fa-arrow-left mr-2"></i>Back
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Today's Key Metrics -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-600">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Total Bookings Today</p>
-                        <p class="text-3xl font-bold text-gray-800 mt-2" id="todayBookings">--</p>
-                    </div>
-                    <div class="bg-blue-100 rounded-full p-4">
-                        <i class="fas fa-calendar-check text-2xl text-blue-600"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-600">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Checked In</p>
-                        <p class="text-3xl font-bold text-gray-800 mt-2" id="checkedIn">--</p>
-                    </div>
-                    <div class="bg-green-100 rounded-full p-4">
-                        <i class="fas fa-user-check text-2xl text-green-600"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-600">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Pending Check-In</p>
-                        <p class="text-3xl font-bold text-gray-800 mt-2" id="pendingCheckin">--</p>
-                    </div>
-                    <div class="bg-yellow-100 rounded-full p-4">
-                        <i class="fas fa-clock text-2xl text-yellow-600"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-600">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Today's Revenue</p>
-                        <p class="text-3xl font-bold text-gray-800 mt-2" id="todayRevenue">$--</p>
-                    </div>
-                    <div class="bg-purple-100 rounded-full p-4">
-                        <i class="fas fa-dollar-sign text-2xl text-purple-600"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- AI-Powered Insights -->
-        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm p-6 mb-6 border border-blue-200">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <i class="fas fa-brain mr-3 text-indigo-600"></i>
-                AI-Powered Operational Recommendations
-            </h2>
-            <div id="aiInsights" class="space-y-3">
-                <p class="text-gray-600">Analyzing data...</p>
-            </div>
-        </div>
-
-        <!-- Live Occupancy Section -->
-        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <i class="fas fa-signal mr-3 text-blue-600"></i>
-                Live Occupancy Status
-                <span class="ml-3 px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full">
-                    <i class="fas fa-circle text-xs animate-pulse mr-1"></i>LIVE
-                </span>
-            </h2>
-            
-            <!-- By Zone -->
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-700 mb-3">Occupancy by Zone</h3>
-                <div id="occupancyByZone" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <p class="text-gray-500">Loading...</p>
-                </div>
-            </div>
-            
-            <!-- By Spot Type -->
-            <div>
-                <h3 class="text-lg font-semibold text-gray-700 mb-3">Occupancy by Spot Type</h3>
-                <div id="occupancyByType" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <p class="text-gray-500">Loading...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Revenue Analytics -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-chart-pie mr-3 text-purple-600"></i>
-                    Revenue by Zone (Last 7 Days)
-                </h2>
-                <div class="chart-container">
-                    <canvas id="revenueByZoneChart"></canvas>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-chart-bar mr-3 text-green-600"></i>
-                    Weekly Booking Trend
-                </h2>
-                <div class="chart-container">
-                    <canvas id="weeklyTrendChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Peak Hours Heatmap -->
-        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <i class="fas fa-fire mr-3 text-red-600"></i>
-                Peak Hours Heatmap (Last 30 Days)
-            </h2>
-            <div id="peakHoursHeatmap" class="overflow-x-auto">
-                <p class="text-gray-500">Loading heatmap...</p>
-            </div>
-        </div>
-
-        <!-- No-Show Tracking -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <i class="fas fa-user-times mr-3 text-red-600"></i>
-                No-Show Tracking (Last 30 Days)
-            </h2>
-            <div id="noShowSection">
-                <p class="text-gray-500">Loading no-show data...</p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const propertyId = 1;
-        let charts = {};
-
-        function esc(v) {
-            return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        }
-
-        async function loadDashboardData() {
-            try {
-                const response = await fetch('/api/analytics/beach/dashboard/' + propertyId);
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Update today's metrics
-                    document.getElementById('todayBookings').textContent = data.today?.total_bookings || 0;
-                    document.getElementById('checkedIn').textContent = data.today?.checked_in || 0;
-                    document.getElementById('pendingCheckin').textContent = data.today?.pending_checkin || 0;
-                    document.getElementById('todayRevenue').textContent = '$' + (data.today?.total_revenue || 0).toFixed(2);
-                    
-                    // Render charts
-                    renderWeeklyTrend(data.week_trend || []);
-                    renderRevenueByZone(data.zone_performance || []);
-                    
-                    // Generate AI insights
-                    generateAIInsights(data);
-                }
-            } catch (error) {
-                console.error('Dashboard load error:', error);
-            }
-        }
-
-        async function loadLiveOccupancy() {
-            try {
-                const response = await fetch('/api/analytics/beach/live-occupancy/' + propertyId);
-                const data = await response.json();
-                
-                if (data.success) {
-                    renderOccupancyByZone(data.occupancy);
-                    renderOccupancyByType(data.occupancy);
-                }
-            } catch (error) {
-                console.error('Live occupancy error:', error);
-            }
-        }
-
-        function renderOccupancyByZone(occupancyData) {
-            const zones = {};
-            occupancyData.forEach(item => {
-                if (!zones[item.zone_name]) {
-                    zones[item.zone_name] = { total: 0, occupied: 0, available: 0 };
-                }
-                zones[item.zone_name].total += item.total;
-                zones[item.zone_name].occupied += item.occupied;
-                zones[item.zone_name].available += item.available;
-            });
-            
-            const container = document.getElementById('occupancyByZone');
-            container.innerHTML = Object.entries(zones).map(([zone, stats]) => {
-                const rate = Math.round((stats.occupied / stats.total) * 100);
-                const color = rate > 80 ? 'red' : rate > 50 ? 'yellow' : 'green';
-                const barColor = rate > 80 ? 'bg-red-500' : rate > 50 ? 'bg-yellow-500' : 'bg-green-500';
-                
-                return \`
-                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <div class="flex items-center justify-between mb-2">
-                            <h4 class="font-semibold text-gray-800">\${esc(zone)}</h4>
-                            <span class="text-2xl font-bold text-\${color}-600">\${rate}%</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
-                            <div class="\${barColor} h-3 rounded-full transition-all" style="width: \${rate}%"></div>
-                        </div>
-                        <div class="flex justify-between text-sm text-gray-600">
-                            <span><i class="fas fa-check-circle text-green-600 mr-1"></i>\${stats.occupied} Occupied</span>
-                            <span><i class="fas fa-circle text-gray-400 mr-1"></i>\${stats.available} Available</span>
-                        </div>
-                    </div>
-                \`;
-            }).join('');
-        }
-
-        function renderOccupancyByType(occupancyData) {
-            const types = {};
-            occupancyData.forEach(item => {
-                if (!types[item.spot_type]) {
-                    types[item.spot_type] = { total: 0, occupied: 0 };
-                }
-                types[item.spot_type].total += item.total;
-                types[item.spot_type].occupied += item.occupied;
-            });
-            
-            const icons = {
-                umbrella: '🔵',
-                cabana: '🟢',
-                lounger: '🟡',
-                daybed: '🟣'
-            };
-            
-            const container = document.getElementById('occupancyByType');
-            container.innerHTML = Object.entries(types).map(([type, stats]) => {
-                const rate = Math.round((stats.occupied / stats.total) * 100);
-                return \`
-                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 text-center">
-                        <div class="text-3xl mb-2">\${icons[type] || '🔵'}</div>
-                        <h4 class="font-semibold text-gray-800 capitalize mb-2">\${esc(type)}</h4>
-                        <div class="text-2xl font-bold text-blue-600 mb-1">\${rate}%</div>
-                        <div class="text-xs text-gray-600">\${stats.occupied}/\${stats.total} Occupied</div>
-                    </div>
-                \`;
-            }).join('');
-        }
-
-        function renderWeeklyTrend(trendData) {
-            const ctx = document.getElementById('weeklyTrendChart');
-            if (charts.weeklyTrend) charts.weeklyTrend.destroy();
-            
-            charts.weeklyTrend = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: trendData.map(d => new Date(d.booking_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })),
-                    datasets: [{
-                        label: 'Bookings',
-                        data: trendData.map(d => d.bookings),
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
-                    }
-                }
-            });
-        }
-
-        function renderRevenueByZone(zoneData) {
-            const ctx = document.getElementById('revenueByZoneChart');
-            if (charts.revenueByZone) charts.revenueByZone.destroy();
-            
-            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
-            
-            charts.revenueByZone = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: zoneData.map(z => z.zone_name),
-                    datasets: [{
-                        data: zoneData.map(z => z.revenue || 0),
-                        backgroundColor: colors.slice(0, zoneData.length),
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    }
-                }
-            });
-        }
-
-        function generateAIInsights(data) {
-            const insights = [];
-            const today = data.today || {};
-            const zones = data.zone_performance || [];
-            
-            // Occupancy insight
-            const totalBookings = today.total_bookings || 0;
-            const checkedIn = today.checked_in || 0;
-            const occupancyRate = totalBookings > 0 ? Math.round((checkedIn / totalBookings) * 100) : 0;
-            
-            if (occupancyRate > 85) {
-                insights.push({
-                    icon: 'fa-exclamation-triangle',
-                    color: 'red',
-                    title: 'High Demand Alert',
-                    text: 'Beach occupancy at ' + occupancyRate + '%. Consider implementing dynamic pricing or extending hours.'
-                });
-            } else if (occupancyRate < 40) {
-                insights.push({
-                    icon: 'fa-bullhorn',
-                    color: 'yellow',
-                    title: 'Low Utilization',
-                    text: 'Current occupancy is ' + occupancyRate + '%. Recommend promotional campaigns or special offers.'
-                });
-            }
-            
-            // Zone performance insight
-            if (zones.length > 0) {
-                const topZone = zones.reduce((max, z) => z.revenue > max.revenue ? z : max, zones[0]);
-                insights.push({
-                    icon: 'fa-trophy',
-                    color: 'green',
-                    title: 'Top Performing Zone',
-                    text: topZone.zone_name + ' generated $' + (topZone.revenue || 0).toFixed(2) + ' this week. Consider expanding similar zones.'
-                });
-            }
-            
-            // Staff optimization
-            if (today.pending_checkin > 5) {
-                insights.push({
-                    icon: 'fa-users',
-                    color: 'blue',
-                    title: 'Staffing Recommendation',
-                    text: today.pending_checkin + ' guests pending check-in. Ensure adequate staff at beach entrance during peak hours.'
-                });
-            }
-            
-            const container = document.getElementById('aiInsights');
-            container.innerHTML = insights.map(insight => \`
-                <div class="insight-card bg-white rounded-lg p-4 border-l-4 border-\${insight.color}-500 shadow-sm">
-                    <div class="flex items-start gap-3">
-                        <div class="bg-\${insight.color}-100 rounded-full p-3 flex-shrink-0">
-                            <i class="fas \${insight.icon} text-\${insight.color}-600"></i>
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-gray-800 mb-1">\${esc(insight.title)}</h4>
-                            <p class="text-sm text-gray-600">\${esc(insight.text)}</p>
-                        </div>
-                    </div>
-                </div>
-            \`).join('');
-        }
-
-        async function loadPeakHours() {
-            try {
-                const response = await fetch('/api/analytics/beach/peak-hours/' + propertyId + '?days=30');
-                const data = await response.json();
-                
-                if (data.success) {
-                    renderPeakHoursHeatmap(data.heatmap_data);
-                }
-            } catch (error) {
-                console.error('Peak hours error:', error);
-            }
-        }
-
-        function renderPeakHoursHeatmap(heatmapData) {
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            const slots = ['Morning', 'Afternoon', 'Full Day'];
-            
-            // Aggregate by day and slot
-            const matrix = {};
-            heatmapData.forEach(row => {
-                const day = days[parseInt(row.day_of_week)];
-                const slot = row.slot_type === 'half_day_am' ? 'Morning' : 
-                            row.slot_type === 'half_day_pm' ? 'Afternoon' : 'Full Day';
-                const key = day + '|' + slot;
-                matrix[key] = (matrix[key] || 0) + row.booking_count;
-            });
-            
-            const maxValue = Math.max(...Object.values(matrix), 1);
-            
-            let html = '<table class="w-full border-collapse"><thead><tr class="bg-gray-100"><th class="p-3 text-left font-semibold text-gray-700">Time</th>';
-            days.forEach(day => {
-                html += '<th class="p-3 text-center font-semibold text-gray-700">' + day + '</th>';
-            });
-            html += '</tr></thead><tbody>';
-            
-            slots.forEach(slot => {
-                html += '<tr><td class="p-3 font-medium text-gray-700">' + slot + '</td>';
-                days.forEach(day => {
-                    const key = day + '|' + slot;
-                    const value = matrix[key] || 0;
-                    const intensity = Math.round((value / maxValue) * 100);
-                    const bgColor = intensity > 75 ? 'bg-red-500' :
-                                   intensity > 50 ? 'bg-orange-500' :
-                                   intensity > 25 ? 'bg-yellow-500' : 'bg-green-500';
-                    const opacity = Math.max(0.2, intensity / 100);
-                    
-                    html += '<td class="p-3 text-center"><div class="' + bgColor + ' rounded-lg p-3 font-semibold text-white" style="opacity: ' + opacity + '">' + value + '</div></td>';
-                });
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            
-            document.getElementById('peakHoursHeatmap').innerHTML = html;
-        }
-
-        async function loadNoShows() {
-            try {
-                const endDate = new Date().toISOString().split('T')[0];
-                const startDate = new Date();
-                startDate.setDate(startDate.getDate() - 30);
-                const startDateStr = startDate.toISOString().split('T')[0];
-                
-                const response = await fetch('/api/analytics/beach/no-shows/' + propertyId + '?start_date=' + startDateStr + '&end_date=' + endDate);
-                const data = await response.json();
-                
-                if (data.success) {
-                    renderNoShows(data.no_shows, data.statistics);
-                }
-            } catch (error) {
-                console.error('No-shows error:', error);
-            }
-        }
-
-        function renderNoShows(noShows, statistics) {
-            const totalNoShows = statistics.reduce((sum, s) => sum + s.no_show_count, 0);
-            const totalLost = statistics.reduce((sum, s) => sum + s.lost_revenue, 0);
-            
-            let html = '<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">';
-            html += '<div class="bg-red-50 rounded-lg p-4 border border-red-200"><div class="text-sm text-gray-600 mb-1">Total No-Shows</div><div class="text-2xl font-bold text-red-600">' + totalNoShows + '</div></div>';
-            html += '<div class="bg-red-50 rounded-lg p-4 border border-red-200"><div class="text-sm text-gray-600 mb-1">Lost Revenue</div><div class="text-2xl font-bold text-red-600">$' + totalLost.toFixed(2) + '</div></div>';
-            html += '<div class="bg-blue-50 rounded-lg p-4 border border-blue-200"><div class="text-sm text-gray-600 mb-1">No-Show Rate</div><div class="text-2xl font-bold text-blue-600">' + (totalNoShows > 0 ? '15%' : '0%') + '</div></div>';
-            html += '</div>';
-            
-            if (statistics.length > 0) {
-                html += '<h3 class="font-semibold text-gray-700 mb-3">By Zone</h3>';
-                html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
-                statistics.forEach(stat => {
-                    html += '<div class="bg-gray-50 rounded-lg p-4 border border-gray-200">';
-                    html += '<div class="flex justify-between items-center">';
-                    html += '<span class="font-medium text-gray-800">' + esc(stat.zone_name) + '</span>';
-                    html += '<span class="text-red-600 font-semibold">' + stat.no_show_count + ' no-shows</span>';
-                    html += '</div>';
-                    html += '<div class="text-sm text-gray-600 mt-1">Lost: $' + (stat.lost_revenue || 0).toFixed(2) + '</div>';
-                    html += '</div>';
-                });
-                html += '</div>';
-            }
-            
-            document.getElementById('noShowSection').innerHTML = html;
-        }
-
-        async function refreshData() {
-            await Promise.all([
-                loadDashboardData(),
-                loadLiveOccupancy(),
-                loadPeakHours(),
-                loadNoShows()
-            ]);
-        }
-
-        // Initialize dashboard
-        refreshData();
-        
-        // Auto-refresh every 30 seconds
-        setInterval(loadLiveOccupancy, 30000);
-    </script>
-</body>
-</html>
-  `)
-})
+// The old Beach Analytics page is part of the Analytics tab now (bookmarks land there)
+app.get('/admin/beach-analytics', (c) => c.redirect('/admin/dashboard#analytics', 302))
 
 // Staff Beach Check-In Interface - Verify bookings via QR or code
 app.get('/staff/beach-check-in', (c) => {
@@ -93808,7 +93578,7 @@ app.post('/api/staff/ack-chat', async (c) => {
     const b = await c.req.json()
     if (!b.session_id) return c.json({ success: false, error: 'session_id required' }, 400)
     await DB.prepare(`
-      UPDATE chatbot_conversations SET staff_ack_at = CURRENT_TIMESTAMP
+      UPDATE chatbot_conversations SET staff_ack_at = CURRENT_TIMESTAMP, first_ack_at = COALESCE(first_ack_at, CURRENT_TIMESTAMP)
       WHERE session_id = ? AND property_id = ?
     `).bind(b.session_id, b.property_id || 1).run()
     return c.json({ success: true })
@@ -97914,8 +97684,19 @@ app.post('/api/staff/wasender-webhook', async (c) => {
 
     const text = (flat.match(/"(?:conversation|text|body)"\s*:\s*"([^"]{1,200})"/) || [])[1] || ''
 
-    // Acknowledge everything outstanding, exactly like tapping Acknowledge
-    await DB.prepare("UPDATE chatbot_conversations SET staff_ack_at = datetime('now') WHERE property_id = 1").run()
+    // Acknowledge everything outstanding, exactly like tapping Acknowledge. Only chats that were
+    // actually waiting (ring-state's rule) get a first acknowledgement time; SET reads the old staff_ack_at.
+    await DB.prepare(`
+      UPDATE chatbot_conversations SET
+        first_ack_at = CASE WHEN first_ack_at IS NULL AND EXISTS (
+          SELECT 1 FROM chatbot_messages m
+          WHERE m.conversation_id = chatbot_conversations.conversation_id AND m.role = 'user'
+            AND m.created_at > datetime('now', '-20 minutes')
+            AND (chatbot_conversations.staff_ack_at IS NULL OR m.created_at > chatbot_conversations.staff_ack_at)
+        ) THEN datetime('now') ELSE first_ack_at END,
+        staff_ack_at = datetime('now')
+      WHERE property_id = 1
+    `).run()
     await DB.prepare('UPDATE feedback_submissions SET is_read = 1 WHERE property_id = 1 AND is_read = 0').run()
     await DB.prepare("UPDATE staff_test_ring SET until = datetime('now', '-1 second') WHERE id = 1").run()
     await DB.prepare(`
