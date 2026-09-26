@@ -9,6 +9,12 @@ type Bindings = {
   OPS_PIN_PEPPER?: string
 }
 
+// Build id (set by vite.config.ts `define` at build time). GET /api/staff/auth/me
+// reports it and /staff/app embeds it, so an Ops page left open across a deploy
+// can see that it is out of date and reload itself.
+declare const __OPS_BUILD__: string
+const OPS_BUILD = typeof __OPS_BUILD__ !== 'undefined' ? __OPS_BUILD__ : 'dev'
+
 const app = new Hono<{ Bindings: Bindings }>()
 
 // Enable CORS for API routes
@@ -95692,6 +95698,12 @@ const OPS_SESSION_HOURS = [12, 24, 168, 720]
 const OPS_NAME_FAILS = 5
 const OPS_IP_FAILS = 50
 const OPS_LOCK_FOREVER = '9999-12-31 00:00:00'
+// A manager's name is never locked for good (someone who only knows the name
+// could otherwise lock every manager out, and only a manager can unlock): from
+// the 3rd lock on it is locked for this long each time instead.
+const OPS_MANAGER_LOCK_MS = 24 * 3600000
+// Managers need a PIN this long (ops_staff.pin_digits records each PIN's length).
+const OPS_MANAGER_PIN_DIGITS = 6
 // Verified against when the name is unknown or disabled, so that costs the same time as a wrong PIN.
 const OPS_DUMMY_HASH = 'pbkdf2h$100000$b3BzLWR1bW15LXNhbHQhIQ==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
 
@@ -95718,8 +95730,9 @@ const OPS_ATTEMPT_SQL = `
   RETURNING fails, lock_count, locked_until,
     (locked_until IS NOT NULL AND locked_until > datetime('now')) AS locked`
 
-// 1st lock 15 min, 2nd 1 hour, then until a manager unlocks. Only applies
-// when not already locked, so a burst of requests counts as one lock.
+// 1st lock 15 min, 2nd 1 hour, then the bound value: until a manager unlocks
+// (OPS_LOCK_FOREVER) for staff and unknown names, now + 24 hours for a manager's
+// name. Only applies when not already locked, so a burst counts as one lock.
 const OPS_LOCK_SQL = `
   UPDATE ops_login_attempts SET
     lock_count = lock_count + 1,
@@ -95880,8 +95893,9 @@ function opsCookieToken(c: any): string {
   return ''
 }
 
-function opsSetCookie(c: any, token: string, maxAge: number) {
-  c.header('Set-Cookie', OPS_COOKIE + '=' + token + '; Path=/; Max-Age=' + maxAge + '; HttpOnly; Secure; SameSite=Lax')
+// maxAge null → a browser-session cookie (no Max-Age: gone when the browser closes).
+function opsSetCookie(c: any, token: string, maxAge: number | null) {
+  c.header('Set-Cookie', OPS_COOKIE + '=' + token + '; Path=/' + (maxAge == null ? '' : '; Max-Age=' + maxAge) + '; HttpOnly; Secure; SameSite=Lax')
 }
 
 function opsBackground(c: any, p: Promise<any>) {
@@ -95930,11 +95944,21 @@ async function opsSession(c: any): Promise<any> {
   const now = Date.now()
   const hit = opsSessions.get(th)
   if (hit && now - hit.at < OPS_CACHE_MS) return hit.acct && hit.exp > now ? hit.acct : null
-  const row: any = await c.env.DB.prepare(`
-    SELECT s.staff_id, s.property_id, s.expires_at, a.name, a.access, a.is_manager
-    FROM ops_sessions s JOIN ops_staff a ON a.staff_id = s.staff_id
-    WHERE s.token_hash = ? AND a.is_active = 1 AND s.expires_at > datetime('now')
-  `).bind(th).first()
+  let row: any
+  try {
+    row = await c.env.DB.prepare(`
+      SELECT s.staff_id, s.property_id, s.expires_at, a.name, a.access, a.is_manager
+      FROM ops_sessions s JOIN ops_staff a ON a.staff_id = s.staff_id
+      WHERE s.token_hash = ? AND a.is_active = 1 AND s.expires_at > datetime('now')
+    `).bind(th).first()
+  } catch (e) {
+    // D1 hiccup: answer from the stale entry for this token rather than failing
+    // (a token never becomes valid again once it isn't, and `at` is left alone
+    // so the next call tries D1 again).
+    if (!hit) throw e
+    console.error('ops session lookup (using the cached entry)', e)
+    return hit.acct && hit.exp > now ? hit.acct : null
+  }
   const acct = row ? { ...opsView(row), property_id: Number(row.property_id) || OPS_PID, expires_at: opsIso(row.expires_at) } : null
   const exp = row ? Date.parse(String(row.expires_at).replace(' ', 'T') + 'Z') || 0 : 0
   if (opsSessions.size >= 500) opsSessions.clear()
@@ -96024,13 +96048,18 @@ function opsLocked(c: any, lockedUntil: any, fresh: boolean) {
   }
   const m = opsMinutesLeft(until)
   const message = fresh
-    ? 'Too many wrong tries — locked for ' + (m > 30 ? '1 hour' : '15 minutes')
-    : 'Too many wrong tries — try again in ' + m + ' min.'
+    ? 'Too many wrong tries — locked for ' + (m > 90 ? '24 hours' : m > 30 ? '1 hour' : '15 minutes')
+    : 'Too many wrong tries — try again in ' + (m > 90 ? Math.ceil(m / 60) + ' hours.' : m + ' min.')
   return c.json({ success: false, error: 'locked', minutes_left: m, message }, 429)
 }
 
-async function opsLockNow(DB: any, key: string): Promise<{ until: any, fresh: boolean }> {
-  const l: any = await DB.prepare(OPS_LOCK_SQL).bind(OPS_LOCK_FOREVER, key).first()
+// The 3rd+ lock: permanent for staff and unknown names, 24 hours for a manager's name.
+function opsThirdLock(isManager: boolean): string {
+  return isManager ? opsSqlTime(Date.now() + OPS_MANAGER_LOCK_MS) : OPS_LOCK_FOREVER
+}
+
+async function opsLockNow(DB: any, key: string, isManager: boolean): Promise<{ until: any, fresh: boolean }> {
+  const l: any = await DB.prepare(OPS_LOCK_SQL).bind(opsThirdLock(isManager), key).first()
   if (l) return { until: l.locked_until, fresh: true }
   const cur: any = await DB.prepare(`SELECT locked_until FROM ops_login_attempts WHERE key = ? AND locked_until > datetime('now')`).bind(key).first()
   return { until: cur ? cur.locked_until : null, fresh: false }
@@ -96058,32 +96087,54 @@ app.post('/api/staff/auth/login', async (c) => {
     // get more than OPS_NAME_FAILS guesses verified.
     const nameKey = name.toLowerCase()
     const nKey = 'n:' + OPS_PID + ':' + nameKey
-    const slot: any = await DB.prepare(OPS_ATTEMPT_SQL).bind(nKey).first()
-    if (slot && slot.locked) return opsLocked(c, slot.locked_until, false)
+    // The account is read alongside the reservation (no PIN work yet): whether the
+    // name belongs to a manager decides how long its 3rd+ lock lasts.
+    const got: any[] = await Promise.all([
+      DB.prepare(OPS_ATTEMPT_SQL).bind(nKey).first(),
+      DB.prepare(`
+        SELECT staff_id, name, access, is_manager, is_active, pin_hash FROM ops_staff
+        WHERE property_id = ? AND name_key = ?
+      `).bind(OPS_PID, nameKey).first()
+    ])
+    const slot: any = got[0]
+    const found: any = got[1]
+    const acct: any = found && found.is_active ? found : null
+    const isMgr = !!(found && found.is_manager)
+    if (slot && slot.locked) {
+      let until = slot.locked_until
+      // A manager's name is never locked for more than 24 hours: a longer lock
+      // (made before this rule, or before the account became a manager) is cut back.
+      const capMs = Date.now() + OPS_MANAGER_LOCK_MS
+      if (isMgr && Date.parse(String(until).replace(' ', 'T') + 'Z') > capMs + 60000) {
+        until = opsSqlTime(capMs)
+        await DB.prepare(`UPDATE ops_login_attempts SET locked_until = ?, updated_at = datetime('now') WHERE key = ? AND locked_until > ?`).bind(until, nKey, until).run()
+      }
+      return opsLocked(c, until, false)
+    }
     const fails = Number(slot && slot.fails) || 1
     if (fails > OPS_NAME_FAILS) {
-      const l = await opsLockNow(DB, nKey)
+      const l = await opsLockNow(DB, nKey, isMgr)
       return opsLocked(c, l.until, l.fresh)
     }
 
-    const acct: any = await DB.prepare(`
-      SELECT staff_id, name, access, is_manager, pin_hash FROM ops_staff
-      WHERE property_id = ? AND name_key = ? AND is_active = 1
-    `).bind(OPS_PID, nameKey).first()
     const ok = await opsVerifyPin(pepper, pin, acct ? acct.pin_hash : OPS_DUMMY_HASH)
     if (!acct || !ok) {
       await DB.prepare(OPS_IP_SQL).bind(ipKey, OPS_IP_FAILS).run()
       if (fails >= OPS_NAME_FAILS) {
-        const l = await opsLockNow(DB, nKey)
+        const l = await opsLockNow(DB, nKey, isMgr)
         return opsLocked(c, l.until, l.fresh)
       }
       return opsErr(c, 401, 'wrong_credentials', 'Wrong name or PIN')
     }
 
+    // purpose 'manage' (the manager page, often on a shared PC): at most 1 hour,
+    // and a browser-session cookie. The Ops app keeps normal sessions.
+    const manage = b.purpose === 'manage'
     const cfg = await opsConfig(c.env)
+    const hours = manage ? Math.min(cfg.hours, 1) : cfg.hours
     const token = b64urlBytes(crypto.getRandomValues(new Uint8Array(32)).buffer)
     const th = await opsSha256Hex(token)
-    const expMs = Date.now() + cfg.hours * 3600000
+    const expMs = Date.now() + hours * 3600000
     const expires = opsSqlTime(expMs)
     await DB.batch([
       DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind(nKey),
@@ -96100,7 +96151,7 @@ app.post('/api/staff/auth/login', async (c) => {
     ]))
     const me = { ...opsView(acct), property_id: OPS_PID, expires_at: opsIso(expires) }
     opsSessions.set(th, { acct: me, at: Date.now(), exp: expMs })
-    opsSetCookie(c, token, cfg.hours * 3600)
+    opsSetCookie(c, token, manage ? null : hours * 3600)
     c.header('Cache-Control', 'no-store')
     return c.json({ success: true, account: opsMe(me) })
   } catch (e) {
@@ -96125,23 +96176,31 @@ app.post('/api/staff/auth/logout', async (c) => {
   return c.json({ success: true })
 })
 
+// Always HTTP 200. When D1 can't answer, the reply is success:false /
+// auth_unavailable (never "nobody is signed in"), so a phone doesn't sign itself
+// out over a hiccup; the app treats that as "unknown" and asks again later.
 app.get('/api/staff/auth/me', async (c) => {
-  let required = false
-  let account: any = null
+  c.header('Cache-Control', 'no-store')
+  let required: boolean | null = null
+  let failed = false
   try {
     required = (await opsConfig(c.env)).required
   } catch (e) {
+    failed = true
     console.error('ops me config', e)
   }
+  let a: any = null
   try {
-    const a = await opsSession(c)
-    if (a) account = opsMe(a)
-    else if (opsCookieToken(c)) opsSetCookie(c, '', 0)
+    a = await opsSession(c)
   } catch (e) {
+    failed = true
     console.error('ops me session', e)
   }
-  c.header('Cache-Control', 'no-store')
-  return c.json({ success: true, login_required: required, account })
+  if (failed) {
+    return c.json({ success: false, error: 'auth_unavailable', message: 'Sign-in is unavailable right now — try again in a moment', login_required: required, account: null, build: OPS_BUILD })
+  }
+  if (!a && opsCookieToken(c)) opsSetCookie(c, '', 0)
+  return c.json({ success: true, login_required: required, account: a ? opsMe(a) : null, build: OPS_BUILD })
 })
 
 // ── Staff account management (manager session only, enforced by opsGate) ──
@@ -96149,6 +96208,7 @@ function opsTeamRow(r: any, sess: any, lockedUntil: any) {
   return {
     ...opsView(r),
     is_active: r.is_active ? 1 : 0,
+    pin_digits: Number(r.pin_digits) || 4,
     last_login_at: opsIso(r.last_login_at),
     created_at: opsIso(r.created_at),
     sessions: sess ? Number(sess.n) || 0 : 0,
@@ -96167,13 +96227,24 @@ function opsStaffId(c: any): number {
 async function opsStaffRow(DB: any, id: number, pid: number): Promise<any> {
   if (!id) return null
   return DB.prepare(`
-    SELECT staff_id, name, name_key, access, is_manager, is_active, last_login_at, created_at
+    SELECT staff_id, name, name_key, access, is_manager, is_active, pin_digits, last_login_at, created_at
     FROM ops_staff WHERE staff_id = ? AND property_id = ?
   `).bind(id, pid).first()
 }
 
 function opsFlag(v: any): number {
   return v === true || v === 1 || v === '1' ? 1 : 0
+}
+
+// The signed-in caller's session (token hash), so a PIN change on their own
+// account can keep the session they are using. '' when there is no cookie.
+async function opsCallerTokenHash(c: any): Promise<string> {
+  const token = opsCookieToken(c)
+  return token ? opsSha256Hex(token) : ''
+}
+
+function opsManagerPinErr(c: any) {
+  return opsErr(c, 400, 'manager_pin', 'Managers need a ' + OPS_MANAGER_PIN_DIGITS + '-digit PIN')
 }
 
 app.get('/api/staff/team', async (c) => {
@@ -96184,7 +96255,7 @@ app.get('/api/staff/team', async (c) => {
   try {
     const res: any[] = await DB.batch([
       DB.prepare(`
-        SELECT staff_id, name, name_key, access, is_manager, is_active, last_login_at, created_at
+        SELECT staff_id, name, name_key, access, is_manager, is_active, pin_digits, last_login_at, created_at
         FROM ops_staff WHERE property_id = ? ORDER BY is_active DESC, name_key
       `).bind(pid),
       DB.prepare(`
@@ -96230,6 +96301,7 @@ app.post('/api/staff/team', async (c) => {
     if (access === null) return opsErr(c, 400, 'bad_access', 'Choose what this person can use')
     const isManager = opsFlag(b.is_manager)
     if (!access && !isManager) return opsErr(c, 400, 'no_tabs', 'Give access to at least one tab')
+    if (isManager && b.pin.length < OPS_MANAGER_PIN_DIGITS) return opsManagerPinErr(c)
     const pepper = c.env.OPS_PIN_PEPPER
     if (!pepper) return opsErr(c, 503, 'not_configured', 'Staff sign-in is not set up yet')
     const nameKey = name.toLowerCase()
@@ -96237,11 +96309,11 @@ app.post('/api/staff/team', async (c) => {
     if (taken) return opsErr(c, 409, 'name_taken', 'Someone already has that name')
     const hash = await opsHashPin(pepper, b.pin)
     const row: any = await DB.prepare(`
-      INSERT INTO ops_staff (property_id, name, name_key, pin_hash, access, is_manager, is_active, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+      INSERT INTO ops_staff (property_id, name, name_key, pin_hash, pin_digits, access, is_manager, is_active, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
       ON CONFLICT(property_id, name_key) DO NOTHING
-      RETURNING staff_id, name, name_key, access, is_manager, is_active, last_login_at, created_at
-    `).bind(pid, name, nameKey, hash, access, isManager, String(me.name || '').slice(0, 40)).first()
+      RETURNING staff_id, name, name_key, access, is_manager, is_active, pin_digits, last_login_at, created_at
+    `).bind(pid, name, nameKey, hash, b.pin.length, access, isManager, String(me.name || '').slice(0, 40)).first()
     if (!row) return opsErr(c, 409, 'name_taken', 'Someone already has that name')
     // Wrong tries typed against this name before the account existed don't count.
     await DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind('n:' + pid + ':' + nameKey).run()
@@ -96290,25 +96362,80 @@ app.put('/api/staff/team/:id', async (c) => {
     if ((b.access !== undefined || b.is_manager !== undefined) && !isManager && !opsParseAccess(access).tabs.length) {
       return opsErr(c, 400, 'no_tabs', 'Give access to at least one tab')
     }
+    // Optional new PIN in the same save, so someone can be made a manager and
+    // given the 6-digit PIN managers need in one step.
+    const pin: string | null = b.pin === undefined || b.pin === null || b.pin === '' ? null : b.pin
+    if (pin !== null) {
+      const pinErr = opsPinProblem(pin)
+      if (pinErr) return opsErr(c, 400, pinErr.error, pinErr.message)
+      if (isManager && pin.length < OPS_MANAGER_PIN_DIGITS) return opsManagerPinErr(c)
+    } else if (isManager && !row.is_manager && (Number(row.pin_digits) || 4) < OPS_MANAGER_PIN_DIGITS) {
+      return opsErr(c, 400, 'manager_pin', 'Give ' + name + ' a new ' + OPS_MANAGER_PIN_DIGITS + '-digit PIN first, then make them a manager')
+    }
+    let hash: string | null = null
+    let callerTh = ''
+    if (pin !== null) {
+      const pepper = c.env.OPS_PIN_PEPPER
+      if (!pepper) return opsErr(c, 503, 'not_configured', 'Staff sign-in is not set up yet')
+      hash = await opsHashPin(pepper, pin)
+      callerTh = await opsCallerTokenHash(c)
+    }
     const dropsManager = !!(row.is_manager && row.is_active) && !(isManager && isActive)
+    // One batch: the UPDATE (guarded so the last active manager stays), then the
+    // clean-ups, each of which only acts if the UPDATE really landed.
+    const stmts: any[] = [DB.prepare(`
+      UPDATE ops_staff SET name = ?, name_key = ?, access = ?, is_manager = ?, is_active = ?,
+        pin_hash = COALESCE(?, pin_hash), pin_digits = COALESCE(?, pin_digits), updated_at = datetime('now')
+      WHERE staff_id = ? AND property_id = ?
+        AND (? = 0 OR EXISTS (SELECT 1 FROM ops_staff o WHERE o.property_id = ? AND o.is_manager = 1 AND o.is_active = 1 AND o.staff_id != ?))
+    `).bind(name, nameKey, access, isManager, isActive, hash, pin !== null ? pin.length : null, id, pid, dropsManager ? 1 : 0, pid, id)]
+    if (nameKey !== row.name_key) {
+      // Wrong-PIN counts and locks belong to a name: drop the old name's row and
+      // any row the new name already had, so the account starts clean.
+      stmts.push(DB.prepare(`
+        DELETE FROM ops_login_attempts WHERE key IN (?, ?)
+          AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND name_key = ?)
+      `).bind('n:' + pid + ':' + row.name_key, 'n:' + pid + ':' + nameKey, id, nameKey))
+    }
+    if (hash) {
+      // New PIN: sign out its other sessions (the caller keeps the one in use) and clear its lock.
+      stmts.push(DB.prepare(`
+        DELETE FROM ops_sessions WHERE staff_id = ? AND token_hash != ?
+          AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND pin_hash = ?)
+      `).bind(id, callerTh, id, hash))
+      stmts.push(DB.prepare(`
+        DELETE FROM ops_login_attempts WHERE key = ?
+          AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND pin_hash = ?)
+      `).bind('n:' + pid + ':' + nameKey, id, hash))
+    }
+    if (!isActive && row.is_active) {
+      stmts.push(DB.prepare(`
+        DELETE FROM ops_sessions WHERE staff_id = ?
+          AND EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ? AND is_active = 0)
+      `).bind(id, id))
+    }
     let res: any
     try {
-      res = await DB.prepare(`
-        UPDATE ops_staff SET name = ?, name_key = ?, access = ?, is_manager = ?, is_active = ?, updated_at = datetime('now')
-        WHERE staff_id = ? AND property_id = ?
-          AND (? = 0 OR EXISTS (SELECT 1 FROM ops_staff o WHERE o.property_id = ? AND o.is_manager = 1 AND o.is_active = 1 AND o.staff_id != ?))
-      `).bind(name, nameKey, access, isManager, isActive, id, pid, dropsManager ? 1 : 0, pid, id).run()
+      res = await DB.batch(stmts)
     } catch (e: any) {
       if (/UNIQUE/i.test(String(e && e.message))) return opsErr(c, 409, 'name_taken', 'Someone already has that name')
       throw e
     }
-    if (!res || !res.meta || !res.meta.changes) {
+    const up = res && res[0]
+    if (!up || !up.meta || !up.meta.changes) {
       if (dropsManager) return opsErr(c, 400, 'last_manager', 'Keep at least one active manager')
       return opsErr(c, 404, 'not_found', 'That account no longer exists')
     }
-    if (!isActive && row.is_active) await DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ?`).bind(id).run()
     opsForget(id)
-    return c.json({ success: true, account: { ...opsView({ staff_id: id, name, access, is_manager: isManager }), is_active: isActive } })
+    return c.json({
+      success: true,
+      pin_set: !!hash,
+      account: {
+        ...opsView({ staff_id: id, name, access, is_manager: isManager }),
+        is_active: isActive,
+        pin_digits: pin !== null ? pin.length : Number(row.pin_digits) || 4
+      }
+    })
   } catch (e) {
     console.error('ops team update', e)
     return opsErr(c, 500, 'server_error', 'Could not save the account')
@@ -96329,14 +96456,17 @@ app.post('/api/staff/team/:id/pin', async (c) => {
     const id = opsStaffId(c)
     const row: any = await opsStaffRow(DB, id, pid)
     if (!row) return opsErr(c, 404, 'not_found', 'That account no longer exists')
+    if (row.is_manager && b.pin.length < OPS_MANAGER_PIN_DIGITS) return opsManagerPinErr(c)
     const hash = await opsHashPin(pepper, b.pin)
+    // Signs out every session of the account (the manager page asks for the new
+    // PIN when a manager resets their own).
     await DB.batch([
-      DB.prepare(`UPDATE ops_staff SET pin_hash = ?, updated_at = datetime('now') WHERE staff_id = ?`).bind(hash, id),
+      DB.prepare(`UPDATE ops_staff SET pin_hash = ?, pin_digits = ?, updated_at = datetime('now') WHERE staff_id = ?`).bind(hash, b.pin.length, id),
       DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ?`).bind(id),
       DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind('n:' + pid + ':' + row.name_key)
     ])
     opsForget(id)
-    return c.json({ success: true })
+    return c.json({ success: true, pin_digits: b.pin.length })
   } catch (e) {
     console.error('ops team pin', e)
     return opsErr(c, 500, 'server_error', 'Could not set the new PIN')
@@ -96387,16 +96517,22 @@ app.delete('/api/staff/team/:id', async (c) => {
     if (id === me.staff_id) return opsErr(c, 400, 'self_lockout', "You can't delete your own account")
     const row: any = await opsStaffRow(DB, id, pid)
     if (!row) return opsErr(c, 404, 'not_found', 'That account no longer exists')
-    const res: any = await DB.prepare(`
-      DELETE FROM ops_staff WHERE staff_id = ? AND property_id = ?
-        AND (NOT (is_manager = 1 AND is_active = 1)
-             OR EXISTS (SELECT 1 FROM ops_staff o WHERE o.property_id = ? AND o.is_manager = 1 AND o.is_active = 1 AND o.staff_id != ?))
-    `).bind(id, pid, pid, id).run()
-    if (!res || !res.meta || !res.meta.changes) return opsErr(c, 400, 'last_manager', 'Keep at least one active manager')
-    await DB.batch([
-      DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ?`).bind(id),
-      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ?`).bind('n:' + pid + ':' + row.name_key)
+    // One batch: the account (guarded so the last active manager stays), then its
+    // sessions and name lock, only once the account is really gone.
+    const res: any[] = await DB.batch([
+      DB.prepare(`
+        DELETE FROM ops_staff WHERE staff_id = ? AND property_id = ?
+          AND (NOT (is_manager = 1 AND is_active = 1)
+               OR EXISTS (SELECT 1 FROM ops_staff o WHERE o.property_id = ? AND o.is_manager = 1 AND o.is_active = 1 AND o.staff_id != ?))
+      `).bind(id, pid, pid, id),
+      DB.prepare(`DELETE FROM ops_sessions WHERE staff_id = ? AND NOT EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ?)`).bind(id, id),
+      DB.prepare(`DELETE FROM ops_login_attempts WHERE key = ? AND NOT EXISTS (SELECT 1 FROM ops_staff WHERE staff_id = ?)`).bind('n:' + pid + ':' + row.name_key, id)
     ])
+    const del = res && res[0]
+    if (!del || !del.meta || !del.meta.changes) {
+      if (row.is_manager && row.is_active) return opsErr(c, 400, 'last_manager', 'Keep at least one active manager')
+      return opsErr(c, 404, 'not_found', 'That account no longer exists')
+    }
     opsForget(id)
     return c.json({ success: true })
   } catch (e) {

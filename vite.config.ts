@@ -4,6 +4,10 @@ import adapter from '@hono/vite-dev-server/cloudflare'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  // Build id for self-updating pages (OPS_BUILD in src/index.tsx).
+  define: {
+    __OPS_BUILD__: JSON.stringify(Date.now().toString(36))
+  },
   plugins: [
     build({
       exclude: [
