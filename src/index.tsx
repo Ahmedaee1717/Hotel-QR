@@ -43247,6 +43247,1027 @@ loadAll();
 </html>`)
 })
 
+// ADMIN: Ops app staff accounts — name + PIN sign-in, per-tab access, lockouts, the sign-in switch.
+// Uses the Ops staff session cookie (manager accounts only), never the admin headers.
+// ?embed=1 = dashboard iframe (no header), ?from=app = opened from the Ops app (back link to /staff/app).
+app.get('/admin/ops-staff', (c) => {
+  c.header('X-Frame-Options', 'SAMEORIGIN')
+  c.header('Content-Security-Policy', "frame-ancestors 'self'")
+  c.header('Cache-Control', 'no-store')
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex">
+<title>Staff app access</title>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#f3f4f6}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#111827;font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
+body.embed,html.embed{background:transparent}
+body.embed header.top{display:none}
+body.noscroll{overflow:hidden}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;background:#fff;border-bottom:1px solid #e5e7eb}
+header.top h1{font-size:1.25rem;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header.top h1 i{color:#4f46e5;margin-right:9px}
+header.top a{color:#2563eb;text-decoration:none;font-weight:600;font-size:.85rem;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-height:40px}
+body.fromapp header.top{position:sticky;top:0;z-index:30;justify-content:flex-start;padding-top:max(10px,env(safe-area-inset-top))}
+body.fromapp header.top a{order:-1;flex:none;font-size:.92rem;font-weight:700;padding:0 14px;border:1px solid #d1d5db;border-radius:999px;min-height:42px;color:#1f2937}
+.wrap{max-width:1080px;margin:0 auto;padding:16px 20px 40px}
+body.embed .wrap{padding:0 0 24px;max-width:none}
+.hidden{display:none!important}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.card+.card{margin-top:14px}
+.card h2{font-size:1.05rem;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 i{color:#4f46e5}
+.muted{color:#6b7280}
+.sm{font-size:.86rem}
+.hint{font-size:.78rem;color:#6b7280;margin-top:5px}
+.lb{display:block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:5px}
+.field{margin-bottom:14px;min-width:0}
+input[type=text],input[type=password],input[type=search],select{width:100%;border:1px solid #d1d5db;border-radius:9px;padding:9px 12px;font-size:1rem;background:#fff;color:#111827;min-height:44px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+select:disabled{background:#f3f4f6;color:#6b7280}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:9px;padding:8px 14px;font-weight:700;font-size:.86rem;cursor:pointer;min-height:40px;font-family:inherit;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.btn:hover{background:#f9fafb}
+.btn.pri{background:#2563eb;border-color:#2563eb;color:#fff}
+.btn.pri:hover{background:#1d4ed8}
+.btn.dpri{background:#dc2626;border-color:#dc2626;color:#fff}
+.btn.dpri:hover{background:#b91c1c}
+.btn.danger{color:#dc2626;border-color:#fecaca;background:#fef2f2}
+.btn.danger:hover{background:#fee2e2}
+.btn.warnb{color:#92400e;border-color:#fcd34d;background:#fffbeb}
+.btn.okb{color:#166534;border-color:#bbf7d0;background:#f0fdf4}
+.btn.icon{width:44px;padding:0;flex:none}
+.btn.big{min-height:48px;font-size:.95rem;padding:10px 18px}
+.btn.sm{min-height:34px;padding:5px 11px;font-size:.8rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.lnk{background:none;border:0;color:#2563eb;font-weight:700;cursor:pointer;font-size:inherit;font-family:inherit;padding:8px 2px;display:inline-flex;align-items:center;gap:5px}
+.err{color:#b91c1c;font-size:.86rem;font-weight:600;margin:8px 0}
+.err:empty{display:none}
+.info{color:#1e3a8a;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:9px 12px;font-size:.86rem;margin:0 0 14px;text-align:left}
+.info:empty{display:none}
+.pill{display:inline-flex;align-items:center;font-size:.74rem;font-weight:800;padding:2px 9px;border-radius:999px;background:#eef2ff;color:#4338ca}
+.solo{max-width:420px;margin:6vh auto 0;text-align:center}
+body.embed .solo{margin-top:24px}
+.solo h2{justify-content:center;font-size:1.2rem}
+.solo form{margin-top:18px;text-align:left}
+.solo .btn.big{width:100%;margin-top:4px}
+.ico{width:58px;height:58px;border-radius:16px;background:#eef2ff;color:#4f46e5;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:4px auto 12px}
+.ico.warn{background:#fffbeb;color:#d97706}
+.ico.bad{background:#fef2f2;color:#dc2626}
+.loading{padding:48px 16px;text-align:center;color:#6b7280;font-weight:600}
+.loading i{margin-right:8px}
+.whobar{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin:0 0 14px;font-size:.9rem;color:#374151}
+.whobar .av{width:32px;height:32px;border-radius:50%;background:#eef2ff;color:#4338ca;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:.78rem;flex:none}
+.whobar .sep{color:#9ca3af}
+.whobar b{word-break:break-word}
+.setrow{display:flex;align-items:flex-start;gap:14px;padding:8px 0 16px;border-bottom:1px solid #f0f1f3;margin-bottom:14px}
+.switch{position:relative;display:inline-block;width:56px;height:32px;flex:none;margin-top:1px}
+.switch input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;cursor:pointer;z-index:1}
+.switch .knob{position:absolute;inset:0;background:#d1d5db;border-radius:999px;transition:background .15s}
+.switch .knob::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.switch input:checked+.knob{background:#16a34a}
+.switch input:checked+.knob::after{transform:translateX(24px)}
+.switch input:focus-visible+.knob{box-shadow:0 0 0 3px rgba(37,99,235,.35)}
+.switch input:disabled{cursor:wait}
+.switch input:disabled+.knob{opacity:.6}
+.settxt{min-width:0}
+.settitle{display:block;font-weight:800;font-size:.98rem;cursor:pointer;margin-bottom:4px}
+.stl{display:inline-flex;align-items:center;gap:5px;font-weight:800;font-size:.7rem;padding:2px 8px;border-radius:999px;margin-right:6px;vertical-align:1px;text-transform:uppercase;letter-spacing:.04em}
+.stl.on{background:#dcfce7;color:#166534}
+.stl.off{background:#f3f4f6;color:#4b5563}
+.hrs{max-width:320px;margin:0}
+.cardhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px 16px;flex-wrap:wrap}
+.cardhead>div{flex:1;min-width:220px}
+.search{margin:14px 0 0;max-width:360px}
+.acclist{margin-top:12px}
+.acchead,.acc{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr);gap:4px 18px}
+.acchead{padding:9px 8px;font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:800;border-bottom:1px solid #e5e7eb}
+.acc{padding:14px 8px 12px;border-bottom:1px solid #f0f1f3;align-items:start}
+.acc:last-child{border-bottom:0}
+.acc.off{background:#fafafa}
+.acc.off .a-name b,.acc.off .a-access{opacity:.6}
+.a-name{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.a-name b{font-size:1rem;font-weight:800;word-break:break-word}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:.66rem;font-weight:800;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.tag.mgr{background:#ede9fe;color:#5b21b6}
+.tag.me{background:#e0f2fe;color:#075985}
+.a-access{display:flex;flex-wrap:wrap;gap:5px}
+.chipx{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:999px;background:#f3f4f6;color:#374151;white-space:nowrap}
+.chipx i{font-size:.72rem;color:#6b7280}
+.chipx.all{background:#eef2ff;color:#4338ca}
+.chipx.all i{color:#4f46e5}
+.chipx.none{background:#fff;border:1px dashed #d1d5db;color:#9ca3af}
+.a-status,.a-seen{display:flex;flex-direction:column;gap:2px;font-size:.86rem;min-width:0}
+.st{display:inline-flex;align-items:center;gap:7px;font-weight:800}
+.st::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.st.ok{color:#15803d}
+.st.off{color:#6b7280}
+.st.warn{color:#b45309}
+.st.bad{color:#b91c1c}
+.sub{font-size:.78rem;color:#6b7280}
+.lbm{display:none}
+.a-act{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.empty{text-align:center;padding:28px 12px}
+.empty p{margin-bottom:10px}
+.modal{position:fixed;inset:0;z-index:80;background:rgba(15,23,42,.5);display:flex;align-items:flex-start;justify-content:center;padding:6vh 14px;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.dlgbox{background:#fff;border-radius:16px;max-width:500px;width:100%;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.3);margin-bottom:24px}
+.dlgbox h3{font-size:1.1rem;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:9px;word-break:break-word}
+.dlgbox h3 i{color:#4f46e5}
+.dlgtxt{color:#374151;margin-bottom:14px}
+.dlgbtns{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:16px}
+.dlgbtns.center{justify-content:center}
+.opt{display:flex;align-items:center;gap:12px;min-height:50px;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:11px;cursor:pointer;font-size:.92rem;color:#111827;margin-bottom:8px;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+.opt input{width:20px;height:20px;accent-color:#2563eb;flex:none;margin:0}
+.opt small{display:block;color:#6b7280;font-size:.78rem;font-weight:500;margin-top:1px}
+.opt.on{border-color:#93c5fd;background:#eff6ff}
+.opt.dis{opacity:.65;cursor:default}
+.opt i{color:#6b7280;margin-right:7px;width:16px;text-align:center}
+.optgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.optgrid .opt{margin:0}
+.pinrow{display:flex;gap:8px}
+.pinrow input{flex:1;min-width:0;font-size:1.25rem;letter-spacing:.25em;font-weight:700;font-variant-numeric:tabular-nums}
+.pinrow input::placeholder{letter-spacing:normal;font-size:.95rem;font-weight:500;color:#9ca3af}
+.pincard{text-align:center}
+.pc-name{font-size:1.25rem;font-weight:800;word-break:break-word;justify-content:center}
+.pc-pin{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:2.8rem;font-weight:800;letter-spacing:.3em;padding:12px 0 12px .3em;margin:4px 0 12px;background:#f9fafb;border:2px dashed #c7d2fe;border-radius:14px;color:#111827;user-select:all;-webkit-user-select:all}
+.pc-note{font-weight:800;color:#b45309;margin-bottom:6px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;background:#111827;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:.88rem;transition:opacity .2s,transform .2s;z-index:100;max-width:min(560px,92vw);pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:#b91c1c}
+.toast.ok{background:#15803d}
+body.embed .toast{top:16px;bottom:auto;transform:translate(-50%,-20px)}
+body.embed .toast.show{transform:translate(-50%,0)}
+@media (max-width:720px){
+  .wrap{padding:12px 12px 32px}
+  header.top{padding:10px 14px}
+  header.top h1{font-size:1.08rem}
+  .card{padding:14px}
+  .acchead{display:none}
+  .acc{grid-template-columns:minmax(0,1fr);border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-top:10px;gap:8px}
+  .acc:last-child{border-bottom:1px solid #e5e7eb}
+  .a-status,.a-seen{flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+  .lbm{display:inline}
+  .a-act{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+  .a-act .btn{min-height:46px;font-size:.88rem;width:100%}
+  .cardhead .btn{width:100%;min-height:48px;font-size:.95rem}
+  .hrs,.search{max-width:none}
+}
+@media (max-width:520px){
+  .modal{padding:10px}
+  .dlgbox{padding:18px 16px}
+  .optgrid{grid-template-columns:minmax(0,1fr)}
+  .dlgbtns .btn{flex:1;min-height:48px}
+  .pc-pin{font-size:2.4rem}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><i class="fas fa-id-badge"></i>Staff app access</h1>
+  <a href="/admin/dashboard" id="backLink"><i class="fas fa-arrow-left"></i> Dashboard</a>
+</header>
+<div class="wrap">
+  <div class="whobar hidden" id="whoBar">
+    <span class="av" id="whoAv" aria-hidden="true"></span>
+    <span>Signed in as <b id="whoName"></b></span>
+    <span class="sep" aria-hidden="true">·</span>
+    <button type="button" class="lnk" id="whoOut"><i class="fas fa-right-from-bracket"></i>Sign out</button>
+  </div>
+
+  <section id="vLoading" class="card loading"><i class="fas fa-spinner fa-spin"></i>Loading…</section>
+
+  <section id="vLogin" class="hidden">
+    <div class="card solo">
+      <div class="ico"><i class="fas fa-user-lock"></i></div>
+      <h2>Manager sign-in</h2>
+      <p class="muted sm">Use your name and PIN from the Ops app. Only manager accounts can manage staff access.</p>
+      <form id="lgForm" novalidate>
+        <div class="info" id="lgInfo" role="status"></div>
+        <div class="field"><label class="lb" for="lgName">Your name</label>
+          <input type="text" id="lgName" maxlength="40" autocomplete="username" autocapitalize="words" spellcheck="false" enterkeyhint="next"></div>
+        <div class="field"><label class="lb" for="lgPin">PIN</label>
+          <input type="password" id="lgPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" enterkeyhint="go"></div>
+        <div class="err" id="lgErr" role="alert"></div>
+        <button type="submit" class="btn pri big" id="lgBtn"><i class="fas fa-right-to-bracket"></i>Sign in</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="vDenied" class="hidden">
+    <div class="card solo">
+      <div class="ico warn"><i class="fas fa-user-shield"></i></div>
+      <h2>Not a manager account</h2>
+      <p class="sm" id="dnTxt"></p>
+      <p class="muted sm" style="margin:8px 0 16px">Ask a manager to turn on “Manager” for your account, or sign out and sign in with a manager account.</p>
+      <button type="button" class="btn pri big" id="dnOut"><i class="fas fa-right-from-bracket"></i>Sign out</button>
+    </div>
+  </section>
+
+  <section id="vError" class="hidden">
+    <div class="card solo">
+      <div class="ico bad"><i class="fas fa-triangle-exclamation"></i></div>
+      <h2>Couldn’t load staff accounts</h2>
+      <p class="sm" id="erTxt" style="margin-bottom:16px"></p>
+      <button type="button" class="btn pri big" id="erRetry"><i class="fas fa-rotate-right"></i>Try again</button>
+    </div>
+  </section>
+
+  <section id="vMain" class="hidden">
+    <div class="card">
+      <h2><i class="fas fa-shield-halved"></i>Sign-in on the Ops app</h2>
+      <div class="setrow">
+        <label class="switch"><input type="checkbox" id="reqSw" role="switch" aria-labelledby="reqTitle" aria-describedby="reqState"><span class="knob"></span></label>
+        <div class="settxt">
+          <label for="reqSw" class="settitle" id="reqTitle">Require sign-in on the Ops app</label>
+          <p class="sm" id="reqState"></p>
+          <p class="hint" id="reqTip"></p>
+        </div>
+      </div>
+      <div class="field hrs">
+        <label class="lb" for="hrsSel">Stay signed in for</label>
+        <select id="hrsSel"></select>
+        <p class="hint">How long a sign-in lasts before the PIN is asked again. Applies from the next sign-in.</p>
+      </div>
+      <div class="err" id="setErr" role="alert"></div>
+    </div>
+
+    <div class="card">
+      <div class="cardhead">
+        <div>
+          <h2><i class="fas fa-users"></i>Staff accounts <span class="pill hidden" id="accCount"></span></h2>
+          <p class="muted sm">Each person signs in to the Ops app with their own name and PIN. Choose which tabs they can use.</p>
+          <p class="sm" id="accSum" style="margin-top:4px"></p>
+        </div>
+        <button type="button" class="btn pri" id="addBtn"><i class="fas fa-user-plus"></i>Add staff</button>
+      </div>
+      <div class="field search hidden" id="findWrap"><input type="search" id="findIn" placeholder="Find by name" aria-label="Find by name" autocomplete="off" spellcheck="false"></div>
+      <div class="acclist" id="accList"></div>
+    </div>
+  </section>
+</div>
+<div class="modal hidden" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle"><div class="dlgbox" id="dlgBox"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+var QS = new URLSearchParams(location.search);
+var EMBED = QS.has('embed');
+var FROM_APP = !EMBED && QS.get('from') === 'app';
+if (EMBED) { document.body.classList.add('embed'); document.documentElement.classList.add('embed'); }
+if (FROM_APP) document.body.classList.add('fromapp');
+
+var TABS = [
+  { k: 'chats', label: 'Chats', icon: 'fa-comments' },
+  { k: 'beach', label: 'Beach', icon: 'fa-umbrella-beach' },
+  { k: 'rest', label: 'Restaurant', icon: 'fa-utensils' }
+];
+var TAB_BY = {};
+TABS.forEach(function (t) { TAB_BY[t.k] = t; });
+var HOURS = [
+  { v: 12, label: '12 hours (one shift)', short: '12 hours' },
+  { v: 24, label: '24 hours', short: '24 hours' },
+  { v: 168, label: '7 days', short: '7 days' },
+  { v: 720, label: '30 days', short: '30 days' }
+];
+var CODE_TEXT = {
+  not_configured: 'Staff sign-in is not set up on the server yet.',
+  auth_unavailable: 'Sign-in is temporarily unavailable. Try again in a minute.'
+};
+var TZ = 'Africa/Cairo';
+var S = { accounts: [], settings: {}, me: null };
+var VIEW = 'loading';
+var DLG = { open: false, esc: false, pinCard: false, after: null, onEnter: null };
+var LOAD = { busy: false, again: false };
+
+function el(id) { return document.getElementById(id); }
+function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+function yes(v) { return v === true || Number(v) === 1; }
+function normName(v) {
+  var s = String(v == null ? '' : v);
+  try { s = s.normalize('NFKC'); } catch (e) {}
+  return s.trim().replace(/\\s+/g, ' ');
+}
+function initials(n) {
+  var p = normName(n).split(' ').filter(Boolean);
+  return ((p[0] || '').charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : '')).toUpperCase();
+}
+function toast(msg, kind) {
+  var t = el('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(toast.tm);
+  toast.tm = setTimeout(function () { t.className = 'toast'; }, kind === 'err' ? 7000 : 3400);
+}
+function setBusy(btn, on, label) {
+  if (!btn) return;
+  if (on) {
+    if (btn.dataset.html == null) btn.dataset.html = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>' + (label ? esc(label) : '');
+  } else {
+    if (btn.dataset.html != null) { btn.innerHTML = btn.dataset.html; delete btn.dataset.html; }
+    btn.disabled = false;
+  }
+}
+async function api(method, url, body) {
+  var opt = { method: method, cache: 'no-store', credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
+  if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  var r, d = {};
+  try { r = await fetch(url, opt); } catch (e) { return { ok: false, status: 0, data: { message: 'No connection. Check the network and try again.' } }; }
+  try { d = await r.json(); } catch (e) { d = {}; }
+  if (!d || typeof d !== 'object') d = {};
+  return { ok: r.ok && d.success !== false, status: r.status, data: d };
+}
+function errText(res, fallback) {
+  var d = (res && res.data) || {};
+  if (typeof d.message === 'string' && d.message) return d.message;
+  var code = typeof d.error === 'string' ? d.error : '';
+  if (code && CODE_TEXT[code]) return CODE_TEXT[code];
+  if (code && code.indexOf(' ') > 0) return code;
+  return (fallback || 'Something went wrong') + (res && res.status ? ' (' + (code ? code.replace(/_/g, ' ') : 'HTTP ' + res.status) + ')' : '');
+}
+// A management call that finds the session gone (or no longer a manager) sends the page back to the right screen
+function authLost(r) {
+  if (!r) return false;
+  if (r.status === 401) { showLogin('Your sign-in has ended. Sign in again.'); return true; }
+  if (r.status === 403 && r.data && r.data.error === 'not_manager') { closeDlg(); load(); return true; }
+  return false;
+}
+
+// ---------- time (server stores UTC 'YYYY-MM-DD HH:MM:SS'; shown in resort time) ----------
+function parseTs(v) {
+  if (!v) return null;
+  var s = String(v).trim();
+  if (!s) return null;
+  if (s.indexOf('T') < 0) s = s.replace(' ', 'T');
+  if (!/(Z|[+-]\\d\\d:?\\d\\d)$/i.test(s)) s += 'Z';
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function fmt(d, o) {
+  try { return new Intl.DateTimeFormat('en-GB', Object.assign({ timeZone: TZ }, o)).format(d); }
+  catch (e) {
+    try { return new Intl.DateTimeFormat('en-GB', o).format(d); } catch (e2) { return d.toISOString().slice(0, 16).replace('T', ' '); }
+  }
+}
+function clock(v) {
+  var d = parseTs(v);
+  if (!d) return '';
+  var t = fmt(d, { hour: '2-digit', minute: '2-digit', hour12: false });
+  var dayOf = function (x) { return fmt(x, { year: 'numeric', month: '2-digit', day: '2-digit' }); };
+  return dayOf(d) === dayOf(new Date()) ? t : fmt(d, { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + t;
+}
+function rel(v) {
+  var d = parseTs(v);
+  if (!d) return '';
+  var s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return 'just now';
+  var m = Math.floor(s / 60);
+  if (m < 60) return m + ' min ago';
+  var h = Math.floor(m / 60);
+  if (h < 24) return plural(h, 'hour') + ' ago';
+  var days = Math.floor(h / 24);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  var o = { day: 'numeric', month: 'short' };
+  if (days > 300) o.year = 'numeric';
+  return fmt(d, o);
+}
+
+// ---------- PINs (same rules as the server) ----------
+function pinProblem(p) {
+  if (!/^\\d{4,6}$/.test(p)) return 'PIN must be 4 to 6 digits';
+  var same = true, up = true, down = true;
+  for (var i = 1; i < p.length; i++) {
+    var a = +p.charAt(i - 1), b = +p.charAt(i);
+    if (b !== a) same = false;
+    if (b !== a + 1) up = false;
+    if (b !== a - 1) down = false;
+  }
+  return (same || up || down) ? 'Choose a PIN that is not a simple pattern like 1234 or 1111' : '';
+}
+// Generated PINs are held to a stricter bar: 3+ different digits, no wrap-around runs like 8901
+function pinEasy(p) {
+  var seen = {}, n = 0, up = true, down = true;
+  for (var i = 0; i < p.length; i++) {
+    var ch = p.charAt(i);
+    if (!seen[ch]) { seen[ch] = 1; n++; }
+    if (i) {
+      var a = +p.charAt(i - 1), b = +ch;
+      if ((a + 1) % 10 !== b) up = false;
+      if ((a + 9) % 10 !== b) down = false;
+    }
+  }
+  return n < 3 || up || down;
+}
+function genPin() {
+  try {
+    var u = new Uint32Array(1);
+    for (var tries = 0; tries < 500; tries++) {
+      window.crypto.getRandomValues(u);
+      if (u[0] >= 4294960000) continue;
+      var p = String(u[0] % 10000);
+      while (p.length < 4) p = '0' + p;
+      if (!pinProblem(p) && !pinEasy(p)) return p;
+    }
+  } catch (e) {}
+  return '';
+}
+function pinFieldHtml(label) {
+  return '<div class="field"><label class="lb" for="fPin">' + esc(label) + '</label>' +
+    '<div class="pinrow"><input type="text" id="fPin" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" placeholder="4–6 digits" enterkeyhint="done">' +
+    '<button type="button" class="btn icon" data-a="eye" aria-label="Hide PIN" title="Hide PIN"><i class="fas fa-eye-slash"></i></button>' +
+    '<button type="button" class="btn" data-a="gen"><i class="fas fa-dice"></i>Generate</button></div>' +
+    '<p class="hint">4 to 6 digits. Avoid easy ones like 1234 or 1111.</p></div>';
+}
+function wirePin() {
+  var box = el('dlgBox'), input = el('fPin');
+  var eye = box.querySelector('[data-a="eye"]'), gen = box.querySelector('[data-a="gen"]');
+  function show(visible) {
+    input.type = visible ? 'text' : 'password';
+    eye.innerHTML = '<i class="fas ' + (visible ? 'fa-eye-slash' : 'fa-eye') + '"></i>';
+    eye.setAttribute('aria-label', visible ? 'Hide PIN' : 'Show PIN');
+    eye.title = visible ? 'Hide PIN' : 'Show PIN';
+  }
+  input.addEventListener('input', function () {
+    var v = input.value.replace(/\\D/g, '').slice(0, 6);
+    if (v !== input.value) input.value = v;
+  });
+  eye.onclick = function () { show(input.type !== 'text'); };
+  gen.onclick = function () {
+    var p = genPin();
+    if (!p) { el('fErr').textContent = 'Could not make a PIN on this device. Type one instead.'; return; }
+    input.value = p;
+    show(true);
+    el('fErr').textContent = '';
+  };
+}
+
+// ---------- dialog ----------
+function openDlg(html, escClose) {
+  var box = el('dlgBox');
+  box.innerHTML = html;
+  DLG.open = true; DLG.esc = !!escClose; DLG.pinCard = false; DLG.after = null; DLG.onEnter = null;
+  el('dlg').classList.remove('hidden');
+  el('dlg').scrollTop = 0;
+  document.body.classList.add('noscroll');
+  var c = box.querySelector('[data-a="cancel"]');
+  if (c) c.onclick = function () { closeDlg(); };
+}
+function closeDlg() {
+  if (!DLG.open) return;
+  var after = DLG.after;
+  DLG.open = false; DLG.esc = false; DLG.pinCard = false; DLG.after = null; DLG.onEnter = null;
+  el('dlg').classList.add('hidden');
+  el('dlgBox').innerHTML = '';
+  document.body.classList.remove('noscroll');
+  if (after) { try { after(); } catch (e) {} }
+}
+// Confirmation: o = {title, html (already escaped), ok, icon, danger}; resolves true/false
+function ask(o) {
+  return new Promise(function (resolve) {
+    var done = false;
+    function fin(v) { if (!done) { done = true; resolve(v); } }
+    openDlg('<h3 id="dlgTitle"><i class="fas ' + (o.icon || 'fa-circle-question') + '"></i>' + esc(o.title) + '</h3>' +
+      '<p class="sm dlgtxt">' + o.html + '</p>' +
+      '<div class="dlgbtns"><button type="button" class="btn" data-a="cancel">Cancel</button>' +
+      '<button type="button" class="btn ' + (o.danger ? 'dpri' : 'pri') + '" data-a="yes">' + esc(o.ok || 'OK') + '</button></div>', true);
+    DLG.after = function () { fin(false); };
+    var box = el('dlgBox');
+    box.querySelector('[data-a="yes"]').onclick = function () { fin(true); closeDlg(); };
+    try { box.querySelector(o.danger ? '[data-a="cancel"]' : '[data-a="yes"]').focus(); } catch (e) {}
+  });
+}
+document.addEventListener('keydown', function (e) {
+  if (!DLG.open) return;
+  if (e.key === 'Escape' && DLG.esc) { e.preventDefault(); closeDlg(); return; }
+  var t = e.target;
+  if (e.key === 'Enter' && DLG.onEnter && t && t.tagName === 'INPUT' && t.type !== 'checkbox' && el('dlgBox').contains(t)) {
+    e.preventDefault();
+    DLG.onEnter(t);
+  }
+});
+
+// ---------- views ----------
+function showView(v) {
+  VIEW = v;
+  el('vLoading').classList.toggle('hidden', v !== 'loading');
+  el('vLogin').classList.toggle('hidden', v !== 'login');
+  el('vDenied').classList.toggle('hidden', v !== 'denied');
+  el('vError').classList.toggle('hidden', v !== 'error');
+  el('vMain').classList.toggle('hidden', v !== 'main');
+  el('whoBar').classList.toggle('hidden', v !== 'main');
+}
+function showLogin(info) {
+  // Never close a PIN card under the manager's eyes: show sign-in once it is dismissed
+  if (DLG.open && DLG.pinCard) {
+    if (!DLG.after) DLG.after = function () { showLogin(info); };
+    return;
+  }
+  closeDlg();
+  S = { accounts: [], settings: {}, me: null };
+  el('lgInfo').textContent = info || '';
+  el('lgErr').textContent = '';
+  el('lgPin').value = '';
+  showView('login');
+  if (!EMBED) {
+    setTimeout(function () { try { (el('lgName').value ? el('lgPin') : el('lgName')).focus(); } catch (e) {} }, 30);
+  }
+}
+async function showDenied() {
+  var r = await api('GET', '/api/staff/auth/me');
+  if (r.ok && r.data && !r.data.account) { showLogin(''); return; }
+  var name = r.ok && r.data.account ? String(r.data.account.name || '') : '';
+  el('dnTxt').innerHTML = name
+    ? 'Signed in as <b>' + esc(name) + '</b> — this account can’t manage staff.'
+    : 'The account signed in on this device can’t manage staff.';
+  closeDlg();
+  showView('denied');
+}
+async function loadNow(silent) {
+  if (!silent) showView('loading');
+  var r = await api('GET', '/api/staff/team');
+  if (r.status === 401) {
+    if (VIEW !== 'login') showLogin(VIEW === 'main' ? 'Your sign-in has ended. Sign in again.' : '');
+    return;
+  }
+  if (r.status === 403) { await showDenied(); return; }
+  if (!r.ok) {
+    if (silent && VIEW === 'main') return;
+    el('erTxt').textContent = errText(r, 'Could not load staff accounts');
+    showView('error');
+    return;
+  }
+  var d = r.data;
+  S.accounts = Array.isArray(d.accounts) ? d.accounts : [];
+  S.settings = d.settings && typeof d.settings === 'object' ? d.settings : {};
+  S.me = d.me && typeof d.me === 'object' ? d.me : null;
+  renderMain();
+  showView('main');
+}
+async function load(silent) {
+  if (LOAD.busy) { LOAD.again = true; return; }
+  LOAD.busy = true;
+  try { await loadNow(silent); }
+  catch (e) {
+    if (!silent || VIEW !== 'main') { el('erTxt').textContent = 'Something went wrong while loading. Try again.'; showView('error'); }
+  }
+  finally { LOAD.busy = false; }
+  if (LOAD.again) { LOAD.again = false; load(true); }
+}
+
+// ---------- sign in / out ----------
+async function signIn(ev) {
+  if (ev) ev.preventDefault();
+  var btn = el('lgBtn');
+  if (btn.disabled) return;
+  var name = normName(el('lgName').value), pin = String(el('lgPin').value || '').trim();
+  el('lgErr').textContent = '';
+  if (!name || !pin) {
+    el('lgErr').textContent = 'Enter your name and PIN';
+    try { (name ? el('lgPin') : el('lgName')).focus(); } catch (e) {}
+    return;
+  }
+  setBusy(btn, true, 'Signing in…');
+  var r;
+  try { r = await api('POST', '/api/staff/auth/login', { name: name, pin: pin }); }
+  finally { setBusy(btn, false); }
+  el('lgPin').value = '';
+  if (!r.ok) {
+    el('lgErr').textContent = errText(r, 'Could not sign in');
+    try { el('lgPin').focus(); } catch (e) {}
+    return;
+  }
+  el('lgInfo').textContent = '';
+  load();
+}
+async function signOut(btn) {
+  setBusy(btn, true);
+  var r;
+  try { r = await api('POST', '/api/staff/auth/logout', {}); }
+  finally { setBusy(btn, false); }
+  if (r.status === 0) { toast(errText(r), 'err'); return; }
+  showLogin('You are signed out.');
+}
+
+// ---------- settings ----------
+function hoursLabel(v) {
+  for (var i = 0; i < HOURS.length; i++) if (HOURS[i].v === v) return HOURS[i].short;
+  return plural(v, 'hour');
+}
+function readyCount() {
+  return S.accounts.filter(function (a) { return yes(a.is_active) && (yes(a.all) || tabsOf(a).length > 0); }).length;
+}
+function renderSettings() {
+  var st = S.settings || {};
+  var on = !!st.login_required && st.login_required !== '0';
+  el('reqSw').checked = on;
+  el('reqState').innerHTML = on
+    ? '<span class="stl on"><i class="fas fa-lock"></i>On</span>Every phone needs a name and PIN.'
+    : '<span class="stl off"><i class="fas fa-lock-open"></i>Off</span>Anyone who opens the Ops app can use every tab. Create accounts, then turn this on.';
+  el('reqTip').textContent = on ? '' : (readyCount()
+    ? 'Staff can already sign in from the Ops app (Sign in, at the top) so they are ready when you turn this on.'
+    : 'Add a staff account with at least one tab first.');
+  var hrs = Math.round(Number(st.session_hours)) || 12;
+  var opts = HOURS.slice();
+  if (!opts.some(function (o) { return o.v === hrs; })) opts.push({ v: hrs, label: plural(hrs, 'hour') });
+  var sel = el('hrsSel');
+  sel.innerHTML = opts.map(function (o) { return '<option value="' + o.v + '"' + (o.v === hrs ? ' selected' : '') + '>' + esc(o.label) + '</option>'; }).join('');
+  sel.dataset.cur = String(hrs);
+}
+async function onReqChange() {
+  var sw = el('reqSw');
+  var want = sw.checked;
+  sw.checked = !want;
+  el('setErr').textContent = '';
+  if (want && !readyCount()) { el('setErr').textContent = 'Create staff accounts first'; return; }
+  var ok = await ask(want ? {
+    title: 'Require sign-in on the Ops app?', icon: 'fa-lock', ok: 'Turn on',
+    html: 'Every phone will be asked for a name and PIN within a minute. Make sure your staff have their PINs.'
+  } : {
+    title: 'Turn off sign-in?', icon: 'fa-lock-open', ok: 'Turn off', danger: true,
+    html: 'Anyone who opens the Ops app will be able to use every tab again, without a name or PIN.'
+  });
+  if (!ok) return;
+  sw.disabled = true;
+  var r;
+  try { r = await api('PUT', '/api/staff/team-settings', { login_required: want }); }
+  finally { sw.disabled = false; }
+  if (authLost(r)) return;
+  if (!r.ok) { el('setErr').textContent = errText(r, 'Could not change the setting'); return; }
+  S.settings.login_required = want;
+  renderSettings();
+  toast(want ? 'Sign-in is now required on the Ops app.' : 'Sign-in is off. The Ops app is open to anyone again.', 'ok');
+  load(true);
+}
+async function onHoursChange() {
+  var sel = el('hrsSel');
+  var v = Number(sel.value), prev = Number(sel.dataset.cur) || 12;
+  if (v === prev) return;
+  el('setErr').textContent = '';
+  sel.disabled = true;
+  var r;
+  try { r = await api('PUT', '/api/staff/team-settings', { session_hours: v }); }
+  finally { sel.disabled = false; }
+  if (authLost(r)) return;
+  if (!r.ok) { sel.value = String(prev); el('setErr').textContent = errText(r, 'Could not save'); return; }
+  S.settings.session_hours = v;
+  sel.dataset.cur = String(v);
+  toast('Saved. New sign-ins last ' + hoursLabel(v) + '.', 'ok');
+}
+
+// ---------- accounts ----------
+function tabsOf(a) {
+  var t = Array.isArray(a.tabs) ? a.tabs : [];
+  return TABS.filter(function (x) { return t.indexOf(x.k) >= 0; }).map(function (x) { return x.k; });
+}
+function isMe(a) { return !!(S.me && a && Number(S.me.staff_id) === Number(a.staff_id)); }
+function findAcc(id) {
+  for (var i = 0; i < S.accounts.length; i++) if (String(S.accounts[i].staff_id) === String(id)) return S.accounts[i];
+  return null;
+}
+function statusOf(a) {
+  if (!yes(a.is_active)) return { cls: 'off', txt: a.locked ? 'Disabled · locked' : 'Disabled' };
+  if (a.locked) {
+    if (a.lock_permanent) return { cls: 'bad', txt: 'Locked — needs unlock' };
+    var t = clock(a.locked_until);
+    return { cls: 'warn', txt: t ? 'Locked until ' + t : 'Locked' };
+  }
+  return { cls: 'ok', txt: 'Active' };
+}
+function accessChips(a) {
+  if (yes(a.all)) return '<span class="chipx all"><i class="fas fa-layer-group"></i>Everything</span>';
+  var t = tabsOf(a);
+  if (!t.length) return '<span class="chipx none">No app tabs</span>';
+  return t.map(function (k) { var d = TAB_BY[k]; return '<span class="chipx"><i class="fas ' + d.icon + '"></i>' + d.label + '</span>'; }).join('');
+}
+function actBtn(act, id, icon, label, cls) {
+  return '<button type="button" class="btn sm' + (cls ? ' ' + cls : '') + '" data-act="' + act + '" data-id="' + id + '"><i class="fas ' + icon + '"></i>' + label + '</button>';
+}
+function rowHtml(a) {
+  var id = esc(a.staff_id), me = isMe(a), on = yes(a.is_active), st = statusOf(a);
+  var n = Math.max(0, Number(a.sessions) || 0);
+  var h = '<div class="acc' + (on ? '' : ' off') + '">';
+  h += '<div class="a-name"><b>' + esc(a.name) + '</b>' + (me ? '<span class="tag me">You</span>' : '') +
+    (yes(a.is_manager) ? '<span class="tag mgr"><i class="fas fa-user-shield"></i>Manager</span>' : '') + '</div>';
+  h += '<div class="a-access">' + accessChips(a) + '</div>';
+  h += '<div class="a-status"><span class="st ' + st.cls + '">' + esc(st.txt) + '</span>' +
+    (a.locked ? '<span class="sub">Too many wrong PINs</span>' : '') +
+    '<span class="sub">' + (n ? plural(n, 'phone') + ' signed in' : 'Not signed in') + '</span></div>';
+  h += '<div class="a-seen"><span><span class="lbm muted">Last sign-in: </span>' + (a.last_login_at ? esc(rel(a.last_login_at) || '—') : '<span class="muted">Never</span>') + '</span>' +
+    (n && a.last_seen_at ? '<span class="sub">Last active ' + esc(rel(a.last_seen_at)) + '</span>' : '') + '</div>';
+  var b = actBtn('edit', id, 'fa-pen', 'Edit') + actBtn('pin', id, 'fa-key', 'New PIN');
+  if (a.locked) b += actBtn('unlock', id, 'fa-lock-open', 'Unlock', 'warnb');
+  if (n) b += actBtn('signout', id, 'fa-right-from-bracket', n > 1 ? 'Sign out phones' : 'Sign out phone');
+  if (!me) {
+    b += on ? actBtn('disable', id, 'fa-ban', 'Disable') : actBtn('enable', id, 'fa-circle-check', 'Enable', 'okb');
+    b += actBtn('delete', id, 'fa-trash-can', 'Delete', 'danger');
+  }
+  h += '<div class="a-act">' + b + '</div></div>';
+  return h;
+}
+function renderList() {
+  var list = S.accounts;
+  var active = list.filter(function (a) { return yes(a.is_active); }).length;
+  var signed = list.filter(function (a) { return Number(a.sessions) > 0; }).length;
+  el('accCount').textContent = String(list.length);
+  el('accCount').classList.toggle('hidden', !list.length);
+  el('accSum').textContent = list.length ? plural(active, 'active account') + ' · ' + signed + ' signed in on a phone now' : '';
+  var findIn = el('findIn');
+  if (list.length < 8) findIn.value = '';
+  el('findWrap').classList.toggle('hidden', list.length < 8);
+  var box = el('accList');
+  if (list.length <= 1) {
+    box.innerHTML = (list.length ? '<div class="acchead"><span>Name</span><span>Access</span><span>Status</span><span>Last sign-in</span></div>' + rowHtml(list[0]) : '') +
+      '<div class="empty"><p><b>' + (list.length ? 'Add your team' : 'No staff accounts yet') + '</b></p>' +
+      '<p class="muted sm">Add an account for each person who uses the Ops app, then give them their name and PIN.</p>' +
+      '<button type="button" class="btn pri big" data-act="add"><i class="fas fa-user-plus"></i>Add staff</button></div>';
+    return;
+  }
+  var q = normName(findIn.value).toLowerCase();
+  var shown = list.slice().sort(function (a, b) {
+    var x = yes(a.is_active) ? 0 : 1, y = yes(b.is_active) ? 0 : 1;
+    if (x !== y) return x - y;
+    return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+  }).filter(function (a) { return !q || String(a.name || '').toLowerCase().indexOf(q) >= 0; });
+  box.innerHTML = shown.length
+    ? '<div class="acchead"><span>Name</span><span>Access</span><span>Status</span><span>Last sign-in</span></div>' + shown.map(rowHtml).join('')
+    : '<p class="muted sm empty">No one matches “' + esc(findIn.value.trim()) + '”.</p>';
+}
+function renderMain() {
+  var me = S.me || {};
+  el('whoName').textContent = me.name || '';
+  el('whoAv').textContent = initials(me.name || '');
+  renderSettings();
+  renderList();
+}
+
+// ---------- add / edit ----------
+function accessKey(all, tabs) { return all ? '*' : tabs.slice().sort().join(','); }
+function openAccountDlg(a) {
+  var isNew = !a, me = isMe(a);
+  var all = !isNew && yes(a.all), tabs = isNew ? [] : tabsOf(a), mgr = !isNew && yes(a.is_manager);
+  var h = '<h3 id="dlgTitle"><i class="fas ' + (isNew ? 'fa-user-plus' : 'fa-user-pen') + '"></i>' + (isNew ? 'Add staff account' : 'Edit ' + esc(a.name)) + '</h3>';
+  h += '<div class="field"><label class="lb" for="fName">Name</label>' +
+    '<input type="text" id="fName" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="next" value="' + (isNew ? '' : esc(a.name)) + '">' +
+    '<p class="hint">What they type to sign in. Capital letters don’t matter.</p></div>';
+  h += '<div class="field"><span class="lb">Access in the Ops app</span>' +
+    '<label class="opt"><input type="checkbox" id="fAll"' + (all ? ' checked' : '') + '><span><b>Everything</b> <small>All tabs, including future ones</small></span></label>' +
+    '<div class="optgrid" id="fTabs">' + TABS.map(function (t) {
+      return '<label class="opt"><input type="checkbox" data-tab="' + t.k + '"' + (all || tabs.indexOf(t.k) >= 0 ? ' checked' : '') + '><span><i class="fas ' + t.icon + '"></i>' + t.label + '</span></label>';
+    }).join('') + '</div></div>';
+  h += '<div class="field"><label class="opt"><input type="checkbox" id="fMgr"' + (mgr ? ' checked' : '') + (me ? ' disabled' : '') + '>' +
+    '<span><b>Manager</b> — can manage staff accounts' + (me ? '<small>You can’t remove your own manager access.</small>' : '<small>Opens this page from the Ops app. Tabs above still apply.</small>') + '</span></label></div>';
+  if (isNew) h += pinFieldHtml('PIN');
+  h += '<div class="err" id="fErr" role="alert"></div>';
+  h += '<div class="dlgbtns"><button type="button" class="btn" data-a="cancel">Cancel</button>' +
+    '<button type="button" class="btn pri" id="fSave">' + (isNew ? '<i class="fas fa-user-plus"></i>Create account' : '<i class="fas fa-floppy-disk"></i>Save changes') + '</button></div>';
+  openDlg(h, true);
+
+  var fAll = el('fAll'), boxes = [].slice.call(el('fTabs').querySelectorAll('input[data-tab]'));
+  var keep = boxes.map(function (b) { return b.checked; });
+  function paint() {
+    [].slice.call(el('dlgBox').querySelectorAll('.opt')).forEach(function (o) {
+      var i = o.querySelector('input');
+      o.classList.toggle('on', !!(i && i.checked));
+      o.classList.toggle('dis', !!(i && i.disabled));
+    });
+  }
+  function applyAll() {
+    boxes.forEach(function (b, i) {
+      if (fAll.checked) { b.checked = true; b.disabled = true; } else { b.checked = keep[i]; b.disabled = false; }
+    });
+    paint();
+  }
+  fAll.addEventListener('change', function () {
+    if (fAll.checked) keep = boxes.map(function (b) { return b.checked; });
+    applyAll();
+  });
+  boxes.forEach(function (b) { b.addEventListener('change', paint); });
+  el('fMgr').addEventListener('change', paint);
+  applyAll();
+  if (isNew) wirePin();
+  el('fSave').onclick = function () { saveAccount(a); };
+  DLG.onEnter = function (t) {
+    if (t.id === 'fName' && el('fPin') && !el('fPin').value) { el('fPin').focus(); return; }
+    saveAccount(a);
+  };
+  try { el('fName').focus(); } catch (e) {}
+}
+async function saveAccount(a) {
+  var isNew = !a, btn = el('fSave'), err = el('fErr');
+  if (!btn || btn.disabled) return;
+  err.textContent = '';
+  var name = normName(el('fName').value);
+  if (!name) { err.textContent = 'Enter a name'; el('fName').focus(); return; }
+  if (name.length > 40) { err.textContent = 'Keep the name to 40 characters or fewer'; el('fName').focus(); return; }
+  var all = el('fAll').checked;
+  var tabs = all ? [] : [].slice.call(el('fTabs').querySelectorAll('input[data-tab]')).filter(function (b) { return b.checked; }).map(function (b) { return b.dataset.tab; });
+  var mgr = el('fMgr').checked;
+  if (!all && !tabs.length && !mgr) { err.textContent = 'Choose at least one tab, or make them a manager.'; return; }
+  var access = all ? '*' : tabs;
+  var method, url, body, pin = '';
+  if (isNew) {
+    pin = String(el('fPin').value || '').trim();
+    var pp = pinProblem(pin);
+    if (pp) { err.textContent = pp; el('fPin').focus(); return; }
+    method = 'POST'; url = '/api/staff/team';
+    body = { name: name, pin: pin, access: access, is_manager: mgr };
+  } else {
+    body = {};
+    if (name !== normName(a.name)) body.name = name;
+    if (accessKey(all, tabs) !== accessKey(yes(a.all), tabsOf(a))) body.access = access;
+    if (mgr !== yes(a.is_manager)) body.is_manager = mgr;
+    if (!Object.keys(body).length) { closeDlg(); return; }
+    method = 'PUT'; url = '/api/staff/team/' + encodeURIComponent(a.staff_id);
+  }
+  setBusy(btn, true, isNew ? 'Creating…' : 'Saving…');
+  var r;
+  try { r = await api(method, url, body); }
+  finally { setBusy(btn, false); }
+  if (authLost(r)) return;
+  if (!r.ok) { err.textContent = errText(r, isNew ? 'Could not create the account' : 'Could not save the changes'); return; }
+  if (isNew) {
+    var acct = r.data.account || {};
+    showPinCard(acct.name || name, pin, null);
+  } else {
+    closeDlg();
+    toast('Saved ' + name + '.', 'ok');
+  }
+  load(true);
+}
+
+// ---------- PINs ----------
+function openPinDlg(a) {
+  var me = isMe(a);
+  var h = '<h3 id="dlgTitle"><i class="fas fa-key"></i>New PIN for ' + esc(a.name) + '</h3>' +
+    '<p class="sm dlgtxt">' + (me
+      ? 'You will be signed out here and on your phones. Then sign in again with the new PIN.'
+      : esc(a.name) + ' is signed out on every phone and signs in again with the new PIN.') +
+    (a.locked ? ' This also unlocks the account.' : '') + '</p>' +
+    pinFieldHtml('New PIN') +
+    '<div class="err" id="fErr" role="alert"></div>' +
+    '<div class="dlgbtns"><button type="button" class="btn" data-a="cancel">Cancel</button>' +
+    '<button type="button" class="btn pri" id="fSave"><i class="fas fa-key"></i>Set new PIN</button></div>';
+  openDlg(h, true);
+  wirePin();
+  el('fSave').onclick = function () { savePin(a); };
+  DLG.onEnter = function () { savePin(a); };
+  try { el('fPin').focus(); } catch (e) {}
+}
+async function savePin(a) {
+  var btn = el('fSave'), err = el('fErr');
+  if (!btn || btn.disabled) return;
+  err.textContent = '';
+  var pin = String(el('fPin').value || '').trim();
+  var pp = pinProblem(pin);
+  if (pp) { err.textContent = pp; el('fPin').focus(); return; }
+  var me = isMe(a);
+  setBusy(btn, true, 'Saving…');
+  var r;
+  try { r = await api('POST', '/api/staff/team/' + encodeURIComponent(a.staff_id) + '/pin', { pin: pin }); }
+  finally { setBusy(btn, false); }
+  if (authLost(r)) return;
+  if (!r.ok) { err.textContent = errText(r, 'Could not set the PIN'); return; }
+  if (me) {
+    showPinCard(a.name, pin, function () { showLogin('Sign in again with your new PIN.'); });
+    return;
+  }
+  showPinCard(a.name, pin, null);
+  load(true);
+}
+function copyText(t) {
+  return new Promise(function (resolve) {
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = t;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, t.length);
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve(!!ok);
+      } catch (e) { resolve(false); }
+    }
+    try {
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(function () { resolve(true); }, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+  });
+}
+function showPinCard(name, pin, after) {
+  openDlg('<div class="pincard">' +
+    '<div class="ico"><i class="fas fa-key"></i></div>' +
+    '<h3 id="dlgTitle" class="pc-name">' + esc(name) + '</h3>' +
+    '<p class="lb">PIN</p>' +
+    '<p class="pc-pin">' + esc(pin) + '</p>' +
+    '<p class="pc-note">Give this to ' + esc(name) + '. It can’t be shown again.</p>' +
+    '<p class="muted sm">They sign in to the Ops app with the name <b>' + esc(name) + '</b> and this PIN.</p>' +
+    '<div class="dlgbtns center"><button type="button" class="btn big" id="pcCopy"><i class="fas fa-copy"></i>Copy</button>' +
+    '<button type="button" class="btn pri big" id="pcDone"><i class="fas fa-check"></i>Done</button></div></div>', false);
+  DLG.pinCard = true;
+  DLG.after = after || null;
+  el('pcDone').onclick = function () { closeDlg(); };
+  el('pcCopy').onclick = function () {
+    var b = this;
+    copyText(name + ' — Ops app PIN: ' + pin).then(function (ok) {
+      if (!ok) { toast('Could not copy. Write the PIN down instead.', 'err'); return; }
+      b.innerHTML = '<i class="fas fa-check"></i>Copied';
+      setTimeout(function () { if (b.isConnected) b.innerHTML = '<i class="fas fa-copy"></i>Copy'; }, 2000);
+    });
+  };
+  try { el('pcDone').focus(); } catch (e) {}
+}
+
+// ---------- row actions ----------
+async function rowCall(btn, method, path, body, okMsg, failMsg) {
+  setBusy(btn, true);
+  var r;
+  try { r = await api(method, path, body); }
+  finally { setBusy(btn, false); }
+  if (authLost(r)) return false;
+  if (!r.ok) { toast(errText(r, failMsg), 'err'); return false; }
+  toast(okMsg, 'ok');
+  load(true);
+  return true;
+}
+async function onListClick(e) {
+  var btn = e.target && e.target.closest ? e.target.closest('[data-act]') : null;
+  if (!btn || btn.disabled) return;
+  var act = btn.dataset.act;
+  if (act === 'add') { openAccountDlg(null); return; }
+  var a = findAcc(btn.dataset.id);
+  if (!a) return;
+  var base = '/api/staff/team/' + encodeURIComponent(a.staff_id);
+  var n = Math.max(0, Number(a.sessions) || 0), me = isMe(a), who = esc(a.name);
+  if (act === 'edit') openAccountDlg(a);
+  else if (act === 'pin') openPinDlg(a);
+  else if (act === 'unlock') rowCall(btn, 'POST', base + '/unlock', {}, a.name + ' can sign in again.', 'Could not unlock');
+  else if (act === 'signout') {
+    if (!(await ask({ title: 'Sign out ' + a.name + '?', icon: 'fa-right-from-bracket', ok: 'Sign out',
+      html: who + ' is signed out on ' + (n === 1 ? '1 phone' : n + ' phones') + ' and needs their PIN to sign in again.' + (me ? ' This signs you out here too.' : '') }))) return;
+    rowCall(btn, 'POST', base + '/signout', {}, a.name + ' is signed out.', 'Could not sign out');
+  } else if (act === 'disable') {
+    if (!(await ask({ title: 'Disable ' + a.name + '?', icon: 'fa-ban', ok: 'Disable', danger: true,
+      html: who + ' is signed out straight away and can’t sign in until you enable the account again.' }))) return;
+    rowCall(btn, 'PUT', base, { is_active: false }, a.name + ' is disabled.', 'Could not disable');
+  } else if (act === 'enable') {
+    rowCall(btn, 'PUT', base, { is_active: true }, a.name + ' can sign in again.', 'Could not enable');
+  } else if (act === 'delete') {
+    if (!(await ask({ title: 'Delete ' + a.name + '?', icon: 'fa-trash-can', ok: 'Delete', danger: true,
+      html: 'This removes ' + who + '’s account for good and signs them out everywhere. Check-ins they recorded keep their name. To stop someone for a while, use Disable instead.' }))) return;
+    rowCall(btn, 'DELETE', base, undefined, a.name + '’s account is deleted.', 'Could not delete');
+  }
+}
+
+// ---------- boot ----------
+(function () {
+  if (FROM_APP) {
+    var back = '/staff/app';
+    try {
+      var ref = document.referrer ? new URL(document.referrer) : null;
+      if (ref && ref.origin === location.origin && ref.pathname === '/staff/app') back = ref.pathname + ref.search;
+    } catch (e) {}
+    try {
+      if (back !== '/staff/app') sessionStorage.setItem('opsStaffBack', back);
+      else back = sessionStorage.getItem('opsStaffBack') || back;
+    } catch (e) {}
+    var bl = el('backLink');
+    bl.href = back;
+    bl.innerHTML = '<i class="fas fa-arrow-left"></i> Ops app';
+  }
+  el('lgForm').addEventListener('submit', signIn);
+  el('lgName').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !el('lgPin').value) { e.preventDefault(); el('lgPin').focus(); }
+  });
+  el('lgPin').addEventListener('input', function () {
+    var v = this.value.replace(/\\D/g, '').slice(0, 6);
+    if (v !== this.value) this.value = v;
+  });
+  el('whoOut').onclick = function () { signOut(this); };
+  el('dnOut').onclick = function () { signOut(this); };
+  el('erRetry').onclick = function () { load(); };
+  el('reqSw').addEventListener('change', onReqChange);
+  el('hrsSel').addEventListener('change', onHoursChange);
+  el('addBtn').onclick = function () { openAccountDlg(null); };
+  el('findIn').addEventListener('input', renderList);
+  el('accList').addEventListener('click', onListClick);
+  function refresh() { if (document.visibilityState === 'visible' && VIEW === 'main' && !DLG.open) load(true); }
+  setInterval(refresh, 60000);
+  document.addEventListener('visibilitychange', refresh);
+  load();
+})();
+</script>
+</body>
+</html>`)
+})
+
 // ADMIN: Beach setup — layout builder on the guest photo, zones & booking limits, time slots
 app.get('/admin/beach-setup', (c) => {
   return c.html(`<!DOCTYPE html>
@@ -56093,6 +57114,9 @@ app.get('/admin/dashboard', (c) => {
                     <button data-tab="users" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-users-cog w-5"></i><span>User Management</span>
                     </button>
+                    <button data-tab="opsstaff" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-id-badge w-5"></i><span>Staff App Access</span>
+                    </button>
                 </div>
                 
                 <!-- Content Section -->
@@ -61299,6 +62323,25 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- Staff App Access: name + PIN accounts for the Ops app (embedded page, signs in with an Ops manager account) -->
+    <div id="opsstaffTab" class="tab-content hidden">
+        <div class="bg-white border-2 border-indigo-200 rounded-lg p-4 mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-id-badge mr-2 text-indigo-600"></i>Staff App Access
+                    </h3>
+                    <p class="text-sm text-gray-600">Who can sign in to the Ops app with a name and PIN, which tabs each person sees (Chats, Beach, Restaurant), and whether sign-in is required. Changes need an Ops manager account.</p>
+                </div>
+                <a href="/admin/ops-staff" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:underline whitespace-nowrap">
+                    <i class="fas fa-up-right-from-square mr-1"></i>Open full screen
+                </a>
+            </div>
+            <iframe id="opsStaffFrame" data-src="/admin/ops-staff?embed=1" title="Staff app access"
+                    style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
+        </div>
+    </div>
+
     <!-- Restaurants Management Tab -->
     <div id="restaurantsTab" class="tab-content hidden">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -63335,6 +64378,7 @@ app.get('/admin/dashboard', (c) => {
         // Embedded tools load their iframe only when first opened
         if (tab === 'resortmap') lazyFrame('resortmapFrame');
         if (tab === 'mainrestaurant') loadRestaurantSetupFrame();
+        if (tab === 'opsstaff') lazyFrame('opsStaffFrame');
         if (tab === 'chatbot') chatbotSub(window.__cbSub || 'agent');
         if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
