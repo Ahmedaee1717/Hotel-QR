@@ -9,6 +9,11 @@ type Bindings = {
   OPS_PIN_PEPPER?: string
 }
 
+// Build id (vite define): /api/staff/auth/me reports it and /staff/app embeds it, so a page
+// left open across a deploy reloads itself. 'dev' when built without the define.
+declare const __OPS_BUILD__: string
+const OPS_BUILD = typeof __OPS_BUILD__ !== 'undefined' ? __OPS_BUILD__ : 'dev'
+
 const app = new Hono<{ Bindings: Bindings }>()
 
 // Enable CORS for API routes
@@ -53880,7 +53885,9 @@ app.get('/staff/app', (c) => {
         .hbtns{display:flex;align-items:center;gap:8px;min-width:0}
         #bellBtn{flex-shrink:0}
         .ops-me{flex-shrink:1;min-width:0;max-width:44vw;overflow:hidden;text-overflow:ellipsis;font-family:inherit}
-        @media(max-width:399px){.ops-me.si .t{display:none} body.ops-signed #bellBtn.on #bellTxt{display:none}}
+        @media(max-width:399px){.ops-me.si .t{display:none}}
+        /* Signed in on a phone: the bell is icon-only so the name chip always fits */
+        @media(max-width:519px){body.ops-signed #bellTxt{display:none}}
         .ops-none{line-height:1.6}
         .ops-none i{display:block;font-size:1.6rem;color:var(--gold2);margin-bottom:10px}
         .ops-none button{margin-top:14px}
@@ -53923,7 +53930,7 @@ app.get('/staff/app', (c) => {
         <h1>Old Palace <span>Ops</span></h1>
         <div class="hbtns">
             <button type="button" class="bell ops-me" id="opsMeBtn" data-oact="me" hidden></button>
-            <button class="bell" id="bellBtn"><i class="fas fa-bell"></i> <span id="bellTxt">Enable alerts</span></button>
+            <button class="bell" id="bellBtn" title="Enable alerts" aria-label="Enable alerts"><i class="fas fa-bell"></i> <span id="bellTxt">Enable alerts</span></button>
         </div>
     </header>
     <div id="watchdog" class="wd">
@@ -54161,6 +54168,17 @@ app.get('/staff/app', (c) => {
     var opsPin = '', opsBusy = false, opsLgOpt = false, opsMeAt = 0, opsRefreshing = false, opsDeniedAt = 0, opsSwitching = false;
     var opsGen = 0;  // bumped on every sign-in: answers to requests sent before it are stale
     var OPS_TAB_NAME = {chats:'Chats', beach:'Beach', rest:'Restaurant'};
+    // opsMeRetry: /api/staff/auth/me failed (or could not tell) at boot, so the phone runs in legacy
+    // mode until a re-read succeeds (every 15 s tick). OPS_PAGE_BUILD: the deploy this page came from;
+    // when /me reports another one the page reloads itself once nobody is using it (opsMaybeReload).
+    var OPS_PAGE_BUILD = '${OPS_BUILD}';
+    var opsMeRetry = false, opsNewBuild = '', opsTouchAt = 0;
+    (function(){
+        try{
+            var mark=function(){ opsTouchAt=Date.now(); };
+            ['pointerdown','touchstart','keydown','wheel'].forEach(function(t){ document.addEventListener(t, mark, {capture:true, passive:true}); });
+        }catch(e){}
+    })();
     // Coming back from the manager page (or a sign-in redirect) without ?app= / ?rst=: restore them
     (function(){
         try{
@@ -54221,7 +54239,8 @@ app.get('/staff/app', (c) => {
             if(st===403 && err==='no_access'){
                 var now=Date.now();
                 if(now-opsDeniedAt>8000){ opsDeniedAt=now; toast('Not allowed for your account'); }
-                if(OPS_ME && now-opsMeAt>20000) opsRefresh();
+                // Also in legacy mode: a phone whose boot-time /me failed may still hold a session
+                if(now-opsMeAt>20000) opsRefresh();
             }
         }catch(e){}
     }
@@ -54273,8 +54292,12 @@ app.get('/staff/app', (c) => {
                 if(r.ok) j=await r.json();
             }finally{ if(tm) clearTimeout(tm); }
         }catch(e){ j=null; }
+        try{ opsBuildSeen(j); }catch(e){}
+        // No answer, or the server could not tell (success:false): run as today and keep asking
+        if(!j || typeof j!=='object' || j.success===false) j=null;
         try{
             opsMeAt=Date.now();
+            opsMeRetry=!j;
             if(j && j.account){ OPS_ME=j.account; OPS_MODE='account'; opsGen++; opsHideLogin(); opsApplyAccess(); }
             else if(j && j.login_required){ opsShowLogin(false); }
             else{ var waiting=OPS_MODE==='login'; opsLegacy(); if(sw || waiting) opsShowLogin(true); }
@@ -54371,7 +54394,8 @@ app.get('/staff/app', (c) => {
             document.body.classList.toggle('ops-signed', OPS_MODE==='account' && !!OPS_ME);
             if(OPS_MODE==='account' && OPS_ME){
                 b.classList.remove('si');
-                b.textContent='👤 '+opsName();
+                // First word only, so the chip fits a phone header; the full name is in the account sheet
+                b.textContent='👤 '+(opsName().split(' ')[0] || opsName());
                 b.title='Signed in as '+opsName();
                 b.setAttribute('aria-label', 'Signed in as '+opsName());
                 b.hidden=false;
@@ -54388,11 +54412,19 @@ app.get('/staff/app', (c) => {
     async function opsRefresh(){
         if(opsRefreshing) return;
         opsRefreshing=true; opsMeAt=Date.now();
-        var gen=opsGen;
+        var gen=opsGen, ctl=null, tm=null;
         try{
-            var r=await fetch('/api/staff/auth/me',{cache:'no-store'});
-            var j=r.ok ? await r.json() : null;
-            if(!j || j.success===false || gen!==opsGen || opsBusy) return;
+            var j=null;
+            // A hung request must not block every later re-read
+            try{ if(window.AbortController){ ctl=new AbortController(); tm=setTimeout(function(){ try{ ctl.abort(); }catch(x){} }, 10000); } }catch(e){}
+            try{
+                var r=await fetch('/api/staff/auth/me', ctl ? {cache:'no-store', signal:ctl.signal} : {cache:'no-store'});
+                j=r.ok ? await r.json() : null;
+            }finally{ if(tm) clearTimeout(tm); }
+            try{ opsBuildSeen(j); }catch(e){}
+            // success:false = the server could not tell: unknown, never "signed out"
+            if(!j || typeof j!=='object' || j.success===false || gen!==opsGen || opsBusy) return;
+            opsMeRetry=false;
             if(j.account){
                 var before=opsAccessKey(OPS_ME);
                 OPS_ME=j.account;
@@ -54550,7 +54582,7 @@ app.get('/staff/app', (c) => {
             opsBusy=false;
             if(!r){ opsRenderPin(); opsLgErr('No connection — try again'); return; }
             if(r.ok && j && j.success!==false && j.account){
-                OPS_ME=j.account; OPS_MODE='account'; opsMeAt=Date.now(); opsGen++;
+                OPS_ME=j.account; OPS_MODE='account'; opsMeAt=Date.now(); opsGen++; opsMeRetry=false;
                 opsRemember(opsName() || name);
                 opsHideLogin();
                 opsRenderPin();
@@ -54626,14 +54658,65 @@ app.get('/staff/app', (c) => {
         try{ sessionStorage.setItem('opsBack', location.search||''); }catch(e){}
         location.href='/admin/ops-staff?from=app';
     }
-    // Chats feed: the 15 s poll, returning to the app, and a periodic re-read of the account
+    // Chats feed: the 15 s poll, returning to the app, and a periodic re-read of the account.
+    // /me is re-read every tick while the boot-time read has not succeeded, every 60 s while
+    // waiting on sign-in, and every 5 min otherwise (also on returning to the app), which is
+    // also how a page left open across a deploy learns about the new build.
     function opsTick(){
         try{
             if(document.visibilityState!=='visible') return;
             var age=Date.now()-opsMeAt;
-            if((OPS_MODE==='account' && age>300000) || (OPS_MODE==='login' && age>60000)) opsRefresh();
+            if(opsMeRetry || (OPS_MODE==='login' && age>60000) || ((OPS_MODE==='account' || OPS_MODE==='legacy') && age>300000)) opsRefresh();
+            if(opsMaybeReload()) return;
             if(opsLive() && opsCan('chats')){ loadAll(); loadWatchdog(); if(cur) loadMsgs(); }
         }catch(e){}
+    }
+    // Remember a newer deploy reported by /me (any answer that carries a build, even success:false)
+    function opsBuildSeen(j){
+        try{
+            var b=(j && typeof j==='object' && typeof j.build==='string') ? j.build : '';
+            if(!b || !OPS_PAGE_BUILD) return;
+            opsNewBuild = b!==OPS_PAGE_BUILD ? b : '';
+            if(opsNewBuild) setTimeout(opsMaybeReload, 0);
+        }catch(e){}
+    }
+    // Nobody is in the middle of something: no ring, no chat/sheet/dialog/scanner, the sign-in
+    // overlay untouched, no text field focused, no walk-in table pick, no tap in the last 30 s
+    function opsIdle(){
+        try{
+            if(ringing || opsBusy || opsSwitching || cur) return false;
+            var open=function(id){ var el=document.getElementById(id); return !!el && el.classList.contains('open'); };
+            if(['chat','bkSheet','rstSheet','bchWho','opsMe','scanWrap'].some(open)) return false;
+            if(open('opsLogin')){
+                var ni=document.getElementById('opsName');
+                if(opsPin || (ni && String(ni.value||'').trim())) return false;
+            }
+            if(typeof rstPick!=='undefined' && rstPick) return false;
+            var ae=document.activeElement;
+            if(ae && ae!==document.body){
+                var tn=String(ae.tagName||'').toUpperCase();
+                if(tn==='INPUT' || tn==='TEXTAREA' || tn==='SELECT' || ae.isContentEditable) return false;
+            }
+            var now=Date.now();
+            if(opsTouchAt && now>=opsTouchAt && now-opsTouchAt<30000) return false;
+            return true;
+        }catch(e){ return false; }
+    }
+    // Reload onto the new build when idle (keeps ?app=); at most once per 10 min per tab
+    function opsMaybeReload(){
+        try{
+            if(!opsNewBuild || !opsIdle()) return false;
+            var now=Date.now(), last=0;
+            try{ last=parseInt(sessionStorage.getItem('opsReloadAt')||'0',10)||0; }catch(e){ return false; }
+            if(last && now>=last && now-last<600000) return false;
+            // No working sessionStorage = no loop guard: never reload then
+            try{
+                sessionStorage.setItem('opsReloadAt', String(now));
+                if(sessionStorage.getItem('opsReloadAt')!==String(now)) return false;
+            }catch(e){ return false; }
+            location.reload();
+            return true;
+        }catch(e){ return false; }
     }
 
     (function(){
@@ -54765,6 +54848,8 @@ app.get('/staff/app', (c) => {
         var b=document.getElementById('bellBtn');
         b.classList.toggle('on',on);
         document.getElementById('bellTxt').textContent = on ? 'Alerts on' : 'Enable alerts';
+        // The label stays readable when a signed-in phone shows the bell as an icon only
+        try{ b.title = on ? 'Alerts on' : 'Enable alerts'; b.setAttribute('aria-label', b.title); }catch(e){}
     }
 
     // ── Lists ──

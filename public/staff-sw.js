@@ -1,8 +1,29 @@
 // Old Palace — Staff app service worker (push + focus handling)
-const STAFF_CACHE = 'ops-shell-v1';
+const STAFF_CACHE = 'ops-shell-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+
+// What is ringing right now. Public, so it answers on a phone that is signed out (or signed in
+// without Chats) while sign-in is required, when the inbox and feedback calls get 401/403.
+async function ringState() {
+  try {
+    const r = await fetch('/api/staff/ring-state?property_id=1', { cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && typeof j === 'object' ? j : null;
+  } catch (e) { return null; }
+}
+
+// { status, body }: status 0 and body null when the request failed
+async function getJson(url) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    let body = null;
+    try { body = await r.json(); } catch (e) {}
+    return { status: r.status, body };
+  } catch (e) { return { status: 0, body: null }; }
+}
 
 // Payload-less push: wake up, fetch what changed, show a precise notification
 self.addEventListener('push', (event) => {
@@ -12,10 +33,11 @@ self.addEventListener('push', (event) => {
     let tag = 'ops-generic';
 
     try {
-      const [inboxRes, fbRes] = await Promise.all([
-        fetch('/api/staff/inbox/1', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
-        fetch('/api/staff/feedback/1', { cache: 'no-store' }).then(r => r.json()).catch(() => null)
+      const [inbox, fbr] = await Promise.all([
+        getJson('/api/staff/inbox/1'),
+        getJson('/api/staff/feedback/1')
       ]);
+      const inboxRes = inbox.body, fbRes = fbr.body;
 
       const conv = inboxRes && inboxRes.conversations && inboxRes.conversations[0];
       const fb = fbRes && fbRes.feedback && fbRes.feedback[0];
@@ -34,6 +56,17 @@ self.addEventListener('push', (event) => {
         title = conv.is_ai_paused ? '💬 ' + who + ' replied' : '💬 New guest chat';
         body = (conv.last_message || 'Tap to open the conversation.').slice(0, 120) + (room ? '\n' + who + room : '');
         tag = 'ops-chat';
+      }
+
+      // Not allowed to read the inbox on this phone: say what is ringing instead
+      const denied = [inbox.status, fbr.status].some(s => s === 401 || s === 403);
+      if (denied && tag === 'ops-generic') {
+        const rs = await ringState();
+        if (rs && rs.ringing && rs.title) {
+          title = String(rs.title);
+          if (rs.body) body = String(rs.body);
+          tag = rs.kind === 'chat' ? 'ops-chat' : 'ops-generic';
+        }
       }
     } catch (e) {}
 
@@ -73,13 +106,26 @@ self.addEventListener('notificationclick', (event) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ property_id: 1 })
         });
-        const inbox = await fetch('/api/staff/inbox/1', { cache: 'no-store' }).then(r => r.json()).catch(() => null);
-        const top = inbox && inbox.conversations && inbox.conversations[0];
-        if (top) {
+      } catch (e) {}
+      try {
+        // Ack the chat that is ringing (ring-state is public: works with sign-in required and
+        // no Chats session on this phone). A test ring is stopped instead.
+        const rs = await ringState();
+        let sid = rs && rs.session_id ? String(rs.session_id) : '';
+        if (rs && rs.kind === 'test') {
+          await fetch('/api/staff/test-ring-stop', { method: 'POST' }).catch(() => null);
+        }
+        // Fallback: the newest chat in the inbox (needs a Chats session while sign-in is required)
+        if (!sid) {
+          const inbox = await fetch('/api/staff/inbox/1', { cache: 'no-store' }).then(r => r.json()).catch(() => null);
+          const top = inbox && inbox.conversations && inbox.conversations[0];
+          if (top && top.session_id) sid = String(top.session_id);
+        }
+        if (sid) {
           await fetch('/api/staff/ack-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ property_id: 1, session_id: top.session_id })
+            body: JSON.stringify({ property_id: 1, session_id: sid })
           });
         }
       } catch (e) {}
