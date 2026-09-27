@@ -27170,38 +27170,150 @@ window.luxTogglePassForm = function() {
             set: (value) => { propertyData = value; }
         });
         
-        // Track QR code scan on page load
-        async function trackQRScan() {
-          try {
-            await fetch('/api/track-scan', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                property_id: propertyData?.property_id || 1
-              })
-            });
-          } catch (error) {
-            console.error('Failed to track scan:', error);
-          }
+        // ── Guest app analytics → POST /api/t (guest_events) ──
+        // A visit is a session, not a page load: reloads and language switches stay inside it, and it
+        // ends after 30 min without use. Events go out in batches by sendBeacon; nothing here may throw
+        // or make the page wait on the network.
+        (function() {
+            var IDLE_MS = 30 * 60 * 1000;
+            var ID_RE = /^[a-z0-9-]{8,40}$/i;
+            var S = { q: [], vid: '', isNew: 0, sid: '', at: 0, src: 'direct', staff: false, pending: false, started: false, timer: 0 };
+
+            function sget(store, k) { try { return window[store].getItem(k); } catch (e) { return null; } }
+            function sset(store, k, v) { try { window[store].setItem(k, v); } catch (e) {} }
+            function newId() {
+                var b = new Uint8Array(11), s = '', i;
+                try { crypto.getRandomValues(b); } catch (e) { for (i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256); }
+                for (i = 0; i < b.length; i++) s += (b[i] < 16 ? '0' : '') + b[i].toString(16);
+                return s;
+            }
+            function saveSession() {
+                sset('sessionStorage', 'gl_sid', S.sid);
+                sset('sessionStorage', 'gl_src', S.src);
+                sset('sessionStorage', 'gl_sid_at', String(S.at));
+            }
+            function flush() {
+                if (S.timer) { clearTimeout(S.timer); S.timer = 0; }
+                while (S.q.length) {
+                    var pd = window.propertyData;
+                    var body = JSON.stringify({
+                        pid: Number(pd && pd.property_id) || 1,
+                        vid: S.vid,
+                        sid: S.sid,
+                        staff: (S.staff || sget('localStorage', 'gl_staff') === '1') ? 1 : 0,
+                        ev: S.q.splice(0, 30)
+                    });
+                    var sent = false;
+                    try { sent = !!(navigator.sendBeacon && navigator.sendBeacon('/api/t', new Blob([body], { type: 'text/plain' }))); } catch (e) {}
+                    if (!sent && window.fetch) {
+                        try { fetch('/api/t', { method: 'POST', body: body, keepalive: true }).catch(function() {}); } catch (e) {}
+                    }
+                }
+            }
+            function queue(ev, target, isNew, now) {
+                S.q.push([ev, target, String(window.currentLanguage || 'en').toLowerCase(), S.src, isNew ? 1 : 0, now]);
+                if (S.q.length >= 30) flush();
+                else if (!S.timer) S.timer = setTimeout(flush, 2000);
+            }
+            function queueVisit(now) {
+                queue('visit', null, S.isNew, now);
+                S.isNew = 0;
+            }
+            // Phones keep the tab alive for days: coming back after the idle window is a new visit
+            // (the source only carries over inside the guest apps).
+            function resume(now) {
+                if (now - S.at <= IDLE_MS) return;
+                flush();
+                S.sid = newId();
+                if (S.src !== 'app-ios' && S.src !== 'app-android') S.src = 'direct';
+                S.at = now;
+                saveSession();
+                if (S.started) queueVisit(now); else S.pending = true;
+            }
+            function away() {
+                S.at = Date.now();
+                sset('sessionStorage', 'gl_sid_at', String(S.at));
+                flush();
+            }
+
+            window.luxTrack = function(ev, target) {
+                try {
+                    var now = Date.now();
+                    resume(now);
+                    S.at = now;
+                    sset('sessionStorage', 'gl_sid_at', String(now));
+                    queue(String(ev), target == null ? null : String(target).slice(0, 80), 0, now);
+                } catch (e) {}
+            };
+            window.luxTrackFlush = function() { try { flush(); } catch (e) {} };
+            // Called once the property has loaded; counts only when this load started a new session
+            window.luxTrackVisit = function() {
+                try {
+                    if (S.started) return;
+                    S.started = true;
+                    if (S.pending) { S.pending = false; queueVisit(Date.now()); }
+                } catch (e) {}
+            };
+
+            try {
+                var now = Date.now();
+                var qs = new URLSearchParams(location.search);
+                var vid = sget('localStorage', 'gl_vid');
+                if (vid && ID_RE.test(vid)) {
+                    S.vid = vid;
+                } else {
+                    S.vid = newId();
+                    S.isNew = 1;
+                    sset('localStorage', 'gl_vid', S.vid);
+                }
+                // Staff browsers (admin dashboard / Ops app on this origin) and ?notrack=1 stay out of reports
+                S.staff = sget('localStorage', 'gl_staff') === '1' || qs.get('notrack') === '1';
+
+                var src = 'direct', ref = document.referrer || '', app = qs.get('app') || '';
+                if (qs.get('src') === 'qr') src = 'qr';
+                else if (app.indexOf('ios-') === 0) src = 'app-ios';
+                else if (ref.indexOf('android-app://online.oldpalaceresort.guest') === 0) src = 'app-android';
+                else if (ref) {
+                    try {
+                        var bare = function(h) { return String(h).toLowerCase().replace(/^www[.]/, ''); };
+                        if (bare(new URL(ref).hostname) !== bare(location.hostname)) src = 'link';
+                    } catch (e) {}
+                }
+                if (qs.get('src') === 'qr') {
+                    qs.delete('src');
+                    var rest = qs.toString();
+                    try { history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash); } catch (e) {}
+                }
+
+                var sid = sget('sessionStorage', 'gl_sid');
+                var at = Number(sget('sessionStorage', 'gl_sid_at')) || 0;
+                if (sid && ID_RE.test(sid) && now - at <= IDLE_MS) {
+                    S.sid = sid;
+                    S.src = sget('sessionStorage', 'gl_src') || src;
+                } else {
+                    S.sid = newId();
+                    S.src = src;
+                    S.pending = true;
+                }
+                S.at = now;
+                saveSession();
+
+                var active = function() { try { var n = Date.now(); resume(n); S.at = n; } catch (e) {} };
+                document.addEventListener('visibilitychange', function() {
+                    if (document.visibilityState === 'hidden') { try { away(); } catch (e) {} }
+                    else active();
+                });
+                window.addEventListener('pagehide', function() { try { away(); } catch (e) {} });
+                window.addEventListener('pageshow', function(e) { if (e.persisted) active(); });
+                document.addEventListener('pointerdown', active, { capture: true, passive: true });
+            } catch (e) {}
+        })();
+
+        // Venue, section and sheet opens (existing call sites): 'offering:H3', 'restaurant', 'live-map', …
+        function trackPageView(pageType, pageId) {
+            if (pageType && window.luxTrack) luxTrack('open', pageId ? pageType + ':' + pageId : pageType);
         }
-        
-        // Track page view
-        async function trackPageView(pageType, pageId) {
-          try {
-            await fetch('/api/track-page-view', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                property_id: propertyData?.property_id || 1,
-                page_type: pageType,
-                page_id: pageId
-              })
-            });
-          } catch (error) {
-            console.error('Failed to track page view:', error);
-          }
-        }
-        
+
         // Translation dictionaries for UI elements
         const uiTranslations = {
             en: {
@@ -28150,6 +28262,8 @@ window.luxTogglePassForm = function() {
                 return;
             }
             
+            if (window.luxTrack) { luxTrack('lang', newLang); luxTrackFlush(); }
+
             // RELOAD THE ENTIRE PAGE - cleanest approach
             console.log('🔄 Reloading page with new language...');
             window.location.reload();
@@ -29571,8 +29685,8 @@ window.luxTogglePassForm = function() {
                 
                 document.title = propertyData.name;
                 
-                // Track QR scan
-                trackQRScan();
+                // Guest app visit (once per session)
+                if (window.luxTrackVisit) luxTrackVisit();
                 
                 // Apply design settings
                 applyDesignSettings(propertyData);
@@ -30742,6 +30856,7 @@ window.luxTogglePassForm = function() {
         };
 
         window.luxGoHome = function() {
+            if (window.luxTrack) luxTrack('home');
             const content = document.getElementById('content');
             if (content) content.classList.add('lux-home-mode');
             const back = document.getElementById('luxBackBtn');
@@ -33122,6 +33237,7 @@ window.luxTogglePassForm = function() {
         }
 
         window.openInfoPage = async function(pageKey) {
+          if (window.luxTrack) luxTrack('open', 'info:' + pageKey);
           try {
             const response = await fetch('/api/info-page/' + propertyData.property_id + '/' + pageKey + '?lang=' + (window.currentLanguage || 'en'));
             const data = await response.json();
@@ -33227,6 +33343,7 @@ window.luxTogglePassForm = function() {
             var su = propertyData.feedback_survey_url;
             var gl = window.currentLanguage || 'en';
             if (gl !== 'en') su += (su.indexOf('?') >= 0 ? '&' : '?') + 'lang=' + encodeURIComponent(gl);
+            if (window.luxTrack) { luxTrack('open', 'feedback'); luxTrackFlush(); }
             window.location.href = su;
             return;
           }
@@ -33235,6 +33352,7 @@ window.luxTogglePassForm = function() {
             return;
           }
           // Legacy in-app form fallback
+          if (window.luxTrack) { luxTrack('open', 'feedback'); luxTrackFlush(); }
           window.location.href = '/feedback/' + activeFeedbackForm.form_id;
         }
         
@@ -34520,6 +34638,7 @@ window.luxTogglePassForm = function() {
             chatButton.addEventListener('click', () => {
               chatWindow.classList.toggle('hidden');
               if (!chatWindow.classList.contains('hidden')) {
+                if (window.luxTrack) luxTrack('chat_open');
                 // Never show an empty chat — greet if nothing is there yet
                 if (chatMessages.children.length === 0) {
                   addMessage(window.chatbotGreetingText || 'Hi! How can I help you today?', 'assistant', false, 'en', 'greeting');
@@ -34799,7 +34918,8 @@ window.luxTogglePassForm = function() {
                   session_id: chatSessionId,
                   message: message,
                   conversation_id: chatConversationId,
-                  guest_context: guest_context
+                  guest_context: guest_context,
+                  site_lang: (window.currentLanguage || 'en')
                 }
                 
                 console.log('📤 Sending to API:', {
@@ -54019,6 +54139,8 @@ app.get('/staff/app', (c) => {
     // when /me reports another one the page reloads itself once nobody is using it (opsMaybeReload).
     var OPS_PAGE_BUILD = '${OPS_BUILD}';
     var opsMeRetry = false, opsNewBuild = '', opsTouchAt = 0;
+    // The guest page shares this origin: guest-app visits from staff phones stay out of Analytics
+    try{ localStorage.setItem('gl_staff','1'); }catch(e){}
     (function(){
         try{
             var mark=function(){ opsTouchAt=Date.now(); };
@@ -58251,8 +58373,9 @@ app.get('/admin/dashboard', (c) => {
                     </summary>
                     <div class="mt-4 space-y-3">
                         <div class="bg-gray-50 p-3 rounded-lg">
-                            <p class="text-xs text-gray-600 mb-1">Hotel Landing Page URL:</p>
+                            <p class="text-xs text-gray-600 mb-1">Hotel Landing Page URL (in the QR code):</p>
                             <p id="hotelURL" class="font-mono text-sm text-blue-600 break-all">Loading...</p>
+                            <p class="text-xs text-gray-500 mt-1"><span class="font-mono">?src=qr</span> tells Analytics the visit came from a printed QR code. Leave it off when you share the link anywhere else.</p>
                         </div>
                         <div class="bg-gray-50 p-3 rounded-lg">
                             <p class="text-xs text-gray-600 mb-1">Property Name:</p>
@@ -64649,6 +64772,8 @@ app.get('/admin/dashboard', (c) => {
     <script>
       const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
       if (!user.user_id) { window.location.href = '/admin/login'; }
+      // The guest page shares this origin: guest-app visits from staff browsers stay out of Analytics
+      try { if (user.user_id) localStorage.setItem('gl_staff', '1'); } catch (e) {}
 
       // CRITICAL: Get property ID from logged-in user (MULTI-TENANCY)
       // Priority: 1. URL param, 2. User's property_id, 3. localStorage backup
@@ -67072,7 +67197,8 @@ app.get('/admin/dashboard', (c) => {
           const property = data.properties[0];  // Now gets authenticated user's property only
           
           if (property) {
-            const hotelURL = window.location.origin + '/hotel/' + property.slug;
+            // ?src=qr lets Analytics tell QR scans from other visits (the guest page strips it on arrival)
+            const hotelURL = window.location.origin + '/hotel/' + property.slug + '?src=qr';
             const hotelURLEl = document.getElementById('hotelURL');
             const propertyNameEl = document.getElementById('propertyName');
             const propertySlugEl = document.getElementById('propertySlug');
