@@ -44366,6 +44366,1138 @@ async function onListClick(e) {
 </html>`)
 })
 
+// ADMIN: Analytics — guest app, AI concierge, bookings and staff response for a period of Cairo days.
+// Data: GET /api/admin/analytics/overview. ?embed=1 = dashboard iframe (no page title).
+app.get('/admin/analytics', (c) => {
+  c.header('X-Frame-Options', 'SAMEORIGIN')
+  c.header('Content-Security-Policy', "frame-ancestors 'self'")
+  c.header('Cache-Control', 'no-store')
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Analytics</title>
+<script>try { if (localStorage.getItem('adminDarkMode') === 'true') document.documentElement.classList.add('dark'); } catch (e) {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#f6f7fb;--card:#fff;--line:#e4e7ee;--line2:#eff1f5;--ink:#0f172a;--ink2:#475569;--muted:#64748b;--faint:#94a3b8;--acc:#2563eb;--acc-soft:#eef4ff;--good:#047857;--good-bg:#ecfdf5;--good-dot:#10b981;--warn:#b45309;--warn-bg:#fffbeb;--warn-line:#fde68a;--warn-dot:#f59e0b;--bad:#b91c1c;--bad-bg:#fef2f2;--bad-line:#fecaca;--bad-dot:#ef4444;--info-bg:#f8fafc;--s1:#2563eb;--s1b:#9ec5f4;--s2:#eb6834;--s3:#1baf7a;--track:#eef1f6;--night:#f3f5f9;--seg:#eceef3;--seg-on:#fff;--skel:#eef0f4;--skel2:#f7f8fa;--pop:#0f172a;--pop-ink:#f8fafc;--pop-mute:#94a3b8;--shadow:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.03);color-scheme:light}
+html.dark{--bg:#121722;--card:#1a212d;--line:#29323f;--line2:#222a36;--ink:#e8ecf2;--ink2:#b6bfcc;--muted:#8b96a8;--faint:#697588;--acc:#3b82f6;--acc-soft:rgba(59,130,246,.15);--good:#34d399;--good-bg:rgba(16,185,129,.13);--warn:#fbbf24;--warn-bg:rgba(245,158,11,.10);--warn-line:rgba(245,158,11,.32);--bad:#f87171;--bad-bg:rgba(239,68,68,.10);--bad-line:rgba(239,68,68,.32);--info-bg:#1f2633;--s1:#3b82f6;--s1b:#1c4f96;--s2:#d95926;--s3:#199e70;--track:#262f3d;--night:#1f2632;--seg:#161c27;--seg-on:#2c3647;--skel:#222a36;--skel2:#2a3341;--pop:#2c3647;--pop-ink:#f1f5f9;--pop-mute:#a3aec0;--shadow:none;color-scheme:dark}
+html,body{background:var(--bg)}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--ink);font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer}
+a{color:var(--acc);text-decoration:none}
+.hidden{display:none!important}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 24px 48px}
+body.embed .wrap{max-width:none;padding:16px 16px 28px}
+body.embed .hd-title{display:none}
+.hd{display:flex;align-items:flex-end;justify-content:space-between;gap:14px 20px;flex-wrap:wrap}
+.back{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:var(--muted);margin-bottom:8px}
+.back:hover{color:var(--ink)}
+.hd h1{font-size:1.65rem;font-weight:700;letter-spacing:-.025em;line-height:1.2}
+.hd .sub{color:var(--muted);margin-top:3px}
+.tools{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+body.embed .tools{width:100%;justify-content:space-between}
+.tools-r{display:flex;align-items:center;gap:8px}
+.seg{display:inline-flex;background:var(--seg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:none;padding:0 13px;min-height:32px;border-radius:7px;font-weight:500;font-size:.86rem;color:var(--ink2);white-space:nowrap}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--seg-on);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.04)}
+.upd{color:var(--muted);font-size:.82rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ibtn{width:34px;height:34px;border-radius:8px;border:0;background:none;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ibtn:hover{background:var(--line2);color:var(--ink)}
+.ibtn.spin i{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:0 13px;min-height:34px;font-weight:600;font-size:.84rem;white-space:nowrap;box-shadow:var(--shadow)}
+.btn:hover{border-color:var(--faint)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.period{color:var(--muted);font-size:.82rem;margin:12px 0 18px;font-variant-numeric:tabular-nums;min-height:1.2em}
+.alerts{display:grid;gap:8px;margin-bottom:14px}
+.alerts:empty{display:none}
+.alert{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px 14px}
+.alert .ai{flex:none;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.82rem;background:var(--line2);color:var(--muted)}
+.alert .at{flex:1;min-width:0;align-self:center}
+.alert b{font-weight:600}
+.alert p{color:var(--ink2);font-size:.84rem;margin-top:2px}
+.alert.bad{background:var(--bad-bg);border-color:var(--bad-line)}
+.alert.bad .ai{background:var(--bad-dot);color:#fff}
+.alert.warn{background:var(--warn-bg);border-color:var(--warn-line)}
+.alert.warn .ai{background:var(--warn-dot);color:#fff}
+.alert .btn{flex:none;align-self:center}
+.errbar{display:flex;align-items:center;gap:10px;background:var(--bad-bg);border:1px solid var(--bad-line);color:var(--bad);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:.84rem}
+.errbar span{flex:1;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px 20px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.kpi{display:flex;flex-direction:column;min-height:178px}
+.kpi-h{display:flex;align-items:center;gap:7px;color:var(--ink2);font-size:.84rem;font-weight:500;min-height:22px}
+.kpi-h>i{color:var(--faint);width:15px;text-align:center;font-size:.82rem}
+.kpi-v{margin-top:10px;font-size:1.95rem;font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.kpi-v small{font-size:.95rem;font-weight:500;letter-spacing:0;color:var(--muted);margin-left:4px}
+.kpi-v.na{color:var(--faint)}
+.kpi-d{display:flex;align-items:center;gap:7px;margin-top:8px;min-height:22px;flex-wrap:wrap}
+.vs{color:var(--muted);font-size:.78rem}
+.delta{display:inline-flex;align-items:center;gap:3px;font-size:.76rem;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.delta.pos{color:var(--good);background:var(--good-bg)}
+.delta.neg{color:var(--bad);background:var(--bad-bg)}
+.delta.flat{color:var(--ink2);background:var(--line2)}
+.kpi-s{margin-top:4px;color:var(--muted);font-size:.8rem;min-height:1.2em}
+.kpi-viz{margin-top:auto;height:48px;position:relative}
+.kpi-viz:empty{display:none}
+.sp{position:absolute;left:0;right:0;bottom:2px;height:34px}
+.sp svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
+.sp .l{fill:none;stroke:currentColor;stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
+.sp .a{fill:currentColor;stroke:none;opacity:.1}
+.sp .d{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:currentColor;box-shadow:0 0 0 2px var(--card)}
+.c1{color:var(--s1)}.c2{color:var(--s2)}.c3{color:var(--s3)}
+.meter{position:absolute;left:0;right:0;bottom:14px;height:8px;border-radius:99px;background:var(--track);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:99px;background:var(--s1)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+.stack{display:grid;gap:14px;align-content:start;min-width:0}
+.mt{margin-top:14px}
+.ch{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;margin-bottom:16px;min-height:28px}
+.ch h2{font-size:.98rem;font-weight:600;letter-spacing:-.01em}
+.ch .note{color:var(--muted);font-size:.8rem}
+.ch .right{margin-left:auto;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.ci{width:28px;height:28px;border-radius:8px;background:var(--acc-soft);color:var(--acc);display:inline-flex;align-items:center;justify-content:center;font-size:.8rem;margin-right:2px;flex:none}
+.tip{border:0;background:none;color:var(--faint);width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.78rem;cursor:help;flex:none}
+.tip:hover,.tip:focus-visible{color:var(--ink2)}
+.legend{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;color:var(--ink2);font-size:.78rem}
+.legend button{border:0;background:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:4px 7px;margin:-4px -7px;border-radius:6px;color:var(--ink2);font-size:.78rem}
+.legend button:hover{background:var(--line2);color:var(--ink)}
+.legend button[aria-pressed="false"]{color:var(--faint)}
+.legend button[aria-pressed="false"] .key{opacity:.3}
+.key{display:inline-block;width:10px;height:10px;border-radius:3px;background:currentColor;flex:none}
+.key.ln{width:14px;height:2px;border-radius:2px}
+.k1{color:var(--s1)}.k2{color:var(--s2)}.k3{color:var(--s3)}.kb{color:var(--s1b)}
+.vt{display:inline-flex;background:var(--seg);border:1px solid var(--line);border-radius:8px;padding:2px}
+.vt button{border:0;background:none;padding:0 10px;min-height:26px;border-radius:6px;font-size:.78rem;font-weight:500;color:var(--ink2)}
+.vt button[aria-pressed="true"]{background:var(--seg-on);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.chart{position:relative;height:280px}
+.chart canvas{display:block}
+.fb{height:100%;display:flex;flex-direction:column}
+.fb .fy{font-size:.7rem;color:var(--faint);font-variant-numeric:tabular-nums}
+.fb svg{flex:1;width:100%;min-height:0}
+.fb .f1{fill:var(--s1)}
+.fb .gl{stroke:var(--line2);stroke-width:1;vector-effect:non-scaling-stroke}
+.fb polyline{fill:none;stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.fb .l2{stroke:var(--s2)}.fb .l3{stroke:var(--s3)}
+.fb .xa{display:flex;justify-content:space-between;font-size:.72rem;color:var(--faint);padding-top:6px}
+.hrs{display:grid;gap:18px}
+.hrow-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:.8rem;margin-bottom:8px}
+.hrow-h>span:first-child{display:inline-flex;align-items:center;gap:7px;font-weight:600;white-space:nowrap}
+.hrow-h .pk{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+.hcols{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));height:108px;border-bottom:1px solid var(--line)}
+.hc{height:100%;display:flex;align-items:flex-end;justify-content:center;padding:0 1px}
+.hc.nt{background:var(--night)}
+.hc.ns{border-top-left-radius:6px}.hc.ne{border-top-right-radius:6px}
+.hc i{display:block;width:100%;max-width:18px;border-radius:3px 3px 0 0}
+.hc i.b1{background:var(--s1)}.hc i.b2{background:var(--s2)}
+.hc:hover i{opacity:.8}
+.hax{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));font-size:.7rem;color:var(--faint);margin-top:6px;font-variant-numeric:tabular-nums}
+.hnote{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:.76rem;margin-top:14px}
+.hnote i{display:inline-block;width:14px;height:10px;border-radius:3px;background:var(--night);box-shadow:inset 0 0 0 1px var(--line)}
+.hb{list-style:none;display:grid;gap:12px}
+.hb li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:6px 12px}
+.hb.ico li{grid-template-columns:30px minmax(0,1fr) auto}
+.hb .hi{grid-row:span 2;align-self:center;width:30px;height:30px;border-radius:8px;background:var(--acc-soft);color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:.8rem}
+.hb .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.86rem}
+.hb .rk{display:inline-block;width:20px;color:var(--faint);font-variant-numeric:tabular-nums;font-size:.78rem}
+.hb .v{font-variant-numeric:tabular-nums;font-weight:600;font-size:.86rem;text-align:right;white-space:nowrap}
+.hb .v small{font-weight:400;color:var(--muted);margin-left:6px;font-size:.78rem}
+.hb .t{grid-column:1/-1;height:6px;border-radius:99px;background:var(--track);overflow:hidden}
+.hb.ico .t{grid-column:2/-1}
+.hb .t i{display:block;height:100%;border-radius:99px;background:var(--s1)}
+.hb .t i.c3{background:var(--s3)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:.8rem;color:var(--ink2);white-space:nowrap}
+.chip b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.chip small{color:var(--muted);font-variant-numeric:tabular-nums}
+.sh{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 10px}
+.sh:first-child{margin-top:0}
+.hint{font-size:.76rem;color:var(--muted);margin-top:12px}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
+.fact{background:var(--info-bg);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;min-width:0}
+.fact b{display:block;font-size:1.1rem;font-weight:600;letter-spacing:-.01em}
+.fact span{font-size:.76rem;color:var(--muted)}
+.ms{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ms>div{padding:12px 14px;border-left:1px solid var(--line);min-width:0}
+.ms>div:first-child{border-left:0}
+.ms .l{font-size:.74rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ms .v{font-size:1.3rem;font-weight:600;letter-spacing:-.02em;margin-top:2px;line-height:1.25}
+.ms .x{font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:3px;min-height:1.3em}
+.msx{font-size:.8rem;color:var(--ink2);margin-top:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--line2);color:var(--ink2);white-space:nowrap}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.pill.on{background:var(--good-bg);color:var(--good)}
+.pill.on .dot{background:var(--good-dot)}
+.split{display:flex;height:10px;border-radius:99px;overflow:hidden;gap:2px}
+.split i{display:block;height:100%}
+.split .a{background:var(--s1)}.split .b{background:var(--s1b)}
+.split-l{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;margin-top:9px;font-size:.8rem;color:var(--ink2);font-variant-numeric:tabular-nums}
+.split-l span{display:inline-flex;align-items:center;gap:7px}
+.rows{list-style:none}
+.rows li{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line2);min-width:0}
+.rows li:first-child{border-top:0;padding-top:0}
+.rows li:last-child{padding-bottom:0}
+.rows .rm{flex:1;min-width:0}
+.rows .rt{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rows .rs{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.lic{flex:none;width:32px;height:32px;border-radius:9px;background:var(--line2);color:var(--ink2);display:flex;align-items:center;justify-content:center;font-size:.85rem}
+.lic.bad{background:var(--bad-bg);color:var(--bad)}.lic.warn{background:var(--warn-bg);color:var(--warn)}.lic.good{background:var(--good-bg);color:var(--good)}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--line2);color:var(--ink2);flex:none}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}.badge.warn{background:var(--warn-bg);color:var(--warn)}.badge.good{background:var(--good-bg);color:var(--good)}
+.sdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--faint)}
+.sdot.good{background:var(--good-dot)}.sdot.warn{background:var(--warn-dot)}
+.cmpn{font-size:.8rem;color:var(--ink2);font-weight:500}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;padding:26px 16px;color:var(--muted);font-size:.84rem}
+.empty .ei{width:42px;height:42px;border-radius:12px;background:var(--line2);color:var(--faint);display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:8px}
+.empty .ei.good{background:var(--good-bg);color:var(--good)}
+.empty b{color:var(--ink);font-weight:600;font-size:.9rem}
+.empty p{max-width:400px}
+.empty.sm{flex-direction:row;justify-content:flex-start;text-align:left;gap:14px;padding:4px 0}
+.empty.sm .ei{margin:0;flex:none}
+.empty.sm p{max-width:none}
+.state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:56px 20px;margin-top:4px}
+.state .ei{width:48px;height:48px;border-radius:14px;background:var(--bad-bg);color:var(--bad);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:8px}
+.state b{font-size:1rem;font-weight:600}
+.state p{color:var(--muted);max-width:420px;margin-bottom:12px}
+.tw{overflow:auto;max-height:300px;border:1px solid var(--line);border-radius:10px}
+.tw table{border-collapse:collapse;width:100%;font-size:.82rem;font-variant-numeric:tabular-nums}
+.tw th,.tw td{padding:8px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line2)}
+.tw th:first-child,.tw td:first-child{text-align:left}
+.tw thead th{position:sticky;top:0;background:var(--card);color:var(--muted);font-weight:600;font-size:.74rem;z-index:1}
+.tw tbody tr:last-child td{border-bottom:0}
+.tw td.na{color:var(--faint)}
+.sk{background:linear-gradient(90deg,var(--skel) 25%,var(--skel2) 50%,var(--skel) 75%);background-size:200% 100%;animation:sh 1.4s ease-in-out infinite;border-radius:8px}
+@keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+body.busy #main{opacity:.55;transition:opacity .2s}
+.foot{color:var(--faint);font-size:.76rem;text-align:center;margin-top:22px}
+#pop{position:fixed;left:0;top:0;z-index:60;max-width:280px;background:var(--pop);color:var(--pop-ink);border-radius:10px;padding:9px 12px;font-size:.8rem;line-height:1.45;box-shadow:0 12px 32px rgba(15,23,42,.22);pointer-events:none;opacity:0;visibility:hidden;transition:opacity .12s}
+#pop.on{opacity:1;visibility:visible}
+#pop .pt{font-weight:600;margin-bottom:5px}
+#pop .pr{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#pop .pr b{font-weight:600;min-width:22px;text-align:right}
+#pop .pr .m{color:var(--pop-mute)}
+@media (max-width:980px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:600px){
+  .wrap{padding:16px 16px 36px}
+  body.embed .wrap{padding:12px 12px 24px}
+  .hd h1{font-size:1.4rem}
+  .tools{width:100%;justify-content:space-between}
+  .seg{width:100%}
+  .seg button{flex:1;padding:0 6px}
+  .kpis{grid-template-columns:minmax(0,1fr);gap:10px}
+  .kpi{min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px}
+  .kpi-h,.kpi-s,.kpi-viz{grid-column:1/-1}
+  .kpi-v{margin-top:8px}
+  .kpi-d{margin-top:0;align-self:end;padding-bottom:2px}
+  .kpi-viz{height:40px;margin-top:10px}
+  .alert{flex-wrap:wrap}
+  .alert .at{flex-basis:calc(100% - 40px)}
+  .alert .btn{margin-left:40px}
+  .hcols{height:84px}
+  .card{padding:16px}
+  .grid2,.stack{gap:10px}
+  .grid2{margin-top:10px}
+  .mt{margin-top:10px}
+  .chart{height:230px}
+  .ch .right{margin-left:0;width:100%}
+  .rows .rt{white-space:normal}
+  .ms{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ms>div:nth-child(3){border-left:0}
+  .ms>div:nth-child(n+3){border-top:1px solid var(--line)}
+}
+@media (prefers-reduced-motion:reduce){.sk,.ibtn.spin i{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hd">
+    <div class="hd-title">
+      <a class="back" href="/admin/dashboard"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i>Dashboard</a>
+      <h1>Analytics</h1>
+      <p class="sub" id="propLine">Times in Cairo</p>
+    </div>
+    <div class="tools">
+      <div class="seg" role="group" aria-label="Period">
+        <button type="button" data-range="today" aria-pressed="false">Today</button>
+        <button type="button" data-range="7d" aria-pressed="false">7 days</button>
+        <button type="button" data-range="30d" aria-pressed="false">30 days</button>
+        <button type="button" data-range="90d" aria-pressed="false">90 days</button>
+      </div>
+      <div class="tools-r">
+        <span class="upd" id="updTxt" aria-live="polite"></span>
+        <button type="button" class="ibtn" id="refreshBtn" data-act="refresh" aria-label="Refresh" title="Refresh"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button>
+        <button type="button" class="btn" id="csvBtn" data-act="csv" disabled><i class="fa-solid fa-download" aria-hidden="true"></i>Download CSV</button>
+      </div>
+    </div>
+  </header>
+  <p class="period" id="periodTxt"></p>
+  <div class="errbar hidden" id="errBar" role="alert"></div>
+  <div class="card state hidden" id="errState" role="alert"></div>
+  <main id="main">
+    <div class="alerts" id="alerts"></div>
+    <section class="kpis" id="kpis" aria-label="Key numbers"></section>
+    <section class="card mt">
+      <div class="ch">
+        <h2>Daily activity</h2>
+        <button type="button" class="tip" data-tip="Guest app visits, guest chats and bookings (beach and El Kasr) for each Cairo day. Hover a day for the details; click a name in the key to hide or show that line."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+        <div class="right">
+          <div class="legend" id="dailyLegend" role="group" aria-label="Shown in the chart"></div>
+          <div class="vt" role="group" aria-label="View">
+            <button type="button" data-view="chart" aria-pressed="true">Chart</button>
+            <button type="button" data-view="table" aria-pressed="false">Table</button>
+          </div>
+        </div>
+      </div>
+      <div id="dailyBody"><div class="sk" style="height:280px"></div></div>
+    </section>
+    <div class="grid2">
+      <section class="card">
+        <div class="ch">
+          <h2>Busiest hours</h2>
+          <button type="button" class="tip" data-tip="When guests open the guest app and start chats, by hour of the day in Cairo time, added up over the whole period."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          <span class="note">Cairo time</span>
+        </div>
+        <div id="hoursBody"><div class="sk" style="height:220px"></div></div>
+      </section>
+      <section class="card">
+        <div class="ch">
+          <h2>What guests ask the AI</h2>
+          <button type="button" class="tip" data-tip="Topics found by keywords (English, Arabic, Russian, German) in what guests wrote to the AI concierge, and the language each chat was in."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          <span class="note" id="askNote"></span>
+        </div>
+        <div id="askBody"><div class="sk" style="height:220px"></div></div>
+      </section>
+    </div>
+    <div class="grid2">
+      <section class="card">
+        <div class="ch">
+          <h2>Most opened in the guest app</h2>
+          <button type="button" class="tip" data-tip="Venue pages guests opened in the guest app: restaurants, bars, pools and other places. Top 10."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          <span class="note">times opened</span>
+        </div>
+        <div id="venuesBody"><div class="sk" style="height:220px"></div></div>
+      </section>
+      <section class="card">
+        <div class="ch">
+          <h2>Sections</h2>
+          <button type="button" class="tip" data-tip="Guest app sections guests opened from the home screen, including opening the chat with the AI concierge."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          <span class="note">times opened</span>
+        </div>
+        <div id="sectionsBody"><div class="sk" style="height:220px"></div></div>
+      </section>
+    </div>
+    <div class="grid2">
+      <section class="card">
+        <div class="ch">
+          <span class="ci"><i class="fa-solid fa-umbrella-beach" aria-hidden="true"></i></span>
+          <h2>Beach</h2>
+          <button type="button" class="tip" data-tip="Beach bookings for dates in this period, made in the guest app, by staff or in the dashboard. Rates are out of all bookings in the period. Test bookings are left out."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          <span class="right" id="beachPill"></span>
+        </div>
+        <div id="beachBody"><div class="sk" style="height:180px"></div></div>
+      </section>
+      <section class="card">
+        <div class="ch">
+          <span class="ci"><i class="fa-solid fa-utensils" aria-hidden="true"></i></span>
+          <h2>El Kasr restaurant</h2>
+          <button type="button" class="tip" data-tip="El Kasr main restaurant table bookings for dates in this period, including walk-ins seated by staff. Covers are guests seated. Test bookings are left out."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          <span class="right" id="restaurantPill"></span>
+        </div>
+        <div id="restaurantBody"><div class="sk" style="height:180px"></div></div>
+      </section>
+    </div>
+    <div class="grid2">
+      <div class="stack">
+        <section class="card">
+          <div class="ch">
+            <h2>Where visits come from</h2>
+            <button type="button" class="tip" data-tip="How each guest app visit started: a printed QR code, the Android or iPhone app, a link on another site, or opening the page directly."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          </div>
+          <div id="reachBody"><div class="sk" style="height:200px"></div></div>
+        </section>
+        <section class="card" id="langCard">
+          <div class="ch">
+            <h2>Guest app language</h2>
+            <button type="button" class="tip" data-tip="The language the guest app was showing when each visit started, and how many phones opened the guest app for the first time (new) or had used it before (returning)."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          </div>
+          <div id="langBody"><div class="sk" style="height:120px"></div></div>
+        </section>
+      </div>
+      <div class="stack">
+        <section class="card">
+          <div class="ch">
+            <h2>Complaints flagged by the AI</h2>
+            <button type="button" class="tip" data-tip="Chats the AI concierge recognised as a complaint, newest first. Guest names are not shown."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+            <span class="right" id="cmpHead"></span>
+          </div>
+          <div id="complaintsBody"><div class="sk" style="height:120px"></div></div>
+        </section>
+        <section class="card">
+          <div class="ch">
+            <h2>Ops phones and alerts</h2>
+            <button type="button" class="tip" data-tip="Right now: guest chats waiting for staff, the WhatsApp alerts to managers, and each Ops app phone with its last check-in. A phone that has not checked in for 30 minutes may be off or signed out and misses chat alerts."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+          </div>
+          <div id="phonesBody"><div class="sk" style="height:120px"></div></div>
+        </section>
+      </div>
+    </div>
+    <p class="foot">Days run midnight to midnight in Cairo. Staff phones, test chats and test bookings are left out.</p>
+  </main>
+</div>
+<div id="pop" role="tooltip"></div>
+<script>
+(function () {
+var QS = new URLSearchParams(location.search);
+var EMBED = QS.has('embed');
+if (EMBED) { document.body.classList.add('embed'); document.documentElement.classList.add('embed'); }
+if (!EMBED && !localStorage.getItem('admin_token')) window.location.href = '/admin/login';
+var ADMIN = {};
+try { ADMIN = JSON.parse(localStorage.getItem('admin_user') || '{}') || {}; } catch (e) { ADMIN = {}; }
+var PID = String(QS.get('property') || ADMIN.property_id || localStorage.getItem('property_id') || '1');
+var UID = String(ADMIN.user_id || localStorage.getItem('user_id') || '');
+
+var RANGES = ['today', '7d', '30d', '90d'];
+var range = '30d';
+try { var savedRange = localStorage.getItem('analyticsRange'); if (RANGES.indexOf(savedRange) >= 0) range = savedRange; } catch (e) {}
+var REFRESH_MS = 5 * 60 * 1000;
+
+var DATA = null, reqSeq = 0, busy = false, lastLoadAt = 0;
+var chartLib = null; // null while Chart.js loads, true when ready, false when unavailable (simple SVG chart instead)
+var dailyChart = null, dailyView = 'chart';
+var SERIES = [['Guest app visits', 'k1'], ['Guest chats', 'ln k2'], ['Bookings', 'ln k3']], dailyOff = [false, false, false];
+var NF = new Intl.NumberFormat('en-GB');
+var DF_DM = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+var DF_DMY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+var DF_WDM = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+var TF_CAIRO = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Africa/Cairo' });
+var DTF_CAIRO = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Africa/Cairo' });
+var HOUR_CAIRO = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Africa/Cairo' });
+var LANGS = null;
+try { LANGS = new Intl.DisplayNames(['en'], { type: 'language' }); } catch (e) { LANGS = null; }
+
+var KPI_DEFS = [
+  { icon: 'fa-mobile-screen-button', label: 'Guest app visits', tip: 'A visit is a guest opening the guest app after at least 30 minutes away; reloads and language switches do not count. Each phone is counted once in unique phones. Staff phones are left out.' },
+  { icon: 'fa-comments', label: 'Guest chats', tip: 'Conversations guests started with the AI concierge in this period, and the messages guests sent in them. Test chats are left out.' },
+  { icon: 'fa-robot', label: 'Answered by AI', tip: 'Share of guest chats that no staff member replied to or took over: the AI concierge handled the whole conversation.' },
+  { icon: 'fa-bolt', label: 'AI reply time', tip: 'Time from a guest message to the AI answer. The big number is the typical (median) wait; 9 in 10 answers came faster than the second number.' },
+  { icon: 'fa-bell-concierge', label: 'Front-desk response', tip: 'Typical (median) time from the first guest message until staff acknowledged the chat on the Ops app or WhatsApp. When no chat was acknowledged, the first staff reply in chats staff took over.' },
+  { icon: 'fa-calendar-check', label: 'Bookings', tip: 'Beach and El Kasr restaurant bookings for dates in this period (not the day they were made). Test bookings are left out.' }
+];
+var TOPIC_ICONS = { dining: 'fa-utensils', room: 'fa-bed', beach_pool: 'fa-umbrella-beach', spa: 'fa-spa', transport: 'fa-taxi', checkout: 'fa-suitcase-rolling', complaint: 'fa-face-frown', other: 'fa-ellipsis' };
+var SECTION_ICONS = { restaurants: 'fa-utensils', beach: 'fa-umbrella-beach', 'room-service': 'fa-bell-concierge', map: 'fa-map-location-dot', amenities: 'fa-person-swimming', events: 'fa-calendar-days', spa: 'fa-spa', info: 'fa-circle-info', feedback: 'fa-star', chat: 'fa-comments' };
+var SOURCES = { qr: ['QR code', 'fa-solid fa-qrcode'], 'app-android': ['Android app', 'fa-brands fa-android'], 'app-ios': ['iPhone app', 'fa-brands fa-apple'], link: ['Link on another site', 'fa-solid fa-link'], direct: ['Direct', 'fa-solid fa-arrow-pointer'] };
+var BOOKED_VIA = { guest: 'Guest app', staff: 'Staff (Ops app)', admin: 'Dashboard', walk_in: 'Walk-in' };
+var COMPLAINT_ICONS = { room: 'fa-bed', food: 'fa-utensils', amenities: 'fa-person-swimming', service: 'fa-bell-concierge', cleanliness: 'fa-broom', noise: 'fa-volume-high', staff: 'fa-user-tie' };
+
+function el(id) { return document.getElementById(id); }
+function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function isNum(v) { return typeof v === 'number' && isFinite(v); }
+function nz(v) { return isNum(v) ? v : 0; }
+function arr(v) { return Array.isArray(v) ? v : []; }
+function fmt(v) { return isNum(v) ? NF.format(Math.round(v)) : '—'; }
+function r1(v) { return Math.round(v * 10) / 10; }
+function plural(n, one, many) { return fmt(n) + ' ' + (n === 1 ? one : (many || one + 's')); }
+function pct(a, b) { return b > 0 ? Math.round(a / b * 100) : null; }
+function pctText(v) { return isNum(v) ? Math.round(v) + '%' : '—'; }
+function cap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+function byDesc(key) { return function (a, b) { return nz(b[key]) - nz(a[key]); }; }
+function hh(h) { h = h % 24; return (h < 10 ? '0' : '') + h + ':00'; }
+function dayDate(s) { var p = String(s || '').split('-'); return new Date(Date.UTC(+p[0], (+p[1] || 1) - 1, +p[2] || 1)); }
+function fmtDay(s) { return DF_DM.format(dayDate(s)); }
+// Server timestamps are UTC, either ISO or D1's 'YYYY-MM-DD HH:MM:SS'
+function toDate(s) {
+  if (!s) return null;
+  var t = String(s);
+  if (t.length >= 16 && t.charAt(10) === ' ') t = t.replace(' ', 'T');
+  if (t.length <= 19 && t.indexOf('Z') < 0 && t.indexOf('+') < 0) t += 'Z';
+  var d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
+}
+function fmtWhen(s) { var d = toDate(s); return d ? DTF_CAIRO.format(d) : ''; }
+function cairoHour() { try { return parseInt(HOUR_CAIRO.format(new Date()), 10) % 24; } catch (e) { return 23; } }
+function ago(sec) {
+  if (!isNum(sec)) return 'never';
+  if (sec < 90) return 'just now';
+  if (sec < 3600) return Math.round(sec / 60) + ' min ago';
+  if (sec < 86400) return Math.floor(sec / 3600) + ' h ago';
+  var d = Math.floor(sec / 86400);
+  return d === 1 ? 'yesterday' : d + ' days ago';
+}
+// Minutes → [number, unit] for a big figure
+function dur(min) {
+  if (!isNum(min)) return null;
+  if (min < 1) return [String(Math.max(1, Math.round(min * 60))), 's'];
+  if (min < 10) return [String(r1(min)), 'min'];
+  if (min < 90) return [String(Math.round(min)), 'min'];
+  if (min < 2880) return [String(r1(min / 60)), 'h'];
+  return [String(Math.round(min / 1440)), 'days'];
+}
+function secs(s) { if (!isNum(s)) return null; return s < 60 ? [String(s < 10 ? r1(s) : Math.round(s)), 's'] : dur(s / 60); }
+function langName(code) {
+  if (!code) return 'Unknown';
+  if (code === 'latin') return 'Other (Latin script)';
+  try { var n = LANGS && LANGS.of(code); if (n && n !== code) return n; } catch (e) {}
+  return String(code).toUpperCase();
+}
+function vsText(R) { if (!R) return ''; if (R.key === 'today') return 'vs yesterday'; return R.days === 1 ? 'vs the day before' : 'vs previous ' + R.days + ' days'; }
+function periodText(R) {
+  if (!R || !R.from) return '';
+  var one = R.days === 1;
+  var cur = one ? (R.key === 'today' ? 'Today, ' : '') + DF_WDM.format(dayDate(R.from)) : DF_DM.format(dayDate(R.from)) + ' – ' + DF_DMY.format(dayDate(R.to));
+  var prev = !R.prev_from ? '' : one ? DF_WDM.format(dayDate(R.prev_from)) : DF_DM.format(dayDate(R.prev_from)) + ' – ' + DF_DM.format(dayDate(R.prev_to));
+  return cur + (prev ? ' · compared with ' + prev : '');
+}
+function delta(cur, prev, upGood, points) {
+  if (!isNum(cur) || !isNum(prev)) return '';
+  if (points) {
+    var d = Math.round(cur - prev);
+    if (!d) return '<span class="delta flat">No change</span>';
+    return '<span class="delta ' + ((d > 0) === upGood ? 'pos' : 'neg') + '">' + (d > 0 ? '▲ ' : '▼ ') + Math.abs(d) + ' pts</span>';
+  }
+  if (prev === 0) return '<span class="delta flat">' + (cur === 0 ? 'No change' : '▲ from 0') + '</span>';
+  var p = Math.round((cur - prev) / prev * 100);
+  if (!p) return '<span class="delta flat">No change</span>';
+  return '<span class="delta ' + ((p > 0) === upGood ? 'pos' : 'neg') + '">' + (p > 0 ? '▲ ' : '▼ ') + NF.format(Math.abs(p)) + '%</span>';
+}
+function tipBtn(t) { return '<button type="button" class="tip" data-tip="' + esc(t) + '" aria-label="' + esc(t) + '"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>'; }
+function empty(icon, title, sub, tone) {
+  return '<div class="empty"><div class="ei' + (tone ? ' ' + tone : '') + '"><i class="fa-solid ' + icon + '" aria-hidden="true"></i></div><b>' + esc(title) + '</b>' + (sub ? '<p>' + esc(sub) + '</p>' : '') + '</div>';
+}
+function hbars(items, opt) {
+  opt = opt || {};
+  var max = opt.max || Math.max.apply(null, items.map(function (x) { return nz(x.value); })) || 1;
+  return '<ul class="hb' + (opt.icons ? ' ico' : '') + '">' + items.map(function (it, i) {
+    var w = it.value > 0 ? Math.max(1.5, Math.min(100, it.value / max * 100)) : 0;
+    return '<li>' + (it.icon ? '<span class="hi"><i class="' + it.icon + '" aria-hidden="true"></i></span>' : '') +
+      '<span class="n" title="' + esc(it.name) + '">' + (opt.rank ? '<span class="rk">' + (i + 1) + '</span>' : '') + esc(it.name) + '</span>' +
+      '<span class="v">' + fmt(it.value) + (it.extra ? '<small>' + esc(it.extra) + '</small>' : '') + '</span>' +
+      '<span class="t"><i class="' + (it.cls || '') + '" style="width:' + r1(w) + '%"></i></span></li>';
+  }).join('') + '</ul>';
+}
+
+// ---------- data ----------
+async function api(url) {
+  var r, d = {};
+  try { r = await fetch(url, { cache: 'no-store', headers: { 'X-User-ID': UID, 'X-Property-ID': PID } }); } catch (e) { return { ok: false, status: 0, data: {} }; }
+  try { d = (await r.json()) || {}; } catch (e) { d = {}; }
+  return { ok: r.ok && d.success !== false, status: r.status, data: d };
+}
+function errText(res) {
+  if (res.status === 0) return 'No connection. Check the network and try again.';
+  if (res.status === 401) return 'You are signed out. Sign in to the dashboard again.';
+  if (res.status === 403) return 'Your account does not have permission to view analytics.';
+  var d = res.data || {};
+  var m = typeof d.error === 'string' ? d.error : (typeof d.message === 'string' ? d.message : '');
+  if (res.ok) return 'The server sent an answer this page does not understand.';
+  m = m.trim();
+  return m ? (/[.!?]$/.test(m) ? m : m + '.') : 'The server did not answer (error ' + res.status + ').';
+}
+async function load() {
+  var my = ++reqSeq;
+  setBusy(true);
+  var res = await api('/api/admin/analytics/overview?range=' + encodeURIComponent(range));
+  if (my !== reqSeq) return;
+  setBusy(false);
+  var d = res.data;
+  if (!res.ok || !d || !d.kpis || !d.range || !Array.isArray(d.daily)) { showError(res); return; }
+  DATA = d;
+  lastLoadAt = Date.now();
+  hideError();
+  render();
+}
+function setBusy(on) {
+  busy = on;
+  document.body.classList.toggle('busy', on && !!DATA);
+  el('refreshBtn').classList.toggle('spin', on);
+}
+function showError(res) {
+  var msg = errText(res);
+  if (DATA) {
+    el('errBar').innerHTML = '<i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>Could not refresh: ' + esc(msg) + ' The numbers below are from ' + esc(TF_CAIRO.format(new Date(lastLoadAt))) + '.</span><button type="button" class="btn" data-act="retry">Retry</button>';
+    el('errBar').classList.remove('hidden');
+    return;
+  }
+  el('main').classList.add('hidden');
+  el('errState').innerHTML = '<div class="ei"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></div><b>Analytics could not be loaded</b><p>' + esc(msg) + '</p>' +
+    (res.status === 401 && !EMBED ? '<a class="btn pri" href="/admin/login">Sign in</a>' : '<button type="button" class="btn pri" data-act="retry"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i>Retry</button>');
+  el('errState').classList.remove('hidden');
+}
+function hideError() {
+  el('errBar').classList.add('hidden');
+  el('errState').classList.add('hidden');
+  el('main').classList.remove('hidden');
+}
+function loadChartLib() {
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  s.async = true;
+  s.onload = function () { chartLib = !!window.Chart; if (DATA) renderDaily(); };
+  s.onerror = function () { chartLib = false; if (DATA) renderDaily(); };
+  document.head.appendChild(s);
+  setTimeout(function () { if (chartLib === null) { chartLib = false; if (DATA) renderDaily(); } }, 8000);
+}
+
+// ---------- render ----------
+function render() {
+  if (!DATA) return;
+  var parts = [renderHead, renderAlerts, renderKpis, renderDaily, renderHours, renderAsk, renderVenues, renderSections,
+    function () { renderBooking('beach'); }, function () { renderBooking('restaurant'); }, renderReach, renderComplaints, renderPhones];
+  parts.forEach(function (fn) { try { fn(); } catch (e) { console.error('Analytics render', e); } });
+  el('csvBtn').disabled = !arr(DATA.daily).length;
+}
+function renderHead() {
+  var R = DATA.range || {}, g = toDate(R.generated_at) || new Date(lastLoadAt);
+  el('periodTxt').textContent = periodText(R);
+  el('updTxt').textContent = 'Updated ' + TF_CAIRO.format(g);
+}
+function syncSeg() {
+  document.querySelectorAll('[data-range]').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-range') === range ? 'true' : 'false'); });
+}
+
+function alertHtml(tone, icon, title, text, action) {
+  return '<div class="alert ' + tone + '" role="' + (tone === 'bad' ? 'alert' : 'status') + '"><span class="ai"><i class="fa-solid ' + icon + '" aria-hidden="true"></i></span><div class="at"><b>' + esc(title) + '</b>' + (text ? '<p>' + esc(text) + '</p>' : '') + '</div>' + (action || '') + '</div>';
+}
+function escalationAction() {
+  if (!EMBED) return '<a class="btn" href="/admin/dashboard#chatbot">Open AI Chatbot</a>';
+  try {
+    var b = window.parent.document.querySelector('.sidebar-btn[data-tab="chatbot"]');
+    if (b && b.style.display !== 'none') return '<button type="button" class="btn" data-act="open-esc">Open WhatsApp Escalation</button>';
+  } catch (e) {}
+  return '';
+}
+function isStale(p) { return !isNum(p.seconds_ago) || p.seconds_ago > 1800; }
+function renderAlerts() {
+  var H = DATA.health || {}, W = H.whatsapp || {}, T = DATA.tracking || {}, out = [];
+  var st = W.state;
+  var failing = nz(W.failed_7d) > 0 && !nz(W.sent_7d);
+  // 'unknown' = the status check itself failed, which alone does not prove alerts are lost
+  if (st === 'unknown' && !failing) {
+    out.push(alertHtml('warn', 'fa-circle-question', 'The WhatsApp connection for manager alerts could not be checked',
+      'Open AI Chatbot → WhatsApp Escalation to see its status.' + (W.last_sent_at ? ' Last delivered ' + fmtWhen(W.last_sent_at) + '.' : ''), escalationAction()));
+  } else if ((st && st !== 'ready') || failing) {
+    var why = { no_session: 'The WhatsApp number is not connected to WaSender.', bad_key: 'WaSender rejected the saved key.', not_configured: 'No WhatsApp sender is set up.' }[st] || '';
+    var detail = [why,
+      nz(W.failed_7d) ? plural(W.failed_7d, 'alert') + ' failed in the last 7 days.' : '',
+      W.last_sent_at ? 'Last delivered ' + fmtWhen(W.last_sent_at) + '.' : ''].filter(Boolean).join(' ');
+    out.push(alertHtml('bad', 'fa-triangle-exclamation', 'WhatsApp alerts to managers are not being delivered',
+      'Reconnect WhatsApp in AI Chatbot → WhatsApp Escalation. ' + detail, escalationAction()));
+  }
+  var stale = arr(H.ops_phones).filter(isStale);
+  if (stale.length) {
+    out.push(alertHtml('warn', 'fa-mobile-screen',
+      stale.length === 1 ? 'An Ops phone has not checked in for over 30 minutes' : stale.length + ' Ops phones have not checked in for over 30 minutes',
+      stale.map(function (p) { return (p.device || 'Unknown phone') + ' (last seen ' + ago(p.seconds_ago) + (p.ringing ? ', stuck ringing' : '') + ')'; }).join(', ') +
+      '. A phone that is off or signed out misses guest chat alerts.'));
+  }
+  if (T.partial && T.started) out.push(alertHtml('info', 'fa-circle-info', 'Visitor tracking started ' + fmtDay(T.started) + ' — earlier days show chats and bookings only.', ''));
+  else if (!T.started) out.push(alertHtml('info', 'fa-circle-info', 'Visitor tracking has not recorded a visit yet — until it does, this page shows chats and bookings only.', ''));
+  el('alerts').innerHTML = out.join('');
+}
+
+function kpiHtml(def, o, vs) {
+  var head = '<div class="kpi-h"><i class="fa-solid ' + def.icon + '" aria-hidden="true"></i><span>' + def.label + '</span>' + tipBtn(def.tip) + '</div>';
+  if (!o) return '<div class="card kpi">' + head + '<div class="sk" style="height:32px;width:52%;margin-top:12px"></div><div class="sk" style="height:14px;width:70%;margin-top:12px"></div><div class="kpi-viz"><div class="sk" style="position:absolute;left:0;right:0;bottom:2px;height:30px"></div></div></div>';
+  return '<div class="card kpi">' + head +
+    '<div class="kpi-v' + (o.na ? ' na' : '') + '">' + esc(o.value) + (o.unit ? '<small>' + esc(o.unit) + '</small>' : '') + '</div>' +
+    '<div class="kpi-d">' + (o.delta ? o.delta + '<span class="vs">' + esc(vs) + '</span>' : (o.note ? '<span class="vs">' + esc(o.note) + '</span>' : '')) + '</div>' +
+    '<div class="kpi-s">' + esc(o.sub || '') + '</div>' +
+    '<div class="kpi-viz">' + (o.viz || '') + '</div></div>';
+}
+function renderKpiSkeleton() { el('kpis').innerHTML = KPI_DEFS.map(function (d) { return kpiHtml(d, null); }).join(''); }
+function spark(vals, cls) {
+  var n = vals.length, max = 0, i;
+  if (n < 2) return '';
+  for (i = 0; i < n; i++) if (isNum(vals[i]) && vals[i] > max) max = vals[i];
+  var segs = [], cur = [], last = null;
+  for (i = 0; i < n; i++) {
+    if (!isNum(vals[i])) { if (cur.length) segs.push(cur); cur = []; continue; }
+    last = [i / (n - 1) * 100, max > 0 ? 31 - vals[i] / max * 29 : 31];
+    cur.push(last);
+  }
+  if (cur.length) segs.push(cur);
+  if (!last || !max) return '';
+  var line = '', area = '';
+  segs.forEach(function (s) {
+    var d = s.map(function (p, j) { return (j ? 'L' : 'M') + r1(p[0]) + ' ' + r1(p[1]); }).join(' ');
+    line += d + ' ';
+    if (s.length > 1) area += d + ' L' + r1(s[s.length - 1][0]) + ' 32 L' + r1(s[0][0]) + ' 32 Z ';
+  });
+  return '<div class="sp ' + cls + '" aria-hidden="true"><svg viewBox="0 0 100 32" preserveAspectRatio="none"><path class="a" d="' + area + '"/><path class="l" d="' + line + '"/></svg>' +
+    '<span class="d" style="left:' + r1(last[0]) + '%;top:' + r1(last[1] / 32 * 100) + '%"></span></div>';
+}
+function meter(p) { return isNum(p) ? '<div class="meter" aria-hidden="true"><i style="width:' + Math.max(0, Math.min(100, p)) + '%"></i></div>' : ''; }
+function renderKpis() {
+  var K = DATA.kpis || {}, R = DATA.range || {}, T = DATA.tracking || {}, H = DATA.hours || {}, days = arr(DATA.daily);
+  var vs = vsText(R), oneDay = days.length < 2, nowH = cairoHour();
+  // One day has no daily trend: the visits/chats sparklines show today hour by hour instead
+  function series(key) {
+    if (oneDay) return R.key === 'today' ? arr(H[key]).slice(0, nowH + 1) : arr(H[key]);
+    return days.map(function (d) { return d[key]; });
+  }
+  var v = K.visits || {};
+  var visits = isNum(v.value)
+    ? { value: fmt(v.value), delta: delta(v.value, v.prev, true), note: T.started ? 'Tracking started ' + fmtDay(T.started) : '',
+        sub: (isNum(v.devices) ? plural(v.devices, 'unique phone') : '') + (isNum(v.new_devices) ? ' · ' + fmt(v.new_devices) + ' new' : ''), viz: spark(series('visits'), 'c1') }
+    : { value: '—', na: true, note: T.started ? 'Tracking started ' + fmtDay(T.started) : 'Visitor tracking has not started yet', sub: 'Counted from the first tracked visit' };
+  var c = K.chats || {};
+  var chats = { value: fmt(c.value), na: !isNum(c.value), delta: delta(c.value, c.prev, true),
+    sub: isNum(c.guest_messages) ? plural(c.guest_messages, 'guest message') : '', viz: spark(series('chats'), 'c2') };
+  var a = K.ai_handled || {};
+  var ai = isNum(a.pct) && a.n > 0
+    ? { value: String(Math.round(a.pct)), unit: '%', delta: delta(a.pct, a.prev_pct, true, true),
+        sub: fmt(Math.round(a.pct * a.n / 100)) + ' of ' + plural(a.n, 'chat') + ' with no staff reply', viz: meter(a.pct) }
+    : { value: '—', na: true, note: 'No guest chats in this period' };
+  var rp = K.ai_reply || {}, med = secs(rp.median_s), p90 = secs(rp.p90_s);
+  var reply = med && rp.n > 0
+    ? { value: med[0], unit: med[1], note: 'Typical wait for an answer', sub: (p90 ? '9 in 10 within ' + p90[0] + ' ' + p90[1] + ' · ' : '') + plural(rp.n, 'reply', 'replies') }
+    : { value: '—', na: true, note: 'No AI replies in this period' };
+  var ak = K.ack || {}, sr = K.staff_reply || {}, am = dur(ak.median_min), sm = dur(sr.median_min), staff;
+  if (am && ak.n > 0) staff = { value: am[0], unit: am[1], note: 'Typical time to acknowledge a chat',
+    sub: (isNum(ak.within5_pct) ? Math.round(ak.within5_pct) + '% within 5 min · ' : '') + plural(ak.n, 'chat'), viz: meter(ak.within5_pct) };
+  else if (sm && sr.n > 0) staff = { value: sm[0], unit: sm[1], note: 'Typical first staff reply', sub: plural(nz(sr.takeovers) || sr.n, 'chat') + ' taken over by staff' };
+  else staff = { value: '—', na: true, note: 'No staff responses in this period', sub: nz(sr.takeovers) ? plural(sr.takeovers, 'chat') + ' taken over by staff' : '' };
+  var b = K.beach || {}, rs = K.restaurant || {};
+  var tot = nz(b.bookings) + nz(rs.bookings);
+  var prevTot = isNum(b.prev) || isNum(rs.prev) ? nz(b.prev) + nz(rs.prev) : null;
+  var book = { value: fmt(tot), delta: delta(tot, prevTot, true),
+    sub: 'Beach ' + fmt(nz(b.bookings)) + ' · El Kasr ' + fmt(nz(rs.bookings)) + (nz(rs.covers) ? ' (' + plural(rs.covers, 'cover') + ')' : ''),
+    viz: oneDay ? '' : spark(days.map(function (d) { return nz(d.beach) + nz(d.restaurant); }), 'c3') };
+  el('kpis').innerHTML = [visits, chats, ai, reply, staff, book].map(function (o, i) { return kpiHtml(KPI_DEFS[i], o, vs); }).join('');
+}
+
+// Chart.js plugins: a hairline at the hovered day, and a marker where visitor tracking began
+var CROSSHAIR = { id: 'crosshair', beforeDatasetsDraw: function (chart, args, o) {
+  var act = chart.tooltip && chart.tooltip.getActiveElements ? chart.tooltip.getActiveElements() : [];
+  if (!act.length) return;
+  var x = Math.round(act[0].element.x) + 0.5, a = chart.chartArea, c = chart.ctx;
+  c.save(); c.strokeStyle = o.color; c.lineWidth = 1; c.beginPath(); c.moveTo(x, a.top); c.lineTo(x, a.bottom); c.stroke(); c.restore();
+} };
+var TRACK_START = { id: 'trackStart', afterDatasetsDraw: function (chart, args, o) {
+  if (!o || !(o.index > 0)) return;
+  var xs = chart.scales.x, a = chart.chartArea, c = chart.ctx;
+  var x = Math.round((xs.getPixelForValue(o.index - 1) + xs.getPixelForValue(o.index)) / 2) + 0.5;
+  var flip = x + 150 > a.right;
+  c.save();
+  c.strokeStyle = o.color; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(x, a.top - 14); c.lineTo(x, a.bottom); c.stroke();
+  c.fillStyle = o.color; c.font = '500 11px ' + o.font; c.textBaseline = 'top'; c.textAlign = flip ? 'right' : 'left';
+  c.fillText(o.text, x + (flip ? -6 : 6), a.top - 16);
+  c.restore();
+} };
+function destroyDaily() { if (dailyChart) { try { dailyChart.destroy(); } catch (e) {} dailyChart = null; } hidePop(); }
+function trackIndex(days) {
+  var T = DATA.tracking || {};
+  if (!T.started || !T.partial) return -1;
+  for (var i = 0; i < days.length; i++) if (days[i].day >= T.started) return i;
+  return -1;
+}
+function renderDaily() {
+  var days = arr(DATA.daily), body = el('dailyBody');
+  destroyDaily();
+  document.querySelectorAll('[data-view]').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-view') === dailyView ? 'true' : 'false'); });
+  var legend = el('dailyLegend');
+  var hasVisits = days.some(function (d) { return isNum(d.visits); });
+  if (!hasVisits && dailyOff[1] && dailyOff[2]) dailyOff[1] = dailyOff[2] = false;
+  legend.innerHTML = SERIES.map(function (s, i) {
+    if (i === 0 && !hasVisits) return '';
+    return '<button type="button" data-series="' + i + '" aria-pressed="' + (dailyOff[i] ? 'false' : 'true') + '" title="Show or hide ' + s[0].toLowerCase() + '"><i class="key ' + s[1] + '"></i>' + s[0] + '</button>';
+  }).join('');
+  if (dailyView === 'table') { legend.classList.add('hidden'); body.innerHTML = dailyTable(days); return; }
+  var any = days.some(function (d) { return nz(d.visits) || nz(d.chats) || nz(d.beach) || nz(d.restaurant); });
+  var show = days.length > 1 && any;
+  legend.classList.toggle('hidden', !show);
+  if (days.length < 2) {
+    body.innerHTML = '<div class="empty sm"><div class="ei"><i class="fa-solid fa-chart-column" aria-hidden="true"></i></div><div><b>One day selected</b>' +
+      '<p>Choose 7, 30 or 90 days to see the day-by-day trend. ' + ((DATA.range || {}).key === 'today' ? 'Today' : 'This day') + ' hour by hour is in Busiest hours below.</p></div></div>';
+    return;
+  }
+  if (!any) { body.innerHTML = empty('fa-chart-column', 'No activity in this period', 'No guest app visits, chats or bookings were recorded on these days.'); return; }
+  if (chartLib === null) { body.innerHTML = '<div class="chart"><div class="sk" style="height:100%"></div></div>'; return; }
+  var tot = days.reduce(function (s, d) { s.v += nz(d.visits); s.c += nz(d.chats); s.b += nz(d.beach) + nz(d.restaurant); return s; }, { v: 0, c: 0, b: 0 });
+  var label = 'Daily activity ' + fmtDay(days[0].day) + ' to ' + fmtDay(days[days.length - 1].day) + ': ' + plural(tot.v, 'visit') + ', ' + plural(tot.c, 'chat') + ', ' + plural(tot.b, 'booking') + '. The Table view lists every day.';
+  if (!chartLib) { body.innerHTML = '<div class="chart" role="img" aria-label="' + esc(label) + '">' + dailySvg(days) + '</div>'; return; }
+  body.innerHTML = '<div class="chart" role="img" aria-label="' + esc(label) + '"><canvas id="dailyCanvas"></canvas></div>';
+  drawDailyChart(days);
+}
+function drawDailyChart(days) {
+  var css = getComputedStyle(document.documentElement);
+  function v(n) { return css.getPropertyValue(n).trim(); }
+  var C = window.Chart, font = getComputedStyle(document.body).fontFamily;
+  C.defaults.font.family = font;
+  C.defaults.font.size = 11;
+  C.defaults.color = v('--muted');
+  function line(label, data, color, order, hidden) {
+    return { type: 'line', label: label, data: data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4,
+      pointHoverBorderWidth: 2, pointHoverBorderColor: v('--card'), cubicInterpolationMode: 'monotone', order: order, hidden: hidden };
+  }
+  dailyChart = new C(el('dailyCanvas'), {
+    type: 'bar',
+    data: {
+      labels: days.map(function (d) { return fmtDay(d.day); }),
+      datasets: [
+        { type: 'bar', label: 'Guest app visits', data: days.map(function (d) { return isNum(d.visits) ? d.visits : null; }), backgroundColor: v('--s1'), hidden: dailyOff[0],
+          borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 }, borderSkipped: 'start', maxBarThickness: 24, categoryPercentage: 0.8, barPercentage: 0.9, order: 3 },
+        line('Guest chats', days.map(function (d) { return nz(d.chats); }), v('--s2'), 1, dailyOff[1]),
+        line('Bookings', days.map(function (d) { return nz(d.beach) + nz(d.restaurant); }), v('--s3'), 2, dailyOff[2])
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 20 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false, external: dailyTooltip },
+        crosshair: { color: v('--line') },
+        trackStart: { index: trackIndex(days), color: v('--faint'), font: font, text: 'Visitor tracking starts' }
+      },
+      scales: {
+        x: { grid: { display: false }, border: { color: v('--line') }, ticks: { maxRotation: 0, autoSkip: true, autoSkipPadding: 16, color: v('--muted') } },
+        y: { beginAtZero: true, grid: { color: v('--line2') }, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 5, padding: 8, color: v('--muted') } }
+      }
+    },
+    plugins: [CROSSHAIR, TRACK_START]
+  });
+}
+function popRow(key, value, label) {
+  return '<div class="pr"><i class="key ' + key + '"' + (key ? '' : ' style="visibility:hidden"') + '></i><b>' + value + '</b><span class="m">' + esc(label) + '</span></div>';
+}
+function dailyTooltip(ctx) {
+  var t = ctx.tooltip;
+  if (!t || t.opacity === 0 || !t.dataPoints || !t.dataPoints.length) { hidePop(); return; }
+  var d = arr(DATA && DATA.daily)[t.dataPoints[0].dataIndex];
+  if (!d) { hidePop(); return; }
+  var b = nz(d.beach) + nz(d.restaurant);
+  var html = '<div class="pt">' + esc(DF_WDM.format(dayDate(d.day))) + '</div>' +
+    popRow('k1', isNum(d.visits) ? fmt(d.visits) : '—', isNum(d.visits) ? 'visits' + (isNum(d.devices) ? ' · ' + plural(d.devices, 'phone') : '') : 'visits (not tracked yet)') +
+    popRow('ln k2', fmt(nz(d.chats)), 'chats') +
+    popRow('ln k3', fmt(b), b ? 'bookings · beach ' + fmt(nz(d.beach)) + ', El Kasr ' + fmt(nz(d.restaurant)) : 'bookings') +
+    (isNum(d.opens) ? popRow('', fmt(d.opens), 'pages opened in the app') : '');
+  var r = ctx.chart.canvas.getBoundingClientRect();
+  showPopHtml(html, r.left + t.caretX, r.top + ctx.chart.chartArea.top);
+}
+function niceMax(m) {
+  if (m <= 4) return 4;
+  var p = Math.pow(10, Math.floor(Math.log(m) / Math.LN10)), steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  for (var i = 0; i < steps.length; i++) if (steps[i] * p >= m) return steps[i] * p;
+  return 10 * p;
+}
+// Drawn when Chart.js cannot load: same marks, same single axis, day totals in each bar's title
+function dailySvg(days) {
+  var n = days.length, W = n * 10, H = 100, max = 0;
+  days.forEach(function (d) { max = Math.max(max, dailyOff[0] ? 0 : nz(d.visits), dailyOff[1] ? 0 : nz(d.chats), dailyOff[2] ? 0 : nz(d.beach) + nz(d.restaurant)); });
+  max = niceMax(max);
+  function y(val) { return r1(H - val / max * H); }
+  var g = '', bars = '', lc = [], lb = [];
+  for (var k = 1; k <= 4; k++) g += '<line class="gl" x1="0" x2="' + W + '" y1="' + r1(H - H * k / 4) + '" y2="' + r1(H - H * k / 4) + '"/>';
+  days.forEach(function (d, i) {
+    var x = i * 10, b = nz(d.beach) + nz(d.restaurant);
+    var title = esc(fmtDay(d.day) + ': ' + (isNum(d.visits) ? plural(d.visits, 'visit') + ', ' : '') + plural(nz(d.chats), 'chat') + ', ' + plural(b, 'booking'));
+    if (!dailyOff[0]) bars += '<rect class="f1" x="' + (x + 2) + '" y="' + y(nz(d.visits)) + '" width="6" height="' + r1(nz(d.visits) / max * H) + '"><title>' + title + '</title></rect>';
+    lc.push((x + 5) + ',' + y(nz(d.chats)));
+    lb.push((x + 5) + ',' + y(b));
+  });
+  return '<div class="fb"><div class="fy">' + fmt(max) + '</div><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + g + bars +
+    (dailyOff[1] ? '' : '<polyline class="l2" points="' + lc.join(' ') + '"/>') + (dailyOff[2] ? '' : '<polyline class="l3" points="' + lb.join(' ') + '"/>') + '</svg>' +
+    '<div class="xa"><span>' + fmtDay(days[0].day) + '</span><span>' + fmtDay(days[n - 1].day) + '</span></div></div>';
+}
+function dailyTable(days) {
+  if (!days.length) return empty('fa-table', 'No days in this period', '');
+  function cell(v) { return isNum(v) ? '<td>' + fmt(v) + '</td>' : '<td class="na">—</td>'; }
+  return '<div class="tw"><table><thead><tr><th scope="col">Day</th><th scope="col">Visits</th><th scope="col">Phones</th><th scope="col">Chats</th><th scope="col">Pages opened</th><th scope="col">Beach</th><th scope="col">El Kasr</th></tr></thead><tbody>' +
+    days.slice().reverse().map(function (d) {
+      return '<tr><td>' + esc(DF_WDM.format(dayDate(d.day))) + '</td>' + cell(d.visits) + cell(d.devices) + cell(d.chats) + cell(d.opens) + cell(d.beach) + cell(d.restaurant) + '</tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+function hourRow(vals, label, key, bar, one, many, off) {
+  var v = [], h;
+  for (h = 0; h < 24; h++) v.push(nz(vals[h]));
+  var max = Math.max.apply(null, v), total = v.reduce(function (s, x) { return s + x; }, 0), peak = v.indexOf(max);
+  var summary = off || (total ? 'Busiest ' + hh(peak) + '–' + hh(peak + 1) + ' · ' + plural(max, one, many) : 'None in this period');
+  var cols = v.map(function (x, hr) {
+    var hint = hh(hr) + '–' + hh(hr + 1) + ' · ' + (off ? 'not tracked' : plural(x, one, many));
+    var night = hr >= 22 || hr < 7 ? ' nt' + (hr === 0 || hr === 22 ? ' ns' : '') + (hr === 6 || hr === 23 ? ' ne' : '') : '';
+    return '<div class="hc' + night + '" data-hint="' + esc(hint) + '">' +
+      (x ? '<i class="' + bar + '" style="height:' + r1(Math.max(x / max * 100, 4)) + '%"></i>' : '') + '</div>';
+  }).join('');
+  return '<div><div class="hrow-h"><span><i class="key ' + key + '"></i>' + esc(label) + '</span><span class="pk">' + esc(summary) + '</span></div>' +
+    '<div class="hcols" role="img" aria-label="' + esc(label + ' by hour. ' + summary) + '">' + cols + '</div></div>';
+}
+function renderHours() {
+  var H = DATA.hours || {}, tracked = isNum(((DATA.kpis || {}).visits || {}).value);
+  var axis = '';
+  for (var h = 0; h < 24; h += 3) axis += '<span>' + (h < 10 ? '0' : '') + h + '</span>';
+  el('hoursBody').innerHTML = '<div class="hrs">' +
+    hourRow(arr(H.visits), 'Guest app visits', 'k1', 'b1', 'visit', 'visits', tracked ? '' : 'Visitor tracking has not started') +
+    hourRow(arr(H.chats), 'Guest chats', 'k2', 'b2', 'chat', 'chats', '') +
+    '</div><div class="hax" aria-hidden="true">' + axis + '</div><div class="hnote"><i></i>Night hours, 22:00–07:00</div>';
+}
+function renderAsk() {
+  var C = DATA.chat || {}, n = nz(C.n);
+  el('askNote').textContent = n ? 'from ' + plural(n, 'chat') : '';
+  if (!n) { el('askBody').innerHTML = empty('fa-comments', 'No guest chats in this period', 'Topics and languages appear here once guests message the AI concierge.'); return; }
+  var topics = arr(C.topics).filter(function (t) { return nz(t.chats) > 0; })
+    .sort(function (a, b) { return (a.key === 'other') - (b.key === 'other') || nz(b.chats) - nz(a.chats); });
+  var html = topics.length
+    ? hbars(topics.map(function (t) { return { name: t.label || cap(t.key), value: nz(t.chats), extra: pct(nz(t.chats), n) + '%', icon: 'fa-solid ' + (TOPIC_ICONS[t.key] || 'fa-tag') }; }), { max: n, icons: true })
+    : empty('fa-tags', 'No topics recognised', '');
+  var langs = arr(C.languages).filter(function (l) { return nz(l.chats) > 0; }).sort(byDesc('chats'));
+  if (langs.length) html += '<div class="sh">Chat languages</div><div class="chips">' + langs.map(function (l) {
+    return '<span class="chip">' + esc(langName(l.lang)) + ' <b>' + fmt(l.chats) + '</b></span>';
+  }).join('') + '</div>';
+  html += '<div class="facts"><div class="fact"><b>' + pctText(C.after_hours_pct) + '</b><span>of chats came in at night (22:00–07:00)</span></div>' +
+    '<div class="fact"><b>' + pctText(C.rooms_linked_pct) + '</b><span>of chats gave a room number</span></div></div>';
+  el('askBody').innerHTML = html;
+}
+function renderVenues() {
+  var list = arr((DATA.app || {}).venues).filter(function (x) { return nz(x.opens) > 0; }).sort(byDesc('opens')).slice(0, 10);
+  el('venuesBody').innerHTML = list.length
+    ? hbars(list.map(function (x) { return { name: x.name || x.key, value: nz(x.opens) }; }), { rank: true })
+    : empty('fa-hand-pointer', 'No venue pages opened in this period', 'Restaurants, bars and other venues appear here when guests open them in the guest app.');
+}
+function renderSections() {
+  var list = arr((DATA.app || {}).sections).filter(function (x) { return nz(x.opens) > 0; }).sort(byDesc('opens'));
+  el('sectionsBody').innerHTML = list.length
+    ? hbars(list.map(function (x) { return { name: x.label || cap(x.key), value: nz(x.opens), icon: 'fa-solid ' + (SECTION_ICONS[x.key] || 'fa-layer-group') }; }), { icons: true })
+    : empty('fa-table-cells-large', 'No sections opened in this period', 'Sections appear here when guests open them from the guest app home screen.');
+}
+
+function miniStat(label, value, extra) {
+  return '<div><div class="l">' + esc(label) + '</div><div class="v">' + value + '</div><div class="x">' + (extra || '') + '</div></div>';
+}
+function rateOf(x, n) { return n > 0 ? pct(nz(x), n) + '%' : '—'; }
+function breakdown(title, items, unitKey, one) {
+  items = items.filter(function (x) { return nz(x.bookings) > 0; });
+  if (!items.length) return '';
+  return '<div class="sh">' + esc(title) + '</div>' + hbars(items.map(function (x) {
+    return { name: x.label || x.key, value: nz(x.bookings), extra: isNum(x[unitKey]) ? plural(x[unitKey], one) : '', cls: 'c3' };
+  }));
+}
+function renderBooking(kind) {
+  var beach = kind === 'beach';
+  var S = DATA[kind] || {}, K = (DATA.kpis || {})[kind] || {}, n = nz(K.bookings);
+  el(kind + 'Pill').innerHTML = !S.enabled ? '<span class="pill">Not set up</span>'
+    : S.online_booking ? '<span class="pill on"><i class="dot"></i>Guest booking on</span>' : '<span class="pill"><i class="dot"></i>Guest booking off</span>';
+  if (!n) {
+    var title = !S.enabled ? (beach ? 'Beach booking is not set up' : 'Table booking is not set up')
+      : S.online_booking ? 'Online booking is on — no guest bookings in this period yet' : 'Online booking is off';
+    var sub = (S.enabled && !S.online_booking ? 'No bookings in this period. ' : '') + (nz(K.prev) ? plural(K.prev, 'booking') + ' in the previous period.' : '');
+    el(kind + 'Body').innerHTML = empty(beach ? 'fa-umbrella-beach' : 'fa-utensils', title, sub.trim());
+    return;
+  }
+  var html = '<div class="ms">' +
+    miniStat('Bookings', fmt(n), delta(n, K.prev, true)) +
+    miniStat(beach ? 'Guests' : 'Covers', fmt(beach ? K.guests : K.covers), '') +
+    miniStat('Checked in', rateOf(K.checked_in, n), fmt(nz(K.checked_in)) + ' of ' + fmt(n)) +
+    miniStat('No-shows', rateOf(K.no_show, n), fmt(nz(K.no_show)) + ' of ' + fmt(n)) + '</div>';
+  var extra = beach ? [nz(K.cancelled) ? plural(K.cancelled, 'cancellation') : '']
+    : [nz(K.walk_ins) ? plural(K.walk_ins, 'walk-in') : '', nz(K.auto_released) ? plural(K.auto_released, 'table') + ' released automatically after a no-show' : ''];
+  extra = extra.filter(Boolean).join(' · ');
+  if (extra) html += '<p class="msx">' + esc(extra) + '</p>';
+  if (beach) html += breakdown('Bookings by time slot', arr(S.by_slot), 'guests', 'guest');
+  else html += breakdown('Bookings by area', arr(S.by_zone), 'covers', 'cover') + breakdown('Bookings by time slot', arr(S.by_slot), 'covers', 'cover');
+  var src = arr(S.by_source).filter(function (x) { return nz(x.bookings) > 0; }).sort(byDesc('bookings'));
+  if (src.length) html += '<div class="sh">Booked through</div><div class="chips">' + src.map(function (x) {
+    return '<span class="chip">' + esc(BOOKED_VIA[x.key] || cap(x.key || 'Other')) + ' <b>' + fmt(x.bookings) + '</b><small>' + pct(nz(x.bookings), n) + '%</small></span>';
+  }).join('') + '</div>';
+  el(kind + 'Body').innerHTML = html;
+}
+function renderReach() {
+  var A = DATA.app || {}, v = (DATA.kpis || {}).visits || {};
+  el('langCard').classList.toggle('hidden', !isNum(v.value));
+  if (!isNum(v.value)) {
+    el('reachBody').innerHTML = empty('fa-signal', 'Visitor tracking has not started', 'Where visits come from, the guest app language and returning phones appear from the first tracked visit.');
+    return;
+  }
+  var src = arr(A.sources).filter(function (x) { return nz(x.visits) > 0; }).sort(byDesc('visits'));
+  var total = src.reduce(function (s, x) { return s + nz(x.visits); }, 0);
+  if (!total) {
+    el('reachBody').innerHTML = empty('fa-signal', 'No guest app visits in this period', '');
+    el('langBody').innerHTML = empty('fa-language', 'No guest app visits in this period', '');
+    return;
+  }
+  var html = hbars(src.map(function (x) {
+    var m = SOURCES[x.key] || [cap(x.key || 'Other'), 'fa-solid fa-circle-question'];
+    return { name: m[0], value: nz(x.visits), extra: pct(nz(x.visits), total) + '%', icon: m[1] };
+  }), { max: total, icons: true });
+  if (src.some(function (x) { return x.key === 'direct'; })) html += '<p class="hint">QR codes printed before tracking began carry no marker, so their visits count as Direct.</p>';
+  el('reachBody').innerHTML = html;
+
+  var langs = arr(A.languages).filter(function (x) { return nz(x.visits) > 0; }).sort(byDesc('visits')).slice(0, 8);
+  var lt = langs.reduce(function (s, x) { return s + nz(x.visits); }, 0);
+  html = langs.length ? '<div class="chips">' + langs.map(function (x) {
+    return '<span class="chip">' + esc(langName(x.lang)) + ' <b>' + fmt(x.visits) + '</b><small>' + pct(nz(x.visits), lt) + '%</small></span>';
+  }).join('') + '</div>' : '';
+  var nr = A.new_vs_returning || {}, nn = nz(nr['new']), rr = nz(nr.returning), t2 = nn + rr;
+  if (t2) html += '<div class="sh">New and returning phones</div>' +
+    '<div class="split" role="img" aria-label="' + esc(pct(nn, t2) + '% new, ' + pct(rr, t2) + '% returning') + '">' +
+    (nn ? '<i class="a" style="flex:' + nn + '"></i>' : '') + (rr ? '<i class="b" style="flex:' + rr + '"></i>' : '') + '</div>' +
+    '<div class="split-l"><span><i class="key k1"></i>New ' + fmt(nn) + ' · ' + pct(nn, t2) + '%</span><span><i class="key kb"></i>Returning ' + fmt(rr) + ' · ' + pct(rr, t2) + '%</span></div>';
+  el('langBody').innerHTML = html || empty('fa-language', 'No language recorded yet', '');
+}
+function renderComplaints() {
+  var K = (DATA.kpis || {}).complaints || {}, list = arr((DATA.chat || {}).recent_complaints).slice(0, 5);
+  el('cmpHead').innerHTML = isNum(K.value) ? '<span class="cmpn">' + plural(K.value, 'complaint') + '</span>' + delta(K.value, K.prev, false) : '';
+  if (!list.length) {
+    el('complaintsBody').innerHTML = nz(K.value)
+      ? empty('fa-flag', 'No recent complaint details', '')
+      : empty('fa-circle-check', 'No complaints flagged in this period', 'When a guest complains in a chat, the AI flags it here so staff can follow up.', 'good');
+    return;
+  }
+  el('complaintsBody').innerHTML = '<ul class="rows">' + list.map(function (x) {
+    var cat = String(x.category || '').toLowerCase(), sent = String(x.sentiment || '').toLowerCase();
+    var meta = [x.room ? 'Room ' + x.room : '', fmtWhen(x.at)].filter(Boolean).join(' · ');
+    // every row is a complaint, so only a sharper label than that earns a badge
+    var badge = sent && sent !== 'complaint' ? '<span class="badge ' + (sent === 'urgent' || sent.indexOf('neg') >= 0 ? 'bad' : sent.indexOf('pos') >= 0 ? 'good' : '') + '">' + esc(cap(sent.split('_').join(' '))) + '</span>' : '';
+    return '<li><span class="lic bad"><i class="fa-solid ' + (COMPLAINT_ICONS[cat] || 'fa-flag') + '" aria-hidden="true"></i></span><div class="rm"><div class="rt">' + esc(cap(cat.split('_').join(' ')) || 'Complaint') + '</div><div class="rs">' + esc(meta) + '</div></div>' + badge + '</li>';
+  }).join('') + '</ul>';
+}
+function renderPhones() {
+  var H = DATA.health || {}, W = H.whatsapp || {}, phones = arr(H.ops_phones), un = H.unacked_chats, html = '<ul class="rows">';
+  if (isNum(un)) html += '<li><span class="lic ' + (un ? 'warn' : 'good') + '"><i class="fa-solid ' + (un ? 'fa-hourglass-half' : 'fa-check') + '" aria-hidden="true"></i></span><div class="rm"><div class="rt">' +
+    (un ? plural(un, 'guest chat') + ' waiting for staff' : 'No guest chats waiting for staff') + '</div><div class="rs">Right now</div></div></li>';
+  var WA = { ready: ['good', 'Connected'], no_session: ['bad', 'Not connected'], bad_key: ['bad', 'Key rejected'], not_configured: ['bad', 'Not set up'] }[W.state] || ['', 'Status unknown'];
+  var waMeta = [isNum(W.sent_7d) ? fmt(W.sent_7d) + ' sent, ' + fmt(nz(W.failed_7d)) + ' failed in 7 days' : '', isNum(W.contacts) ? plural(W.contacts, 'manager') : '',
+    W.last_sent_at ? 'last sent ' + fmtWhen(W.last_sent_at) : ''].filter(Boolean).join(' · ');
+  html += '<li><span class="lic ' + WA[0] + '"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></span><div class="rm"><div class="rt">Manager alerts on WhatsApp</div><div class="rs">' + esc(waMeta) + '</div></div><span class="badge ' + WA[0] + '">' + WA[1] + '</span></li>';
+  phones.forEach(function (p) {
+    var stale = isStale(p), ringing = !!p.ringing;
+    html += '<li><span class="lic"><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i></span><div class="rm"><div class="rt">' + esc(p.device || 'Unknown phone') + '</div>' +
+      '<div class="rs"><span class="sdot ' + (stale ? 'warn' : 'good') + '"></span>' + (p.app_version ? 'v' + esc(p.app_version) + ' · ' : '') + 'seen ' + esc(ago(p.seconds_ago)) + '</div></div>' +
+      (ringing ? '<span class="badge bad"><i class="fa-solid fa-bell" aria-hidden="true"></i>' + (stale ? 'Stuck ringing' : 'Ringing') + '</span>' : stale ? '<span class="badge warn">Offline</span>' : '') + '</li>';
+  });
+  if (!phones.length) html += '<li><span class="lic"><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i></span><div class="rm"><div class="rt">No Ops phones have checked in yet</div><div class="rs">Phones appear once staff sign in to the Ops app</div></div></li>';
+  el('phonesBody').innerHTML = html + '</ul>';
+}
+
+// ---------- CSV ----------
+function csvCell(v) {
+  if (isNum(v)) return String(v);
+  if (v == null) return '';
+  var s = String(v);
+  return /[",]/.test(s) ? '"' + s.split('"').join('""') + '"' : s;
+}
+function downloadCsv() {
+  if (!DATA) return;
+  var R = DATA.range || {}, nl = String.fromCharCode(13, 10);
+  var lines = [['Date', 'Guest app visits', 'Unique phones', 'Guest chats', 'Pages opened', 'Beach bookings', 'El Kasr bookings'].join(',')];
+  arr(DATA.daily).forEach(function (d) { lines.push([d.day, d.visits, d.devices, d.chats, d.opens, d.beach, d.restaurant].map(csvCell).join(',')); });
+  var blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(nl) + nl], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'analytics_' + (R.from || '') + '_to_' + (R.to || '') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+// ---------- popover (definitions, hour bars, chart days) ----------
+var pop = el('pop'), popFor = null, popAt = 0;
+function placePop(x, y, below, side) {
+  var w = pop.offsetWidth, h = pop.offsetHeight, vw = document.documentElement.clientWidth, vh = window.innerHeight, left, top;
+  if (side) { left = x + 16; if (left + w > vw - 8) left = x - 16 - w; top = y; }
+  else { left = x - w / 2; top = y - h - 10; if (top < 8) top = below + 10; }
+  left = Math.max(8, Math.min(left, vw - w - 8));
+  top = Math.max(8, Math.min(top, vh - h - 8));
+  pop.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
+}
+function showPopFor(t) {
+  pop.textContent = t.getAttribute('data-tip') || t.getAttribute('data-hint') || '';
+  pop.classList.add('on');
+  var r = t.getBoundingClientRect();
+  placePop(r.left + r.width / 2, r.top, r.bottom, false);
+  popFor = t;
+  popAt = Date.now();
+}
+function showPopHtml(html, x, y) {
+  pop.innerHTML = html;
+  pop.classList.add('on');
+  placePop(x, y, y, true);
+  popFor = null;
+}
+function hidePop() { pop.classList.remove('on'); popFor = null; }
+function popTarget(e) { return e.target && e.target.closest ? e.target.closest('[data-tip],[data-hint]') : null; }
+document.addEventListener('mouseover', function (e) { var t = popTarget(e); if (t) { if (t !== popFor) showPopFor(t); } else if (popFor) hidePop(); });
+document.addEventListener('focusin', function (e) { var t = popTarget(e); if (t) showPopFor(t); });
+document.addEventListener('focusout', function (e) { if (popTarget(e)) hidePop(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hidePop(); });
+window.addEventListener('scroll', hidePop, { passive: true });
+window.addEventListener('resize', hidePop);
+
+document.addEventListener('click', function (e) {
+  var t = e.target && e.target.closest ? e.target.closest('[data-range],[data-view],[data-series],[data-act],[data-tip]') : null;
+  if (!t) return;
+  if (t.hasAttribute('data-series')) {
+    var si = +t.getAttribute('data-series');
+    if (!dailyOff[si] && document.querySelectorAll('#dailyLegend [aria-pressed="true"]').length < 2) return;
+    dailyOff[si] = !dailyOff[si];
+    t.setAttribute('aria-pressed', dailyOff[si] ? 'false' : 'true');
+    if (dailyChart) { dailyChart.setDatasetVisibility(si, !dailyOff[si]); dailyChart.update(); }
+    else if (DATA) renderDaily();
+  } else if (t.hasAttribute('data-range')) {
+    var r = t.getAttribute('data-range');
+    if (r === range && DATA) return;
+    range = r;
+    try { localStorage.setItem('analyticsRange', r); } catch (err) {}
+    syncSeg();
+    load();
+  } else if (t.hasAttribute('data-view')) {
+    dailyView = t.getAttribute('data-view') === 'table' ? 'table' : 'chart';
+    if (DATA) renderDaily();
+  } else if (t.hasAttribute('data-act')) {
+    var act = t.getAttribute('data-act');
+    if (act === 'refresh' || act === 'retry') load();
+    else if (act === 'csv') downloadCsv();
+    else if (act === 'open-esc') {
+      try {
+        var P = window.parent, btn = P.document.querySelector('.sidebar-btn[data-tab="chatbot"]');
+        if (btn) btn.click();
+        if (typeof P.chatbotSub === 'function') P.chatbotSub('esc');
+      } catch (err) {}
+    }
+  } else if (popFor === t && Date.now() - popAt > 400) hidePop();
+  else showPopFor(t);
+});
+
+// ---------- theme: follows the dashboard's dark mode switch, live ----------
+function applyTheme() {
+  var dark = false;
+  try { dark = localStorage.getItem('adminDarkMode') === 'true'; } catch (e) {}
+  if (document.documentElement.classList.contains('dark') === dark) return;
+  document.documentElement.classList.toggle('dark', dark);
+  if (DATA) renderDaily();
+}
+window.addEventListener('storage', function (e) { if (!e.key || e.key === 'adminDarkMode') applyTheme(); });
+
+setInterval(function () { if (!document.hidden && !busy && DATA) load(); }, REFRESH_MS);
+document.addEventListener('visibilitychange', function () { if (!document.hidden && DATA && !busy && Date.now() - lastLoadAt > REFRESH_MS) load(); });
+
+applyTheme();
+syncSeg();
+renderKpiSkeleton();
+loadChartLib();
+load();
+if (!EMBED) api('/api/property/' + encodeURIComponent(PID)).then(function (r) {
+  var name = r.ok && r.data.property && r.data.property.name;
+  if (name) el('propLine').textContent = name + ' · times in Cairo';
+});
+})();
+</script>
+</body>
+</html>`)
+})
+
 // ADMIN: Beach setup — layout builder on the guest photo, zones & booking limits, time slots
 app.get('/admin/beach-setup', (c) => {
   return c.html(`<!DOCTYPE html>
@@ -57724,27 +58856,11 @@ app.get('/admin/dashboard', (c) => {
         opacity: 0.95;
       }
       
-      /* Stats cards - keep their gradient colors */
-      .dark .stats-card {
-        opacity: 1 !important;
-      }
-      
       /* Tab button hover in dark mode */
       .dark .tab-btn:hover {
         background-color: rgba(59, 130, 246, 0.2) !important;
       }
-      
-      /* Date filter buttons in dark mode */
-      .dark .date-filter-btn {
-        background-color: #4a5568 !important;
-        color: #e2e8f0 !important;
-      }
-      
-      .dark .date-filter-btn.active {
-        background-color: #3B82F6 !important;
-        color: white !important;
-      }
-      
+
       * {
         transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
       }
@@ -57774,17 +58890,6 @@ app.get('/admin/dashboard', (c) => {
         /* Make all form inputs stack on mobile */
         .grid {
           grid-template-columns: 1fr !important;
-        }
-        
-        /* Stats cards mobile */
-        .stats-card {
-          padding: 1rem !important;
-        }
-        .stats-card .text-3xl {
-          font-size: 1.5rem !important;
-        }
-        .stats-card i {
-          font-size: 2rem !important;
         }
         
         /* Better mobile padding */
@@ -58499,124 +59604,20 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Analytics Tab -->
         <div id="analyticsTab" class="tab-content hidden">
-            <!-- Beach Analytics Quick Link -->
-            <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-xl p-6 mb-6">
-                <div class="flex items-center justify-between">
+            <div class="bg-white border-2 border-teal-200 rounded-lg p-4 mb-6">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div>
-                        <h3 class="text-2xl font-bold text-white mb-2 flex items-center">
-                            <i class="fas fa-umbrella-beach mr-3"></i>
-                            Beach Analytics Dashboard
+                        <h3 class="text-xl font-bold">
+                            <i class="fas fa-chart-line mr-2 text-teal-600"></i>Analytics
                         </h3>
-                        <p class="text-blue-100 mb-4">
-                            Comprehensive beach analytics with live occupancy tracking, revenue insights, peak hours heatmap, AI-powered recommendations, and no-show monitoring.
-                        </p>
-                        <div class="flex flex-wrap gap-3">
-                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
-                                <i class="fas fa-signal mr-1"></i>Live Occupancy
-                            </span>
-                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
-                                <i class="fas fa-brain mr-1"></i>AI Insights
-                            </span>
-                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
-                                <i class="fas fa-fire mr-1"></i>Peak Hours
-                            </span>
-                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
-                                <i class="fas fa-dollar-sign mr-1"></i>Revenue Analytics
-                            </span>
-                        </div>
+                        <p class="text-sm text-gray-600">Guest app, AI concierge, bookings and staff response — in Cairo time.</p>
                     </div>
-                    <a href="/admin/beach-analytics" class="bg-white hover:bg-gray-100 text-blue-600 px-6 py-3 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 whitespace-nowrap">
-                        <i class="fas fa-chart-bar"></i>
-                        Open Dashboard
-                        <i class="fas fa-arrow-right"></i>
+                    <a href="/admin/analytics" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:underline whitespace-nowrap">
+                        <i class="fas fa-up-right-from-square mr-1"></i>Open full screen
                     </a>
                 </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
-                    <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-0"><i class="fas fa-chart-line mr-2 text-green-600"></i>Analytics & Usage Stats</h2>
-                    
-                    <!-- Date Range Filter -->
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="filterAnalytics('today')" class="date-filter-btn active px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">Today</button>
-                        <button onclick="filterAnalytics('yesterday')" class="date-filter-btn px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">Yesterday</button>
-                        <button onclick="filterAnalytics('7days')" class="date-filter-btn px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">Last 7 Days</button>
-                        <button onclick="filterAnalytics('30days')" class="date-filter-btn px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">Last 30 Days</button>
-                    </div>
-                </div>
-                
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-4 md:mb-8">
-                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex-1">
-                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">QR Code Scans</p>
-                                <p class="text-4xl font-bold mt-2" id="totalScans">0</p>
-                            </div>
-                            <div class="bg-white/10 rounded-full p-4">
-                                <i class="fas fa-qrcode text-3xl"></i>
-                            </div>
-                        </div>
-                        <div id="scansComparison" class="text-sm text-white/80 flex items-center gap-1 mt-2">
-                            <i class="fas fa-spinner fa-spin"></i> Loading...
-                        </div>
-                    </div>
-                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex-1">
-                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Bookings</p>
-                                <p class="text-4xl font-bold mt-2" id="activeBookings">0</p>
-                            </div>
-                            <div class="bg-white/10 rounded-full p-4">
-                                <i class="fas fa-calendar-check text-3xl"></i>
-                            </div>
-                        </div>
-                        <div id="bookingsComparison" class="text-sm text-white/80 flex items-center gap-1 mt-2">
-                            <i class="fas fa-spinner fa-spin"></i> Loading...
-                        </div>
-                    </div>
-                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Total Activities</p>
-                                <p class="text-4xl font-bold mt-2" id="totalActivities">0</p>
-                            </div>
-                            <div class="bg-white/10 rounded-full p-4">
-                                <i class="fas fa-hiking text-3xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Total Vendors</p>
-                                <p class="text-4xl font-bold mt-2" id="totalVendors">0</p>
-                            </div>
-                            <div class="bg-white/10 rounded-full p-4">
-                                <i class="fas fa-store text-3xl"></i>
-                            </div>
-                            <i class="fas fa-store text-2xl md:text-4xl opacity-30"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Popular Sections -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    <div class="bg-white border rounded-lg p-4 md:p-6">
-                        <h3 class="text-base md:text-lg font-bold mb-3 md:mb-4 text-gray-700"><i class="fas fa-fire mr-2 text-red-500"></i>Most Popular Activities</h3>
-                        <div id="popularActivities" class="space-y-2 md:space-y-3">
-                            <!-- Will be populated by loadAnalytics() -->
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white border rounded-lg p-4 md:p-6">
-                        <h3 class="text-base md:text-lg font-bold mb-3 md:text-2xl font-bold mb-3 md:mb-4 text-gray-700"><i class="fas fa-star mr-2 text-yellow-500"></i>Most Viewed Sections</h3>
-                        <div id="popularSections" class="space-y-2 md:space-y-3">
-                            <!-- Will be populated by loadAnalytics() -->
-                        </div>
-                    </div>
-                </div>
+                <iframe id="analyticsFrame" data-src="/admin/analytics?embed=1" title="Analytics"
+                        style="width:100%;height:calc(100vh - 24px);min-height:640px;border:0;border-radius:12px;background:transparent;"></iframe>
             </div>
         </div>
 
@@ -63561,7 +64562,7 @@ app.get('/admin/dashboard', (c) => {
                         <i class="fas fa-user-plus mr-2"></i>
                         Book for Walk-In Guest
                     </button>
-                    <button onclick="window.location.href='/admin/beach-analytics'" class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                    <button onclick="document.querySelector('.sidebar-btn[data-tab=analytics]').click()" class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
                         <i class="fas fa-chart-bar mr-2"></i>
                         View Analytics
                     </button>
@@ -64962,7 +65963,15 @@ app.get('/admin/dashboard', (c) => {
           break;
         }
       }
-      
+      // A #<tab> link opens that tab once (the old /admin/beach-analytics address redirects to #analytics)
+      (function() {
+        const hashTab = (location.hash || '').slice(1);
+        if (!/^[a-z]+$/.test(hashTab) || !document.getElementById(hashTab + 'Tab') || !document.querySelector('.sidebar-btn[data-tab="' + hashTab + '"]')) return;
+        const perm = TAB_PERMISSIONS[hashTab];
+        if (!perm || hasPermission(perm)) currentTab = hashTab;
+        try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
+      })();
+
       // ========================================
       // FRONT DESK / CONCIERGE VARIABLES & FUNCTIONS
       // (Must be declared BEFORE showTab function!)
@@ -65232,30 +66241,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'opsstaff') lazyFrame('opsStaffFrame');
         if (tab === 'chatbot') chatbotSub(window.__cbSub || 'agent');
         if (tab === 'qrcode') loadQRCode();
-        if (tab === 'analytics') {
-          console.log('📊 Analytics tab clicked!', {
-            loadAnalyticsType: typeof window.loadAnalytics,
-            loadAnalyticsExists: !!window.loadAnalytics
-          });
-          requestAnimationFrame(() => {
-            try {
-              if (typeof window.loadAnalytics === 'function') {
-                console.log('✅ Calling window.loadAnalytics()');
-                window.loadAnalytics()
-                  .then(() => console.log('✅ loadAnalytics completed successfully'))
-                  .catch(err => {
-                    console.error('❌ Analytics promise error:', err);
-                    console.error('Error stack:', err.stack);
-                  });
-              } else {
-                console.error('❌ window.loadAnalytics is not a function!', typeof window.loadAnalytics);
-              }
-            } catch (syncError) {
-              console.error('❌ Synchronous error calling loadAnalytics:', syncError);
-              console.error('Sync error stack:', syncError.stack);
-            }
-          });
-        }
+        if (tab === 'analytics') loadAnalyticsFrame();
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();
         if (tab === 'regcode') loadRegCode();
@@ -65307,7 +66293,7 @@ app.get('/admin/dashboard', (c) => {
       });
       
       // Show the default tab on page load
-      showTab(currentTab);
+      showTab(currentTab, document.querySelector('.sidebar-btn[data-tab="' + currentTab + '"]'));
       
       window.setFrontDeskView = function(view) {
         currentFrontDeskView = view;
@@ -67614,182 +68600,9 @@ app.get('/admin/dashboard', (c) => {
         updateQRCardPreview();
       });
       
-      // Analytics functions
-      let currentAnalyticsRange = 'today';
-      
-      async function loadAnalytics(range) {
-        console.log('🎯🎯🎯 ADMIN DASHBOARD loadAnalytics FUNCTION STARTED 🎯🎯🎯');
-        try {
-          console.log('🔍 PropertyId:', propertyId, 'User:', user);
-        } catch (immediateError) {
-          console.error('❌ IMMEDIATE ERROR in loadAnalytics:', immediateError);
-          return;
-        }
-        try {
-          console.log('🔍 loadAnalytics called with range:', range, 'currentAnalyticsRange:', currentAnalyticsRange);
-          if (range) currentAnalyticsRange = range;
-          
-          console.log('🔍 Looking for DOM elements...');
-          // Get all DOM elements once at the start
-          const totalScansEl = document.getElementById('totalScans');
-          const activeBookingsEl = document.getElementById('activeBookings');
-          const totalActivitiesEl = document.getElementById('totalActivities');
-          const totalVendorsEl = document.getElementById('totalVendors');
-          const scansComparisonEl = document.getElementById('scansComparison');
-          const bookingsComparisonEl = document.getElementById('bookingsComparison');
-          const popularActivitiesEl = document.getElementById('popularActivities');
-          const popularSectionsEl = document.getElementById('popularSections');
-          
-          console.log('✅ Found DOM elements:', {
-            totalScans: !!totalScansEl,
-            activeBookings: !!activeBookingsEl,
-            totalActivities: !!totalActivitiesEl,
-            totalVendors: !!totalVendorsEl
-          });
-          
-          // Show loading state
-          if (popularActivitiesEl) {
-            popularActivitiesEl.innerHTML = '<div class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading activities...</p></div>';
-          }
-          if (popularSectionsEl) {
-            popularSectionsEl.innerHTML = '<div class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading sections...</p></div>';
-          }
-          
-          const apiUrl = '/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange;
-          console.log('📡 About to fetch analytics from:', apiUrl);
-          console.log('🔐 Using fetchWithAuth with headers:', {
-            'X-User-ID': user.user_id,
-            'X-Property-ID': propertyId
-          });
-          const response = await fetchWithAuth(apiUrl);
-          console.log('📥 Response received:', response.status, response.statusText);
-          
-          if (!response.ok) {
-            console.error('❌ Analytics API error:', response.status, response.statusText);
-            throw new Error('Analytics API returned ' + response.status);
-          }
-          
-          const data = await response.json();
-          console.log('✅ Analytics data received:', data);
-          
-          if (!totalScansEl || !activeBookingsEl || !totalActivitiesEl || !totalVendorsEl) {
-            console.error('❌ Analytics DOM elements not found:', {
-              totalScans: !!totalScansEl,
-              activeBookings: !!activeBookingsEl,
-              totalActivities: !!totalActivitiesEl,
-              totalVendors: !!totalVendorsEl
-            });
-            alert('Analytics elements not found. Please refresh the page.');
-            return;
-          }
-          
-          console.log('✅ Analytics loading data...', {
-            propertyId: propertyId,
-            range: currentAnalyticsRange,
-            stats: data.stats
-          });
-          
-          // Update stats
-          totalScansEl.textContent = data.stats.totalScans || '0';
-          activeBookingsEl.textContent = data.stats.activeBookings || '0';
-          totalActivitiesEl.textContent = data.stats.totalActivities || '0';
-          totalVendorsEl.textContent = data.stats.totalVendors || '0';
-          
-          // Show comparison for scans
-          if (scansComparisonEl && data.stats.scansChange !== undefined) {
-            const scansChange = parseFloat(data.stats.scansChange);
-            const scansIcon = scansChange > 0 ? 'arrow-up' : scansChange < 0 ? 'arrow-down' : 'minus';
-            const scansColor = scansChange > 0 ? 'text-green-200' : scansChange < 0 ? 'text-red-200' : 'text-blue-200';
-            const scansChangeText = scansChange > 0 ? '+' + Math.abs(scansChange) : scansChange < 0 ? '-' + Math.abs(scansChange) : scansChange;
-            scansComparisonEl.innerHTML = 
-              '<i class="fas fa-' + scansIcon + ' ' + scansColor + '"></i>' +
-              '<span class="' + scansColor + '">' + scansChangeText + '%</span>' +
-              '<span>vs previous period</span>';
-          }
-          
-          // Show comparison for bookings
-          if (bookingsComparisonEl && data.stats.bookingsChange !== undefined) {
-            const bookingsChange = parseFloat(data.stats.bookingsChange);
-            const bookingsIcon = bookingsChange > 0 ? 'arrow-up' : bookingsChange < 0 ? 'arrow-down' : 'minus';
-            const bookingsColor = bookingsChange > 0 ? 'text-green-200' : bookingsChange < 0 ? 'text-red-200' : 'text-green-200';
-            const bookingsChangeText = bookingsChange > 0 ? '+' + Math.abs(bookingsChange) : bookingsChange < 0 ? '-' + Math.abs(bookingsChange) : bookingsChange;
-            bookingsComparisonEl.innerHTML = 
-              '<i class="fas fa-' + bookingsIcon + ' ' + bookingsColor + '"></i>' +
-              '<span class="' + bookingsColor + '">' + bookingsChangeText + '%</span>' +
-              '<span>vs previous period</span>';
-          }
-          
-          // Popular activities
-          if (popularActivitiesEl && data.popularActivities) {
-            const activitiesHTML = data.popularActivities.map((a, i) => 
-              '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
-              '<div class="flex items-center gap-3">' +
-              '<span class="text-2xl font-bold text-gray-300">' + (i + 1) + '</span>' +
-              '<div>' +
-              '<p class="font-semibold">' + (a.title_en || 'Activity') + '</p>' +
-              '<p class="text-sm text-gray-600">' + a.booking_count + ' bookings</p>' +
-              '</div>' +
-              '</div>' +
-              '<span class="text-green-600 font-semibold">$' + (a.total_revenue || 0) + '</span>' +
-              '</div>'
-            ).join('');
-            popularActivitiesEl.innerHTML = activitiesHTML || '<p class="text-center text-gray-400 py-4">No activity data yet</p>';
-          }
-          
-          // Popular sections
-          if (popularSectionsEl && data.popularSections) {
-            const sectionsHTML = data.popularSections.map((s, i) =>
-              '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
-              '<div class="flex items-center gap-3">' +
-              '<i class="fas fa-' + (s.icon || 'eye') + ' text-xl text-indigo-600"></i>' +
-              '<p class="font-semibold capitalize">' + s.name + '</p>' +
-              '</div>' +
-              '<span class="text-blue-600 font-semibold">' + s.views + ' views</span>' +
-              '</div>'
-            ).join('');
-            popularSectionsEl.innerHTML = sectionsHTML || '<p class="text-center text-gray-400 py-4">No section data yet</p>';
-          }
-          
-        } catch (error) {
-          console.error('❌ Analytics load error:', error);
-          
-          // Set default values to stop infinite loading (elements already declared above)
-          if (totalScansEl) totalScansEl.textContent = '0';
-          if (activeBookingsEl) activeBookingsEl.textContent = '0';
-          if (totalActivitiesEl) totalActivitiesEl.textContent = '0';
-          if (totalVendorsEl) totalVendorsEl.textContent = '0';
-          if (scansComparisonEl) scansComparisonEl.innerHTML = '<span class="text-blue-100">No data</span>';
-          if (bookingsComparisonEl) bookingsComparisonEl.innerHTML = '<span class="text-green-100">No data</span>';
-          if (popularActivitiesEl) popularActivitiesEl.innerHTML = '<p class="text-center text-gray-400 py-8">No data available</p>';
-          if (popularSectionsEl) popularSectionsEl.innerHTML = '<p class="text-center text-gray-400 py-8">No data available</p>';
-          
-          console.log('✅ Set default values to stop infinite loading');
-        }
-      }
-      
-      // Make loadAnalytics globally accessible to avoid scope issues
-      window.loadAnalytics = loadAnalytics;
-      
-      function filterAnalytics(range) {
-        // Update active button
-        document.querySelectorAll('.date-filter-btn').forEach(btn => {
-          btn.classList.remove('active', 'bg-blue-600', 'text-white');
-          btn.classList.add('bg-gray-200', 'text-gray-700');
-        });
-        event.target.classList.add('active', 'bg-blue-600', 'text-white');
-        event.target.classList.remove('bg-gray-200', 'text-gray-700');
-        
-        // Reload analytics with new range
-        loadAnalytics(range);
-      }
-      
       // Initialize: Load QR code tab by default (it's marked as tab-active)
       loadQRCode();
       loadQRCardTemplate();
-      
-      // NOTE: Analytics section is visible but not loaded on initial page load
-      // It will only load when user clicks the "Analytics" tab button
-      // This prevents errors when permissions/auth aren't fully configured
 
       async function loadRegCode() {
         try {
@@ -75099,6 +75912,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         return f;
       }
 
+      // Analytics is an embedded page, loaded on first open
+      function loadAnalyticsFrame() {
+        const f = document.getElementById('analyticsFrame');
+        if (!f || f.src) return f;
+        f.dataset.src = '/admin/analytics?embed=1&property=' + encodeURIComponent(propertyId);
+        lazyFrame('analyticsFrame');
+        return f;
+      }
+
       async function loadRestaurantsTab() {
         try {
           const response = await fetch('/api/hotel-offerings/' + propertyId);
@@ -75939,8 +76761,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             { icon: '📥', text: 'Download QR', desc: '1 min', completed: false, taskKey: 'qrCodeDownloaded', action: () => document.getElementById('downloadCard')?.click() }
           ],
           analytics: [
-            { icon: '📊', text: 'View Beach Analytics', desc: '2 min', completed: false, taskKey: 'viewedAnalytics', action: () => window.location.href = '/admin/beach-analytics' },
-            { icon: '📈', text: 'Check Live Occupancy', desc: '1 min', completed: false, taskKey: 'checkedOccupancy', action: () => window.location.href = '/admin/beach-analytics' }
+            { icon: '📊', text: 'Open Analytics', desc: '2 min', completed: false, taskKey: 'viewedAnalytics', action: () => document.querySelector('[data-tab="analytics"]')?.click() },
+            { icon: '📈', text: 'See Busiest Hours', desc: '1 min', completed: false, taskKey: 'checkedOccupancy', action: () => document.querySelector('[data-tab="analytics"]')?.click() }
           ],
           settings: [
             { icon: '📤', text: 'Upload Logo', desc: '1 min', completed: false, taskKey: 'logoUploaded', action: () => document.getElementById('logoUpload')?.click() },
@@ -76287,7 +77109,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           zones: 'Zones are colored overlays on the beach map. In Beach Map Designer, click Draw Zone, draw on the canvas, name it, and save. Guests will see these zones with a legend.',
           spots: 'Add spots by selecting umbrella/cabana/lounger/daybed icons in Beach Map Designer. Click the canvas to place them. Edit details like spot number, capacity, price, and premium status in the right panel.',
           qrCode: 'Beach bookings automatically generate QR codes with 6-digit booking codes. Staff can scan these at /staff/beach-check-in.',
-          analytics: 'Visit /admin/beach-analytics for comprehensive analytics including live occupancy by zone, peak hours heatmaps, revenue by zone, no-show tracking, and AI recommendations.',
+          analytics: 'Beach numbers are in the Analytics tab in the sidebar: bookings, guests, check-in and no-show rates, and the split by slot and booking source, for today, 7, 30 or 90 days.',
           importantInfo: 'Go to Beach Booking Management → scroll to Important Information section (blue gradient card). Edit the text (one line = one bullet point) and click Save. This appears on guest confirmation pages.'
         },
         qrCodes: {
@@ -76296,9 +77118,9 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           download: 'After designing, click the download button to get your QR code as PNG (print quality) or SVG (vector format for scaling).'
         },
         analytics: {
-          view: 'Click Analytics tab in the sidebar. You will see guest engagement metrics, QR code scans, popular services, and trends over time.',
-          export: 'In Analytics tab, click Export Data button to download CSV reports of your metrics.',
-          beach: 'For beach-specific analytics, visit Beach Booking Management → click Open Dashboard in the Analytics card, or go directly to /admin/beach-analytics.'
+          view: 'Click Analytics in the sidebar. It shows guest app visits, AI concierge chats and reply times, front-desk response, beach and El Kasr bookings, busiest hours, what guests ask and the most opened venues, each compared with the previous period (Cairo time).',
+          export: 'In the Analytics tab, click Download CSV to save the daily numbers (visits, chats, bookings) for the selected period.',
+          beach: 'Beach analytics are part of the Analytics tab: the Beach card shows bookings, guests, check-in and no-show rates, and the split by slot and source.'
         },
         settings: {
           logo: 'Go to Settings tab → Hotel Information section → click Upload Logo → select your image file. Your logo appears throughout the platform.',
@@ -76348,7 +77170,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         // Analytics queries
         if (msg.includes('analytic') || msg.includes('report')) {
           if (msg.includes('beach')) {
-            return { text: systemKnowledge.analytics.beach, action: () => window.location.href = '/admin/beach-analytics' };
+            return { text: systemKnowledge.analytics.beach, action: () => document.querySelector('[data-tab="analytics"]')?.click() };
           }
           return { text: systemKnowledge.analytics.view, action: () => document.querySelector('[data-tab="analytics"]')?.click() };
         }
