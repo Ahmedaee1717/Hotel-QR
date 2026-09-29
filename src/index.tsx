@@ -33617,10 +33617,28 @@ window.luxTogglePassForm = function() {
           // Chat chrome in the guest's chosen language: greeting, placeholder,
           // tagline and footer. English is used as-is; other languages go
           // through the cached translator once, then are instant.
+          // The voice concierge strings (Talk button, voice screen) ride in the
+          // same call and land in LUX_I18N, so luxT('Talk') etc. answer in the
+          // guest's language. Elements marked data-chat-i18n="<English>" (text)
+          // or data-chat-i18n-title="<English>" (title + aria-label) are filled
+          // by applyChatI18n, which runs once the translations are in.
           window.chatPlaceholder = 'Ask me anything, in any language…';
+          var CHAT_VOICE_STRS = ['Talk', 'Talk to the concierge', 'Listening…', 'Speaking…', 'Connecting…', 'Type instead', 'A team member has joined — continue by text', 'Voice is busy right now — please type your question'];
+          window.applyChatI18n = function (root) {
+            var scope = root || document;
+            var texts = scope.querySelectorAll('[data-chat-i18n]');
+            for (var i = 0; i < texts.length; i++) texts[i].textContent = luxT(texts[i].getAttribute('data-chat-i18n'));
+            var titles = scope.querySelectorAll('[data-chat-i18n-title]');
+            for (var j = 0; j < titles.length; j++) {
+              var t = luxT(titles[j].getAttribute('data-chat-i18n-title'));
+              titles[j].title = t;
+              titles[j].setAttribute('aria-label', t);
+            }
+          };
           async function localizeChatChrome(greetingEn) {
             var lang = window.currentLanguage || 'en';
-            var strs = [greetingEn, 'Ask me anything, in any language…', 'At your service · 35+ languages', 'I understand 35+ languages — write in yours'];
+            var base = [greetingEn, 'Ask me anything, in any language…', 'At your service · 35+ languages', 'I understand 35+ languages — write in yours'];
+            var strs = base.concat(CHAT_VOICE_STRS);
             var out = strs.slice();
             if (lang !== 'en') {
               try {
@@ -33629,6 +33647,8 @@ window.luxTogglePassForm = function() {
                 (d.results || []).forEach(function (r) { if (r && r.text && out[r.id] !== undefined) out[r.id] = r.text; });
               } catch (e) {}
             }
+            window.LUX_I18N = window.LUX_I18N || {};
+            for (var k = base.length; k < strs.length; k++) if (out[k] && out[k] !== strs[k]) window.LUX_I18N[strs[k]] = out[k];
             window.chatbotGreetingText = out[0];
             // The guest may have opened the chat before the translation
             // arrived — swap the greeting in place while it's the only message.
@@ -33640,6 +33660,8 @@ window.luxTogglePassForm = function() {
             if (chatInput) chatInput.placeholder = out[1];
             var tag = document.getElementById('chatTagline'); if (tag) tag.textContent = out[2];
             var foot = document.getElementById('chatUsageInfo'); if (foot) foot.textContent = '🌐 ' + out[3];
+            window.applyChatI18n();
+            document.dispatchEvent(new CustomEvent('chatchrome:localized', { detail: { lang: lang } }));
           }
 
           // Load chatbot settings and show if enabled
@@ -53762,6 +53784,7 @@ app.get('/staff/app', (c) => {
         .b.assistant{align-self:flex-end;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.3);border-top-right-radius:5px}
         .b.admin{align-self:flex-end;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;border-top-right-radius:5px;font-weight:500}
         .b .rl{font-size:.55rem;letter-spacing:.14em;text-transform:uppercase;opacity:.65;display:block;margin-bottom:3px}
+        .b .rl .mic{display:inline-block;font-size:.72rem;letter-spacing:0;margin-right:5px;vertical-align:-1px;cursor:default}
         #takeoverBar{padding:10px 14px;border-top:1px solid rgba(212,175,55,.2);display:flex;gap:8px;align-items:center}
         #takeoverBar button{flex:1;border-radius:999px;padding:11px;font-size:.75rem;font-weight:700;cursor:pointer;border:none}
         .btn-take{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307}
@@ -56848,7 +56871,8 @@ app.get('/staff/app', (c) => {
                 if(role==='user' && isForeign) foreign=tr.lang;
                 var shown = isForeign ? tr.text : m.content;
                 var ln = isForeign ? esc(LANGNAME[tr.lang]||tr.lang).replace(/"/g,'&quot;') : '';
-                var html = '<div class="b '+role+'"><span class="rl">'+label+
+                var spoken = m.channel==='voice' ? '<span class="mic" title="Spoken">🎤</span>' : '';
+                var html = '<div class="b '+role+'"><span class="rl">'+spoken+label+
                     (isForeign?'<span class="langflag">'+ln+'</span>':'')+'</span>'+esc(shown);
                 if(isForeign){
                     html += '<span class="xl" data-orig="'+esc(m.content).replace(/"/g,'&quot;')+'" data-ln="'+ln+'" data-showing="0" onclick="toggleOriginal(this)">Original ('+ln+') — tap to show</span>';
@@ -62843,6 +62867,26 @@ app.get('/admin/dashboard', (c) => {
                     <input type="hidden" id="chatbotPrimaryColor" value="#D4AF37">
                     <input type="hidden" id="chatbotPrimaryColorText" value="#D4AF37">
                     <textarea id="chatbotGreeting" class="hidden"></textarea>
+
+                    <!-- Voice concierge: same Save button; only the voice keys the admin changed are sent -->
+                    <div class="w-full border-t border-gray-100 pt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="voiceEnabled" class="w-5 h-5 rounded">
+                            <span class="font-semibold text-gray-800"><i class="fas fa-microphone mr-2 text-amber-500"></i>Voice concierge — guests can talk to the AI</span>
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-gray-700 text-sm">Voice</span>
+                            <select id="voiceModel" class="px-3 py-2 border rounded-lg text-sm bg-white">
+                                <option value="gpt-realtime-2.1-mini">Standard · gpt-realtime-2.1-mini</option>
+                                <option value="gpt-realtime-2.1">Premium voice · gpt-realtime-2.1 (~4× cost)</option>
+                            </select>
+                        </div>
+                        <p class="w-full text-xs text-gray-500">
+                            About 3 ¢ per spoken minute on standard (premium ~12 ¢). Daily cap
+                            <span id="voiceDailyCap" class="font-semibold text-gray-700">—</span> minutes across all guests —
+                            once reached, guests are asked to type until tomorrow. Needs "AI concierge is live".
+                        </p>
+                    </div>
                 </div>
 
                 <!-- What the AI knows -->
@@ -70785,15 +70829,40 @@ app.get('/admin/dashboard', (c) => {
                 document.getElementById('chatbotPrimaryColor').value = e.target.value;
               }
             });
+
+            applyVoiceSettings(settingsData.settings);
           }
-          
+
           // Load documents
           await loadChatbotDocuments();
         } catch (error) {
           console.error('Load chatbot error:', error);
         }
       }
-      
+
+      // Voice concierge switch + model (system_settings voice_enabled / voice_model,
+      // carried by the chatbot settings API). The loaded values are remembered so
+      // Save only sends a voice key the admin actually changed.
+      let voiceLoaded = null;
+      function voiceOn(v) { return v === true || v === 1 || v === '1' || v === 'true'; }
+      function applyVoiceSettings(s) {
+        const on = document.getElementById('voiceEnabled');
+        const model = document.getElementById('voiceModel');
+        const cap = document.getElementById('voiceDailyCap');
+        if (!on || !model) return;
+        const m = (s && s.voice_model) ? String(s.voice_model) : '';
+        if (m && !Array.from(model.options).some(o => o.value === m)) {
+          // A model set outside this panel is shown as-is rather than silently replaced on Save
+          const o = document.createElement('option');
+          o.value = m; o.textContent = m;
+          model.appendChild(o);
+        }
+        on.checked = voiceOn(s && s.voice_enabled);
+        if (m) model.value = m;
+        if (cap) cap.textContent = (s && s.voice_daily_minutes !== undefined && s.voice_daily_minutes !== null && s.voice_daily_minutes !== '') ? String(s.voice_daily_minutes) : '—';
+        voiceLoaded = { enabled: on.checked, model: model.value };
+      }
+
       // The Knowledge Bin: dump anything, the AI tidies and files it
       window.kbIngest = async function() {
         const box = document.getElementById('kbDump');
@@ -70867,20 +70936,34 @@ app.get('/admin/dashboard', (c) => {
       
       window.saveChatbotSettings = async function() {
         try {
+          const body = {
+            property_id: propertyId,  // Use authenticated property_id
+            chatbot_enabled: document.getElementById('chatbotEnabled').checked,
+            chatbot_name: document.getElementById('chatbotName').value,
+            chatbot_greeting_en: document.getElementById('chatbotGreeting').value,
+            chatbot_primary_color: document.getElementById('chatbotPrimaryColorText').value
+          };
+          const vOn = document.getElementById('voiceEnabled');
+          const vModel = document.getElementById('voiceModel');
+          if (voiceLoaded && vOn && vModel) {
+            if (vOn.checked !== voiceLoaded.enabled) body.voice_enabled = vOn.checked;
+            if (vModel.value !== voiceLoaded.model) body.voice_model = vModel.value;
+          }
           const response = await fetchWithAuth('/api/admin/chatbot/settings', {
             method: 'POST',
-            body: JSON.stringify({
-              property_id: propertyId,  // Use authenticated property_id
-              chatbot_enabled: document.getElementById('chatbotEnabled').checked,
-              chatbot_name: document.getElementById('chatbotName').value,
-              chatbot_greeting_en: document.getElementById('chatbotGreeting').value,
-              chatbot_primary_color: document.getElementById('chatbotPrimaryColorText').value
-            })
+            body: JSON.stringify(body)
           });
-          
+
           const data = await response.json();
-          
+
           if (data.success) {
+            if (body.voice_enabled !== undefined || body.voice_model !== undefined) {
+              // Re-read so the panel shows what was actually stored
+              try {
+                const r = await fetch('/api/chatbot/settings/' + propertyId).then(res => res.json());
+                if (r.success && r.settings) applyVoiceSettings(r.settings);
+              } catch (e) {}
+            }
             alert('✅ Chatbot settings saved successfully!');
           } else {
             alert('❌ Failed to save settings: ' + data.error);
