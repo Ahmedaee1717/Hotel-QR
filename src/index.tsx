@@ -2617,7 +2617,7 @@ app.post('/api/vendor/activities/:activity_id/translate', async (c) => {
   const { DB } = c.env
   const vendor_id = c.req.header('X-Vendor-ID')
   const { activity_id } = c.req.param()
-  const { openai_api_key } = await c.req.json()
+  const openai_api_key = c.env.OPENAI_API_KEY || (await c.req.json().catch(() => ({}))).openai_api_key
   
   if (!openai_api_key) {
     return c.json({ error: 'OpenAI API key required' }, 400)
@@ -7615,7 +7615,7 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
 app.post('/api/admin/offerings/:offering_id/translate', async (c) => {
   const { DB } = c.env
   const { offering_id } = c.req.param()
-  const { openai_api_key } = await c.req.json()
+  const openai_api_key = c.env.OPENAI_API_KEY || (await c.req.json().catch(() => ({}))).openai_api_key
   
   if (!openai_api_key) {
     return c.json({ error: 'OpenAI API key required' }, 400)
@@ -7689,7 +7689,9 @@ app.post('/api/admin/offerings/:offering_id/translate', async (c) => {
 // Batch translate ALL offerings to all languages (Admin)
 app.post('/api/admin/offerings/translate-all', async (c) => {
   const { DB } = c.env
-  const { property_id, openai_api_key } = await c.req.json()
+  const reqBody = await c.req.json().catch(() => ({}))
+  const property_id = reqBody.property_id
+  const openai_api_key = c.env.OPENAI_API_KEY || reqBody.openai_api_key
   
   if (!openai_api_key) {
     return c.json({ error: 'OpenAI API key required' }, 400)
@@ -7809,7 +7811,9 @@ app.post('/api/admin/offerings/:offering_id/occupancy', async (c) => {
 // Batch translate ALL activities to all languages (Admin)
 app.post('/api/admin/activities/translate-all', async (c) => {
   const { DB } = c.env
-  const { property_id, openai_api_key } = await c.req.json()
+  const reqBody = await c.req.json().catch(() => ({}))
+  const property_id = reqBody.property_id
+  const openai_api_key = c.env.OPENAI_API_KEY || reqBody.openai_api_key
   
   if (!openai_api_key) {
     return c.json({ error: 'OpenAI API key required' }, 400)
@@ -7902,7 +7906,7 @@ app.post('/api/admin/activities/translate-all', async (c) => {
 app.post('/api/admin/property/:property_id/translate-tagline', async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
-  const { openai_api_key } = await c.req.json()
+  const openai_api_key = c.env.OPENAI_API_KEY || (await c.req.json().catch(() => ({}))).openai_api_key
   
   if (!openai_api_key) {
     return c.json({ error: 'OpenAI API key required' }, 400)
@@ -9956,7 +9960,7 @@ Please provide a complete, accurate transcription that preserves the menu's layo
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -10043,7 +10047,7 @@ app.post('/api/admin/restaurant/menus/:menu_id/translate', async (c) => {
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -11224,7 +11228,7 @@ app.get('/api/restaurant/:offering_id/menu-display', async (c) => {
                 const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+                    'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
                     'Content-Type': 'application/json'
                   },
                   body: JSON.stringify({
@@ -11277,7 +11281,7 @@ app.get('/api/restaurant/:offering_id/menu-display', async (c) => {
                   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: {
-                      'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+                      'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
                       'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
@@ -14156,130 +14160,6 @@ app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
 // ============================================
 // OPENAI VOICE API - Whisper STT + TTS
 // ============================================
-
-// API: Speech-to-Text using OpenAI Whisper (auto language detection)
-app.post('/api/voice/transcribe', async (c) => {
-  try {
-    const { OPENAI_API_KEY } = c.env
-    if (!OPENAI_API_KEY) {
-      console.error('❌ OpenAI API key not configured')
-      return c.json({ error: 'OpenAI API key not configured' }, 500)
-    }
-
-    const formData = await c.req.formData()
-    const audioFile = formData.get('audio')
-    
-    if (!audioFile) {
-      console.error('❌ No audio file in request')
-      return c.json({ error: 'No audio file provided' }, 400)
-    }
-
-    console.log('🎤 Received audio file:', audioFile.name, 'Size:', audioFile.size, 'Type:', audioFile.type)
-
-    // Forward to OpenAI Whisper API with better file naming
-    const whisperFormData = new FormData()
-    // Rename to .webm to help Whisper understand the format
-    const audioBlob = new Blob([await audioFile.arrayBuffer()], { type: 'audio/webm' })
-    whisperFormData.append('file', audioBlob, 'audio.webm')
-    whisperFormData.append('model', 'whisper-1')
-    whisperFormData.append('response_format', 'verbose_json')
-    // Add prompt to help with Egyptian Arabic dialect recognition
-    whisperFormData.append('prompt', 'فين المطاعم؟ ايه الاسعار؟ Where are the restaurants? Egyptian Arabic dialect.')
-    // Set language hint to Arabic to improve detection for Arabic speech
-    whisperFormData.append('language', 'ar')
-
-    console.log('📡 Sending to Whisper API...')
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: whisperFormData
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      console.error('❌ Whisper API error:', response.status, error)
-      return c.json({ error: 'Transcription failed', details: error }, 500)
-    }
-
-    const result = await response.json()
-    console.log('✅ Whisper transcription:', {
-      text: result.text,
-      language: result.language,
-      duration: result.duration,
-      audioSize: audioFile.size
-    })
-    
-    // If detected as English but contains Arabic words, log warning
-    if (result.language === 'en' && /[\u0600-\u06FF]/.test(result.text)) {
-      console.warn('⚠️ Detected English but text contains Arabic characters!')
-    }
-    
-    return c.json({
-      success: true,
-      text: result.text,
-      language: result.language || 'unknown'
-    })
-  } catch (error) {
-    console.error('❌ Transcribe error:', error)
-    return c.json({ error: 'Failed to transcribe audio', details: error.message }, 500)
-  }
-})
-
-// API: Text-to-Speech using OpenAI TTS (natural voices)
-app.post('/api/voice/synthesize', async (c) => {
-  try {
-    const { OPENAI_API_KEY } = c.env
-    if (!OPENAI_API_KEY) {
-      return c.json({ error: 'OpenAI API key not configured' }, 500)
-    }
-
-    const { text, voice = 'alloy', language = 'en' } = await c.req.json()
-    
-    if (!text) {
-      return c.json({ error: 'No text provided' }, 400)
-    }
-
-    // Map language to appropriate voice
-    let selectedVoice = voice
-    if (language === 'ar' || language.startsWith('ar')) {
-      selectedVoice = 'onyx' // Deeper voice works better for Arabic
-    }
-
-    // Call OpenAI TTS API
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'tts-1',
-        input: text,
-        voice: selectedVoice,
-        response_format: 'mp3'
-      })
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      console.error('TTS API error:', error)
-      return c.json({ error: 'Synthesis failed', details: error }, 500)
-    }
-
-    // Return audio stream
-    return new Response(response.body, {
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Cache-Control': 'public, max-age=3600'
-      }
-    })
-  } catch (error) {
-    console.error('Synthesize error:', error)
-    return c.json({ error: 'Failed to synthesize speech' }, 500)
-  }
-})
 
 // API: Get chatbot analytics stats
 app.get('/api/admin/chatbot/analytics/stats', async (c) => {
@@ -23295,296 +23175,6 @@ app.post('/api/service-requests', async (c) => {
   }
 })
 
-// OpenAI Voice Assistant API for Service Requests
-app.post('/api/voice-assistant/session', async (c) => {
-  const { DB } = c.env
-  const { service_type_id, guest_info, property_id } = await c.req.json()
-  
-  // Get OpenAI API key from environment (VoiceCall secret)
-  const OPENAI_API_KEY = c.env.VoiceCall || c.env.OPENAI_API_KEY
-  
-  if (!OPENAI_API_KEY) {
-    return c.json({ success: false, error: 'OpenAI API key not configured. Please add VoiceCall secret in Cloudflare.' }, 500)
-  }
-  
-  try {
-    // Get property info
-    const propertyInfo = await DB.prepare(`
-      SELECT name, chatbot_name FROM properties WHERE property_id = ?
-    `).bind(property_id).first()
-    
-    const hotelName = propertyInfo?.name || 'Old Palace Resort'
-    const chatbotName = propertyInfo?.chatbot_name || 'AI Concierge'
-    
-    // Get knowledge base chunks for hotel information (fetch more for comprehensive context)
-    const allChunks = await DB.prepare(`
-      SELECT chunk_text FROM chatbot_chunks WHERE property_id = ? ORDER BY chunk_id LIMIT 50
-    `).bind(property_id).all()
-    
-    const hotelContext = (allChunks.results || [])
-      .map((chunk: any) => chunk.chunk_text)
-      .join('\n\n')
-    
-    // Get service type details (if specified)
-    let serviceType = null
-    let isGeneralRequest = !service_type_id
-    
-    if (service_type_id) {
-      serviceType = await DB.prepare(`
-        SELECT * FROM service_types WHERE service_type_id = ? AND property_id = ?
-      `).bind(service_type_id, property_id).first()
-      
-      if (!serviceType) {
-        return c.json({ success: false, error: 'Service type not found' }, 404)
-      }
-    }
-    
-    // Get all available service types for general requests
-    const allServiceTypes = await DB.prepare(`
-      SELECT service_type_id, service_name, description FROM service_types WHERE property_id = ?
-    `).bind(property_id).all()
-    
-    // Create instructions based on request type
-    const instructions = isGeneralRequest ? 
-      `YOU ARE NADIA - PERSONAL CONCIERGE AT ${hotelName}
-
-=== GUEST INFORMATION (ALREADY KNOWN) ===
-Guest Name: ${guest_info.full_name}
-Room Number: ${guest_info.room_number}
-Current Location: ${hotelName}
-
-=== YOUR IDENTITY ===
-You are Nadia, the personal AI concierge at ${hotelName}.
-Your role is to provide warm, personalized hospitality and assist with any hotel service request.
-You represent the highest standard of 5-star hotel service.
-
-=== COMPLETE HOTEL KNOWLEDGE BASE ===
-${hotelContext}
-
-=== AVAILABLE SERVICES ===
-${allServiceTypes.results.map(st => `- ${st.service_name} (ID: ${st.service_type_id})`).join('\\n')}
-
-=== CONVERSATION FLOW ===
-1. WARM GREETING: "Hello ${guest_info.full_name}, I'm Nadia, your personal concierge. How may I assist you today?"
-2. LISTEN attentively to their request
-3. ASK PRIORITY: "How urgent is this? Urgent, high priority, or normal?"
-4. CREATE REQUEST: Use create_service_request function with complete details
-5. CONFIRM: "I've arranged this for you - request #[ID]. Our team will attend to room ${guest_info.room_number} shortly."
-
-=== CORE PRINCIPLES ===
-1. The guest is INSIDE ${hotelName}, room ${guest_info.room_number} - you already know this
-2. NEVER ask: location, ZIP code, "which hotel?", "where are you?"
-3. NEVER ask: "Is this for a car?" "home appliance?"
-4. "Maintenance" = hotel room maintenance (AC, TV, plumbing, lights, etc.)
-5. ALL services are for the guest's hotel room
-6. Be warm, professional, and efficient
-7. Use hotel knowledge base to answer facility questions
-8. ONLY use create_service_request function`
-    : 
-      `YOU ARE NADIA - PERSONAL CONCIERGE FOR ${serviceType.service_name}
-
-=== GUEST INFORMATION (ALREADY KNOWN) ===
-Guest Name: ${guest_info.full_name}
-Room Number: ${guest_info.room_number}
-Service Requested: ${serviceType.service_name}
-
-=== YOUR IDENTITY ===
-You are Nadia, personal concierge at ${hotelName}.
-The guest has specifically requested ${serviceType.service_name}.
-
-=== HOTEL KNOWLEDGE BASE ===
-${hotelContext}
-
-=== CONVERSATION FLOW ===
-1. GREETING: "Hello ${guest_info.full_name}, I'm Nadia. I understand you need ${serviceType.service_name} for room ${guest_info.room_number}. Please tell me what you need."
-2. LISTEN to specific details
-3. ASK PRIORITY: "How urgent is this?"
-4. CREATE REQUEST: Use create_service_request with details
-5. CONFIRM: "All arranged - request #[ID]. Our team will assist you shortly."
-
-=== CORE PRINCIPLES ===
-1. Guest is IN the hotel, room ${guest_info.room_number}
-2. NEVER ask about location or "which hotel?"
-3. This is ${serviceType.service_name} for the HOTEL ROOM
-4. Be warm, professional, efficient
-5. Use hotel knowledge base for questions`
-
-
-    // NEW SIMPLE APPROACH: Return config for Whisper + Chat Completions + TTS
-    // This is the SAME proven pattern used in the working text chat!
-    return c.json({
-      success: true,
-      approach: 'chat_completions', // Use reliable Chat Completions API instead of buggy Realtime API
-      system_instructions: instructions,
-      model: 'gpt-4o-mini', // Fast and cost-effective
-      voice: 'alloy', // For TTS responses
-      temperature: 0.6,
-      max_tokens: 300,
-      tools: [
-        {
-          type: 'function',
-          function: {
-            name: 'create_service_request',
-            description: 'Creates a service request when the guest confirms their booking',
-            parameters: {
-              type: 'object',
-              properties: {
-                service_type_id: {
-                  type: 'number',
-                  description: 'The ID of the service type (required for general requests). Match the guest request to one of the available services.'
-                },
-                request_details: {
-                  type: 'string',
-                  description: 'Detailed description of what the guest needs'
-                },
-                priority: {
-                  type: 'string',
-                  enum: ['normal', 'high', 'urgent'],
-                  description: 'Priority level of the request'
-                },
-                guest_phone: {
-                  type: 'string',
-                  description: 'Guest phone number if provided (optional)'
-                }
-              },
-              required: ['request_details', 'priority']
-            }
-          }
-        }
-      ],
-      tool_choice: 'auto',
-      api_key: OPENAI_API_KEY,
-      guest_info: guest_info,
-      service_type_id: service_type_id
-    })
-  } catch (error) {
-    console.error('Voice session error:', error)
-    return c.json({ success: false, error: 'Failed to create voice session' }, 500)
-  }
-})
-
-// NEW: Transcribe audio using Whisper API (for simple voice assistant)
-app.post('/api/voice-assistant/transcribe', async (c) => {
-  try {
-    const formData = await c.req.formData()
-    const audio = formData.get('audio')
-    const api_key = formData.get('api_key')
-    
-    if (!audio || !api_key) {
-      return c.json({ success: false, error: 'Missing audio or API key' }, 400)
-    }
-    
-    // Convert audio blob to file for Whisper API
-    const whisperFormData = new FormData()
-    whisperFormData.append('file', audio, 'audio.webm')
-    whisperFormData.append('model', 'whisper-1')
-    
-    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + api_key
-      },
-      body: whisperFormData
-    })
-    
-    if (!whisperResponse.ok) {
-      throw new Error('Whisper API error: ' + whisperResponse.statusText)
-    }
-    
-    const whisperData = await whisperResponse.json()
-    console.log('✅ Transcription:', whisperData.text)
-    
-    return c.json({
-      success: true,
-      text: whisperData.text
-    })
-  } catch (error) {
-    console.error('❌ Transcription error:', error)
-    return c.json({ success: false, error: error.message }, 500)
-  }
-})
-
-// Handle voice assistant function calls
-app.post('/api/voice-assistant/function-call', async (c) => {
-  const { DB } = c.env
-  const { function_name, arguments: func_args, session_data } = await c.req.json()
-  
-  if (function_name === 'create_service_request') {
-    try {
-      const { service_type_id: ai_service_type_id, request_details, priority, guest_phone } = func_args
-      const { service_type_id: session_service_type_id, guest_info, property_id } = session_data
-      
-      // Use AI-provided service_type_id if available, otherwise use session one
-      const final_service_type_id = ai_service_type_id || session_service_type_id
-      
-      if (!final_service_type_id) {
-        console.error('❌ No service type ID provided')
-        return c.json({ 
-          success: false, 
-          error: 'Service type must be specified' 
-        }, 400)
-      }
-      
-      // Get pass_id from pass_reference
-      let pass_id = null
-      if (guest_info.pass_reference) {
-        const pass = await DB.prepare(`
-          SELECT pass_id FROM digital_passes WHERE pass_reference = ?
-        `).bind(guest_info.pass_reference).first()
-        
-        if (pass) {
-          pass_id = pass.pass_id
-        }
-      }
-      
-      console.log('🎤 Creating voice service request:', {
-        property_id,
-        service_type_id: final_service_type_id,
-        pass_id,
-        guest_name: guest_info.full_name,
-        room_number: guest_info.room_number,
-        guest_phone: guest_phone || null,
-        request_details,
-        priority: priority || 'normal',
-        status: 'pending'
-      })
-      
-      // Create the service request - SAME FORMAT AS REGULAR FORM
-      const result = await DB.prepare(`
-        INSERT INTO service_requests (
-          property_id, service_type_id, pass_id, guest_name, room_number,
-          guest_phone, request_details, priority, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-      `).bind(
-        property_id,
-        final_service_type_id,
-        pass_id,
-        guest_info.full_name,
-        guest_info.room_number,
-        guest_phone || null,
-        request_details,
-        priority || 'normal'
-      ).run()
-      
-      console.log('✅ Voice service request created! ID:', result.meta.last_row_id)
-      
-      return c.json({
-        success: true,
-        request_id: result.meta.last_row_id,
-        message: `Service request #${result.meta.last_row_id} has been created successfully! Our team will assist you shortly.`
-      })
-    } catch (error) {
-      console.error('❌ Voice function call error:', error)
-      return c.json({ 
-        success: false, 
-        error: 'Failed to create service request: ' + error.message 
-      }, 500)
-    }
-  }
-  
-  return c.json({ success: false, error: 'Unknown function' }, 400)
-})
-
 // Get service requests for admin (Front Desk)
 app.get('/api/admin/service-requests', async (c) => {
   const { DB } = c.env
@@ -23654,190 +23244,6 @@ app.get('/api/admin/service-requests', async (c) => {
   }
 })
 
-// Save voice call transcript/log
-app.post('/api/voice-call-logs', async (c) => {
-  const { DB } = c.env
-  const { property_id, pass_reference, guest_name, room_number, service_type_id, transcript, duration_seconds } = await c.req.json()
-  
-  try {
-    console.log('💾 Saving voice call log:', { property_id, pass_reference, guest_name, room_number, service_type_id, transcript_length: transcript?.length })
-    
-    const result = await DB.prepare(`
-      INSERT INTO voice_call_logs (
-        property_id, pass_reference, guest_name, room_number, 
-        service_type_id, transcript, duration_seconds, call_timestamp
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).bind(
-      property_id,
-      pass_reference,
-      guest_name,
-      room_number,
-      service_type_id || null,
-      transcript,
-      duration_seconds || 0
-    ).run()
-    
-    const log_id = result.meta.last_row_id
-    console.log('✅ Voice call log saved! ID:', log_id)
-    
-    // CRITICAL NEW FEATURE: Auto-extract service request from transcript using AI
-    if (transcript && transcript.trim().length > 20) {
-      console.log('🤖 Auto-extracting service request from transcript...')
-      
-      try {
-        // Use OpenAI to parse the transcript
-        const OPENAI_API_KEY = c.env.VoiceCall || c.env.OPENAI_API_KEY
-        
-        if (!OPENAI_API_KEY) {
-          console.error('❌ No OpenAI API key available for transcript parsing')
-          return c.json({ success: true, log_id })
-        }
-        
-        // Get available service types
-        const serviceTypes = await DB.prepare(`
-          SELECT service_type_id, service_name, description FROM service_types WHERE property_id = ?
-        `).bind(property_id).all()
-        
-        // Call GPT-4 to extract details
-        const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'system',
-                content: `Extract service request details from this hotel voice call transcript.
-
-Available services:
-${serviceTypes.results.map(st => `- ID ${st.service_type_id}: ${st.service_name}`).join('\n')}
-
-Return JSON:
-{
-  "service_type_id": number (matching ID above),
-  "request_details": "what guest needs",
-  "priority": "normal|high|urgent"
-}
-
-If no clear request, return null.`
-              },
-              {
-                role: 'user',
-                content: transcript
-              }
-            ],
-            response_format: { type: 'json_object' }
-          })
-        })
-        
-        const gptData = await gptResponse.json()
-        console.log('🤖 GPT extraction response:', gptData)
-        
-        if (gptData.choices && gptData.choices[0]?.message?.content) {
-          const extracted = JSON.parse(gptData.choices[0].message.content)
-          
-          if (extracted && extracted.service_type_id && extracted.request_details) {
-            console.log('✅ Extracted request:', extracted)
-            
-            // Get pass_id from pass_reference
-            let pass_id = null
-            if (pass_reference) {
-              const pass = await DB.prepare(`
-                SELECT pass_id FROM digital_passes WHERE pass_reference = ?
-              `).bind(pass_reference).first()
-              
-              if (pass) pass_id = pass.pass_id
-            }
-            
-            // Create service request automatically
-            const serviceResult = await DB.prepare(`
-              INSERT INTO service_requests (
-                property_id, service_type_id, pass_id, guest_name, room_number,
-                guest_phone, request_details, priority, status, source
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'voice_call')
-            `).bind(
-              property_id,
-              extracted.service_type_id,
-              pass_id,
-              guest_name,
-              room_number,
-              null,
-              extracted.request_details,
-              extracted.priority || 'normal'
-            ).run()
-            
-            const request_id = serviceResult.meta.last_row_id
-            console.log('✅ AUTO-CREATED service request from voice call! ID:', request_id)
-            
-            // Update voice call log with the created request_id
-            await DB.prepare(`
-              UPDATE voice_call_logs 
-              SET auto_created_request_id = ?
-              WHERE log_id = ?
-            `).bind(request_id, log_id).run()
-            
-            return c.json({
-              success: true,
-              log_id,
-              auto_created_request: {
-                request_id,
-                service_type_id: extracted.service_type_id,
-                request_details: extracted.request_details,
-                priority: extracted.priority
-              }
-            })
-          }
-        }
-      } catch (extractError) {
-        console.error('❌ Auto-extraction error (non-fatal):', extractError)
-        // Don't fail the whole request - transcript is still saved
-      }
-    }
-    
-    return c.json({
-      success: true,
-      log_id
-    })
-  } catch (error) {
-    console.error('❌ Save voice call log error:', error)
-    return c.json({ success: false, error: 'Failed to save call log' }, 500)
-  }
-})
-
-// Get voice call logs for admin
-app.get('/api/admin/voice-call-logs', async (c) => {
-  const { DB } = c.env
-  const property_id = c.req.header('X-Property-ID') || '1'
-  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
-  
-  try {
-    const logs = await DB.prepare(`
-      SELECT 
-        vcl.*,
-        st.service_name,
-        st.service_icon,
-        st.service_color
-      FROM voice_call_logs vcl
-      LEFT JOIN service_types st ON vcl.service_type_id = st.service_type_id
-      WHERE vcl.property_id = ?
-        AND DATE(vcl.call_timestamp) = ?
-      ORDER BY vcl.call_timestamp DESC
-    `).bind(property_id, date).all()
-    
-    return c.json({
-      success: true,
-      logs: logs.results,
-      total: logs.results.length
-    })
-  } catch (error) {
-    console.error('Get voice call logs error:', error)
-    return c.json({ success: false, error: 'Failed to load call logs' }, 500)
-  }
-})
-
 // Update service request status
 app.patch('/api/admin/service-requests/:request_id', async (c) => {
   const { DB } = c.env
@@ -23884,121 +23290,6 @@ app.patch('/api/admin/service-requests/:request_id', async (c) => {
   } catch (error) {
     console.error('Update service request error:', error)
     return c.json({ success: false, error: 'Failed to update service request' }, 500)
-  }
-})
-
-// Admin: Voice Call Logs HTML Page
-app.get('/admin/voice-call-logs', async (c) => {
-  const { DB } = c.env
-  const property_id = c.req.query('property_id') || '1'
-  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
-  
-  try {
-    const logs = await DB.prepare(
-      'SELECT vcl.*, st.service_name, st.service_icon, st.service_color ' +
-      'FROM voice_call_logs vcl ' +
-      'LEFT JOIN service_types st ON vcl.service_type_id = st.service_type_id ' +
-      'WHERE vcl.property_id = ? AND DATE(vcl.call_timestamp) = ? ' +
-      'ORDER BY vcl.call_timestamp DESC'
-    ).bind(property_id, date).all()
-    
-    const logsHtml = logs.results.map(log => {
-      const timestamp = new Date(log.call_timestamp)
-      const timeStr = timestamp.toLocaleTimeString()
-      const serviceColor = log.service_color || '#6B7280'
-      const serviceName = log.service_name || 'General Request'
-      const serviceIcon = log.service_icon || 'fa-question-circle'
-      const hasRequest = log.auto_created_request_id
-      const guestName = log.guest_name || 'Unknown Guest'
-      const roomNumber = log.room_number || 'N/A'
-      const passRef = log.pass_reference || 'No Pass'
-      const transcript = (log.transcript || 'No transcript available').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      
-      return '<div class="bg-white rounded-lg shadow-md p-6 border-l-4 mb-4" style="border-left-color: ' + serviceColor + ';">' +
-          '<div class="flex items-start justify-between mb-4">' +
-            '<div class="flex items-center gap-3">' +
-              '<div class="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl" style="background: ' + serviceColor + ';">' +
-                '<i class="fas ' + serviceIcon + '"></i>' +
-              '</div>' +
-              '<div>' +
-                '<h4 class="text-lg font-bold text-gray-900">' + guestName + '</h4>' +
-                '<p class="text-sm text-gray-600">Room ' + roomNumber + ' - ' + passRef + '</p>' +
-              '</div>' +
-            '</div>' +
-            '<div class="text-right">' +
-              '<div class="text-sm font-semibold" style="color: ' + serviceColor + ';">' +
-                '<i class="fas ' + serviceIcon + ' mr-1"></i>' + serviceName +
-              '</div>' +
-              '<div class="text-xs text-gray-500 mt-1">' +
-                '<i class="fas fa-clock mr-1"></i>' + timeStr +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="bg-gray-50 rounded-lg p-3 mb-3">' +
-            '<p class="text-sm text-gray-700 whitespace-pre-wrap">' + transcript + '</p>' +
-          '</div>' +
-          (hasRequest ?
-            '<div class="flex items-center gap-2">' +
-              '<span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">' +
-                '<i class="fas fa-check-circle mr-1"></i>Service Request Created (#' + hasRequest + ')' +
-              '</span>' +
-            '</div>'
-          :
-            '<div class="flex items-center gap-2">' +
-              '<span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">' +
-                '<i class="fas fa-info-circle mr-1"></i>No Service Request' +
-              '</span>' +
-            '</div>'
-          ) +
-        '</div>'
-    }).join('')
-    
-    const html = '<!DOCTYPE html><html lang="en"><head>' +
-      '<meta charset="UTF-8">' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-      '<title>Voice Call Transcripts</title>' +
-      '<script src="https://cdn.tailwindcss.com"></script>' +
-      '<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">' +
-      '</head><body class="bg-gray-100">' +
-      '<div class="container mx-auto px-4 py-8">' +
-        '<div class="bg-white rounded-lg shadow-lg p-6 mb-6">' +
-          '<div class="flex items-center justify-between mb-4">' +
-            '<div>' +
-              '<h1 class="text-3xl font-bold text-gray-900">' +
-                '<i class="fas fa-phone-volume mr-3 text-green-600"></i>Voice Call Transcripts' +
-              '</h1>' +
-              '<p class="text-gray-600 mt-2">All guest AI voice assistant calls with transcripts</p>' +
-            '</div>' +
-            '<a href="/admin/dashboard" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">' +
-              '<i class="fas fa-arrow-left mr-2"></i>Back to Dashboard' +
-            '</a>' +
-          '</div>' +
-          '<div class="flex items-center gap-4 mt-4">' +
-            '<label class="text-sm font-semibold text-gray-700">Date:</label>' +
-            '<input type="date" id="dateFilter" value="' + date + '" class="px-3 py-2 border rounded-lg" onchange="window.location.href=' + "'/admin/voice-call-logs?property_id=" + property_id + "&date=' + this.value" + '">' +
-            '<button onclick="location.reload()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">' +
-              '<i class="fas fa-sync-alt mr-2"></i>Refresh' +
-            '</button>' +
-            '<div class="ml-auto text-sm text-gray-600">' +
-              '<i class="fas fa-phone mr-2"></i>' + logs.results.length + ' calls today' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="space-y-4">' +
-          (logs.results.length === 0 ?
-            '<div class="bg-white rounded-lg shadow-md p-12 text-center">' +
-              '<i class="fas fa-phone-slash text-6xl text-gray-300 mb-4"></i>' +
-              '<p class="text-xl text-gray-500">No voice calls on this date</p>' +
-            '</div>'
-          : logsHtml) +
-        '</div>' +
-      '</div>' +
-      '</body></html>'
-    
-    return c.html(html)
-  } catch (error) {
-    console.error('Voice call logs page error:', error)
-    return c.html('<h1>Error loading voice call logs</h1>', 500)
   }
 })
 
@@ -58519,9 +57810,6 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="setFrontDeskView('guest-lookup')" id="viewGuestLookupBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
                         <i class="fas fa-address-card mr-2"></i>Guest Pass Requests
                     </button>
-                    <a href="/admin/voice-call-logs?property_id=1" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
-                        <i class="fas fa-phone-volume mr-2"></i>Voice Call Transcripts
-                    </a>
                     
                     <div class="ml-auto flex gap-2">
                         <input type="date" id="frontDeskDateFilter" class="px-3 py-2 border rounded-lg" onchange="loadFrontDeskData()">
@@ -70579,7 +69867,6 @@ app.get('/admin/dashboard', (c) => {
           const response = await fetchWithAuth('/api/admin/offerings/translate-all', {
             method: 'POST',
             body: JSON.stringify({
-              openai_api_key: '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'
             })
           });
           
@@ -70617,7 +69904,6 @@ app.get('/admin/dashboard', (c) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               property_id: 1,
-              openai_api_key: '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'
             })
           });
           

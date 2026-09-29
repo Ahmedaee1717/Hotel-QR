@@ -33,3 +33,4 @@ lerna-debug.log*
 .DS_Store
 core
 prod-snapshot/
+src/index.tsx.backup*
