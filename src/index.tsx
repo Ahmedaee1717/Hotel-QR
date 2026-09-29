@@ -12788,6 +12788,162 @@ async function getConversationHistory(DB: any, conversation_id: any, limit: numb
   } catch (e) { return [] }
 }
 
+// Whole-knowledge mode: the Knowledge Base is the bot's only source of
+// venue facts, so it gets ALL of it — grouped by document, in a stable
+// order so the model's prompt cache keeps repeat calls cheap. Keyword
+// extracts remain the fallback for an oversized base and the no-API path.
+async function getKnowledgeBase(DB: any, property_id: any): Promise<string> {
+  try {
+    const kbRows = await DB.prepare(`
+      SELECT d.title, c.chunk_text
+      FROM chatbot_chunks c
+      JOIN chatbot_documents d ON d.document_id = c.document_id
+      WHERE c.property_id = ? AND (d.is_active = 1 OR d.is_active IS NULL)
+      ORDER BY c.document_id, c.chunk_index
+    `).bind(property_id).all()
+    let lastTitle = ''
+    const lines: string[] = []
+    for (const r of (kbRows.results || [])) {
+      const title = String(r.title || '')
+      if (title !== lastTitle) { lines.push('\n## ' + title); lastTitle = title }
+      lines.push(String(r.chunk_text || '').trim())
+    }
+    const full = lines.join('\n').trim()
+    return full.length && full.length <= 60000 ? full : ''
+  } catch (e) { return '' }
+}
+
+// The concierge brain shared by the text chat and the voice concierge: live
+// resort status, the Knowledge Base, the app:// navigation catalogue, the
+// identity/truth/style protocols and the resort clock. Text mode renders
+// exactly what /api/chatbot/chat has always sent. Voice mode swaps the
+// [[REGISTER]] tag for the register_guest tool and appends the spoken-call
+// rules. kbFallback is the keyword extract used when the whole base is too
+// big to send.
+async function buildConciergePrompt(DB: any, env: any, propertyId: any, opts: {
+  guestContext?: any; sessionId?: string; conversationId?: any; mode: 'text' | 'voice'; kbFallback?: string
+}): Promise<{ prompt: string; navValid: Set<string>; kbChars: number }> {
+  const guest_context = opts.guestContext
+  const [propertyInfo, convIdentity, kbFull, nav, liveKnowledge, lessons] = await Promise.all([
+    DB.prepare('SELECT name, chatbot_name FROM properties WHERE property_id = ?').bind(propertyId).first(),
+    opts.conversationId
+      ? DB.prepare('SELECT guest_name, room_number FROM chatbot_conversations WHERE conversation_id = ?').bind(opts.conversationId).first()
+      : Promise.resolve(null),
+    getKnowledgeBase(DB, propertyId),
+    buildNavigationCatalog(DB, propertyId).catch(() => ({ text: '', valid: new Set<string>() })),
+    buildLiveKnowledge(DB, propertyId),
+    getCoachingLessons(DB, propertyId)
+  ])
+  const hotelName = propertyInfo?.name || 'our hotel'
+  const chatbotName = propertyInfo?.chatbot_name || 'Hotel Assistant'
+  const kbSection = kbFull || opts.kbFallback || ''
+
+  // App navigation: the bot may not source FACTS from the offerings, but it
+  // can send the guest to the right place in the app. The catalog is
+  // names + app:// targets only; every link in a text reply is validated
+  // against navValid before the reply is stored.
+  const navValid: Set<string> = nav.valid
+  let linkContext = ''
+  if (nav.text) {
+    linkContext = '\n\n════════ APP NAVIGATION (places you can open for the guest) ════════\n' +
+      'Each line below is a markdown link you may include VERBATIM in a reply, e.g. [Room Service menu](app://room-service). Tapping it opens that part of the app for the guest.\n' +
+      'RULES: use ONLY links from this list — copy the app:// target exactly and never invent one; write the link LABEL in the guest\'s language (e.g. [قائمة خدمة الغرف](app://room-service)). These are navigation targets: their names are NOT facts, so describe a place only with Knowledge Base facts. ' +
+      'Whenever the guest wants to DO something the app covers (see or order from the room service menu, view a restaurant, book a table, book the beach, find their way, read an information page, give feedback), include the matching link so they can tap straight through. ' +
+      'When you lack facts about something but a link exists, say so honestly and still give the link. Weave the link into the sentence where it helps ("You can browse and order from the [Room Service menu](app://room-service)").\n' +
+      nav.text
+  }
+
+  let guestContextStr = ''
+  if (guest_context && guest_context.tier_name) {
+    guestContextStr = `\n\n🎯 GUEST PROFILE (Use this to personalize responses):
+- Guest Name: ${guest_context.guest_name || 'Guest'}
+- Room Number: ${guest_context.room_number || 'N/A'}
+- Membership Tier: ${guest_context.tier_name}
+- Tier Color: ${guest_context.tier_color || 'N/A'}
+
+💎 INCLUDED BENEFITS & ACCESS:
+${guest_context.benefits_summary || 'Standard benefits'}
+
+When guest asks "my tier", "my benefits", "what's included", "what do I have", or "my package", refer to THEIR specific tier information above.`
+  }
+
+  // Identity known from the linked pass OR captured earlier in this conversation
+  const knownName = (guest_context && guest_context.guest_name) || (convIdentity && convIdentity.guest_name) || ''
+  const knownRoom = (guest_context && guest_context.room_number) || (convIdentity && convIdentity.room_number) || ''
+
+  // The model has no clock: give it the resort's local date and time so
+  // "tonight" and weekday schedules are answered, not guessed.
+  const nowCairo = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).format(new Date())
+  const tomorrowCairo = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'long' })
+    .format(new Date(Date.now() + 24 * 60 * 60 * 1000))
+  // Part of day drives the greeting: the model otherwise says
+  // "Good morning" at 2 am because the date has rolled over.
+  const hourCairo = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', hour12: false })
+    .format(new Date())) % 24
+  const dayPart = hourCairo >= 5 && hourCairo < 12 ? 'morning'
+    : hourCairo >= 12 && hourCairo < 18 ? 'afternoon'
+    : hourCairo >= 18 ? 'evening'
+    : 'late night'
+  const dayGreeting = dayPart === 'morning' ? 'Good morning'
+    : dayPart === 'afternoon' ? 'Good afternoon'
+    : 'Good evening'
+
+  const identity = knownName && knownRoom
+    ? `The guest is ${knownName}, room ${knownRoom}. Never ask for their name or room again; use their name naturally.`
+    : opts.mode === 'voice'
+      ? `You do NOT yet know this guest. Help them straight away, and at a natural moment early in the call warmly ask for their NAME and ROOM NUMBER — once, not every turn. The moment they give either, call the register_guest tool with what you have and carry on; ask once more, politely, only for the part still missing.`
+      : `You do NOT yet know this guest. Before helping with ANY request, warmly ask for their NAME and ROOM NUMBER in your first reply (briefly acknowledge their question so they feel heard). Once they provide either, begin your NEXT reply with this exact hidden tag on its own line, then continue normally:
+[[REGISTER name="<their name or ->" room="<their room or ->"]]
+Use "-" for whichever part is still missing and keep politely asking for it. The tag is invisible to the guest — never mention it.`
+
+  const voiceRules = opts.mode !== 'voice' ? '' : `
+
+════════ VOICE MODE (you are on a live voice call — these rules override every formatting rule above) ════════
+- Speak the language the guest speaks and stay in it for the whole call; never drift into English. Egyptian guests get Egyptian Arabic (مصري), not formal Arabic.
+- Answer in 1 to 3 short spoken sentences. No markdown, no lists, no bullet points, no emoji, no headings, no URLs.
+- Never say or read out an app:// link. When the guest wants to see or do something the app covers (a menu, a venue, a booking form, the beach, the map, an information page, the feedback survey), call the open_app_page tool with the exact target from APP NAVIGATION and then say you have opened it for them.
+- Say times, prices, phone numbers and room numbers slowly and clearly.
+- Name and room number: ask naturally, once, and save them with register_guest as soon as the guest gives either. Never refuse to help before you have them.
+- Requests for the team (a room service order with the items, maintenance, housekeeping, amenities to the room, anything that needs a person): call notify_front_desk with one clear sentence that includes the room number when known, then confirm aloud that it is on its way to the team.
+- If you are unsure or the answer is not in your knowledge, say so honestly and offer the front desk (dial 0 from the room phone).
+- The identity and truth rules above still apply. Hidden tags such as [[REGISTER]] are never used on a call; the register_guest tool replaces them.`
+
+  const prompt = `You are ${chatbotName}, the AI concierge of ${hotelName} — a luxury Red Sea resort in Sahl Hasheesh, Egypt. You speak with the polish, warmth and competence of the best concierge the guest has ever met. Reply in the guest's language, always.
+
+════════ IDENTITY PROTOCOL (highest priority) ════════
+${identity}
+
+════════ TRUTH PROTOCOL (never break these) ════════
+1. You may ONLY state facts that appear in the KNOWLEDGE BASE or RESORT STATUS below, or in this conversation. No exceptions. The Knowledge Base is long — read ALL of it carefully before saying you don't know; when a guest asks for "the restaurants", "the bars", "activities" etc., list every one the Knowledge Base mentions.
+2. If the answer is not in your knowledge: say so honestly, offer to connect the front desk ("I'll ask our team to confirm — or dial 0 from your room phone"), and never guess.
+3. NEVER invent: prices, opening hours, menus, phone numbers, distances, availability, policies. If a time or price is not written below, you do not know it.
+4. Booking promises: you may only say something can be booked in the app if it is marked (bookable in the app) in APP NAVIGATION. You cannot make reservations yourself — send the guest to the matching app link or the front desk.
+5. Service dispatch (maintenance, housekeeping, amenities to the room, and ROOM SERVICE ORDERS): respond as the concierge — confirm you are passing it to the team now (the front desk sees this chat live), and include their room number. When a guest names dishes or drinks to be brought to their room, TAKE THE ORDER: repeat the items back with their room number and confirm it is on its way to the team — do not send them back to the menu. You need no menu facts for this; the team confirms availability and price.
+6. If the guest disputes something you said, do not double down — offer the front desk.
+
+════════ RESORT STATUS (live: information pages & beach) ════════
+${liveKnowledge || '(knowledge temporarily unavailable — be honest about not having details and offer the front desk)'}
+
+${kbSection ? '════════ KNOWLEDGE BASE (everything your managers have written — your primary source of facts) ════════\n' + kbSection : ''}${linkContext}${guestContextStr}
+${lessons ? '\n════════ MANAGEMENT COACHING (standing orders from your managers — follow them) ════════\n' + lessons : ''}
+
+════════ STYLE ════════
+- Concise and elegant: 2-5 sentences unless the guest asks for detail. No walls of text.
+- Warm, personal, five-star: use the guest's name when known, mirror their tone, one tasteful emoji at most.
+- In-hotel context always: "maintenance" means their hotel room, never cars or homes. You know where they are.
+- End with a helpful next step when natural (an app link from APP NAVIGATION, a venue, or the front desk).
+
+════════ NOW (resort local time, Egypt) ════════
+It is ${nowCairo}. Tomorrow is ${tomorrowCairo}. It is ${dayPart} at the resort.
+GREETINGS: any time-of-day greeting must be "${dayGreeting}" (or its equivalent in the guest's language, e.g. ${dayGreeting === 'Good morning' ? '"Guten Morgen", "صباح الخير"' : dayGreeting === 'Good afternoon' ? '"Guten Tag", "مساء الخير"' : '"Guten Abend", "مساء الخير"'}) — never another part of the day.${dayPart === 'late night' ? ' It is after midnight: never say "Good morning"; keep your voice calm and considerate of the hour.' : ''}
+Use this for "today", "tonight", "tomorrow", "now", "still open?" and any weekday-based schedule (e.g. which restaurants are open tonight) — work out the weekday yourself for other dates.` + voiceRules
+
+  return { prompt, navValid, kbChars: kbSection.length }
+}
+
 app.post('/api/chatbot/chat', async (c) => {
   const { DB } = c.env
 
@@ -13223,50 +13379,10 @@ app.post('/api/chatbot/chat', async (c) => {
     const context = scoredChunks.map((chunk: any) => chunk.chunk_text).join('\n\n')
     const chunkIds = scoredChunks.map((chunk: any) => chunk.chunk_id)
 
-    // Whole-knowledge mode: the Knowledge Base is the bot's only source of
-    // venue facts, so it gets ALL of it — grouped by document, in a stable
-    // order so the model's prompt cache keeps repeat calls cheap. Keyword
-    // extracts remain the fallback for an oversized base and the no-API path.
-    let kbFull = ''
-    try {
-      const kbRows = await DB.prepare(`
-        SELECT d.title, c.chunk_text
-        FROM chatbot_chunks c
-        JOIN chatbot_documents d ON d.document_id = c.document_id
-        WHERE c.property_id = ? AND (d.is_active = 1 OR d.is_active IS NULL)
-        ORDER BY c.document_id, c.chunk_index
-      `).bind(property_id).all()
-      let lastTitle = ''
-      const lines: string[] = []
-      for (const r of (kbRows.results || [])) {
-        const title = String(r.title || '')
-        if (title !== lastTitle) { lines.push('\n## ' + title); lastTitle = title }
-        lines.push(String(r.chunk_text || '').trim())
-      }
-      const full = lines.join('\n').trim()
-      if (full.length && full.length <= 60000) kbFull = full
-    } catch (e) {}
-    const kbSection = kbFull || context
-
-    // App navigation: the bot may not source FACTS from the offerings, but it
-    // can send the guest to the right place in the app. The catalog is
-    // names + app:// targets only; every link in the reply is validated
-    // against it before the reply is stored (see below).
+    // Navigation targets the reply may link to (filled by buildConciergePrompt;
+    // every app:// link in the reply is validated against it before storing).
     let navValid = new Set<string>()
-    let linkContext = ''
-    try {
-      const nav = await buildNavigationCatalog(DB, property_id)
-      navValid = nav.valid
-      if (nav.text) {
-        linkContext = '\n\n════════ APP NAVIGATION (places you can open for the guest) ════════\n' +
-          'Each line below is a markdown link you may include VERBATIM in a reply, e.g. [Room Service menu](app://room-service). Tapping it opens that part of the app for the guest.\n' +
-          'RULES: use ONLY links from this list — copy the app:// target exactly and never invent one; write the link LABEL in the guest\'s language (e.g. [قائمة خدمة الغرف](app://room-service)). These are navigation targets: their names are NOT facts, so describe a place only with Knowledge Base facts. ' +
-          'Whenever the guest wants to DO something the app covers (see or order from the room service menu, view a restaurant, book a table, book the beach, find their way, read an information page, give feedback), include the matching link so they can tap straight through. ' +
-          'When you lack facts about something but a link exists, say so honestly and still give the link. Weave the link into the sentence where it helps ("You can browse and order from the [Room Service menu](app://room-service)").\n' +
-          nav.text
-      }
-    } catch (e) {}
-    
+
     // Generate AI response (apiKey and baseURL already declared above for translation)
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
     
@@ -13277,90 +13393,16 @@ app.post('/api/chatbot/chat', async (c) => {
         console.log('🤖 Using AI with API key:', apiKey ? 'SET' : 'NOT SET')
         console.log('📚 Context length:', context.length)
         console.log('📝 Context preview:', context.substring(0, 200))
-        
-        // Build guest context string if available
-        let guestContextStr = ''
-        let guestGreeting = ''
-        if (guest_context && guest_context.tier_name) {
-          guestGreeting = guest_context.guest_name ? `Always greet the guest as "${guest_context.guest_name}" when appropriate. ` : ''
-          guestContextStr = `\n\n🎯 GUEST PROFILE (Use this to personalize responses):
-- Guest Name: ${guest_context.guest_name || 'Guest'}
-- Room Number: ${guest_context.room_number || 'N/A'}
-- Membership Tier: ${guest_context.tier_name}
-- Tier Color: ${guest_context.tier_color || 'N/A'}
 
-💎 INCLUDED BENEFITS & ACCESS:
-${guest_context.benefits_summary || 'Standard benefits'}
+        const [brain, history] = await Promise.all([
+          buildConciergePrompt(DB, c.env, property_id, {
+            guestContext: guest_context, sessionId: session_id, conversationId: convId, mode: 'text', kbFallback: context
+          }),
+          getConversationHistory(DB, convId, 12)
+        ])
+        navValid = brain.navValid
+        const systemPrompt = brain.prompt
 
-When guest asks "my tier", "my benefits", "what's included", "what do I have", or "my package", refer to THEIR specific tier information above.`
-        }
-        
-        // Identity known from the linked pass OR captured earlier in this conversation
-        const convIdentity = await DB.prepare(
-          'SELECT guest_name, room_number FROM chatbot_conversations WHERE conversation_id = ?'
-        ).bind(convId).first()
-        const knownName = (guest_context && guest_context.guest_name) || (convIdentity && convIdentity.guest_name) || ''
-        const knownRoom = (guest_context && guest_context.room_number) || (convIdentity && convIdentity.room_number) || ''
-
-        // Everything the model is allowed to state, fetched live
-        const liveKnowledge = await buildLiveKnowledge(DB, property_id)
-        const lessons = await getCoachingLessons(DB, property_id)
-        const history = await getConversationHistory(DB, convId, 12)
-
-        // The model has no clock: give it the resort's local date and time so
-        // "tonight" and weekday schedules are answered, not guessed.
-        const nowCairo = new Intl.DateTimeFormat('en-GB', {
-          timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-          hour: '2-digit', minute: '2-digit', hour12: false
-        }).format(new Date())
-        const tomorrowCairo = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'long' })
-          .format(new Date(Date.now() + 24 * 60 * 60 * 1000))
-        // Part of day drives the greeting: the model otherwise says
-        // "Good morning" at 2 am because the date has rolled over.
-        const hourCairo = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', hour12: false })
-          .format(new Date())) % 24
-        const dayPart = hourCairo >= 5 && hourCairo < 12 ? 'morning'
-          : hourCairo >= 12 && hourCairo < 18 ? 'afternoon'
-          : hourCairo >= 18 ? 'evening'
-          : 'late night'
-        const dayGreeting = dayPart === 'morning' ? 'Good morning'
-          : dayPart === 'afternoon' ? 'Good afternoon'
-          : 'Good evening'
-
-        const systemPrompt = `You are ${chatbotName}, the AI concierge of ${hotelName} — a luxury Red Sea resort in Sahl Hasheesh, Egypt. You speak with the polish, warmth and competence of the best concierge the guest has ever met. Reply in the guest's language, always.
-
-════════ IDENTITY PROTOCOL (highest priority) ════════
-${knownName && knownRoom
-  ? `The guest is ${knownName}, room ${knownRoom}. Never ask for their name or room again; use their name naturally.`
-  : `You do NOT yet know this guest. Before helping with ANY request, warmly ask for their NAME and ROOM NUMBER in your first reply (briefly acknowledge their question so they feel heard). Once they provide either, begin your NEXT reply with this exact hidden tag on its own line, then continue normally:
-[[REGISTER name="<their name or ->" room="<their room or ->"]]
-Use "-" for whichever part is still missing and keep politely asking for it. The tag is invisible to the guest — never mention it.`}
-
-════════ TRUTH PROTOCOL (never break these) ════════
-1. You may ONLY state facts that appear in the KNOWLEDGE BASE or RESORT STATUS below, or in this conversation. No exceptions. The Knowledge Base is long — read ALL of it carefully before saying you don't know; when a guest asks for "the restaurants", "the bars", "activities" etc., list every one the Knowledge Base mentions.
-2. If the answer is not in your knowledge: say so honestly, offer to connect the front desk ("I'll ask our team to confirm — or dial 0 from your room phone"), and never guess.
-3. NEVER invent: prices, opening hours, menus, phone numbers, distances, availability, policies. If a time or price is not written below, you do not know it.
-4. Booking promises: you may only say something can be booked in the app if it is marked (bookable in the app) in APP NAVIGATION. You cannot make reservations yourself — send the guest to the matching app link or the front desk.
-5. Service dispatch (maintenance, housekeeping, amenities to the room, and ROOM SERVICE ORDERS): respond as the concierge — confirm you are passing it to the team now (the front desk sees this chat live), and include their room number. When a guest names dishes or drinks to be brought to their room, TAKE THE ORDER: repeat the items back with their room number and confirm it is on its way to the team — do not send them back to the menu. You need no menu facts for this; the team confirms availability and price.
-6. If the guest disputes something you said, do not double down — offer the front desk.
-
-════════ RESORT STATUS (live: information pages & beach) ════════
-${liveKnowledge || '(knowledge temporarily unavailable — be honest about not having details and offer the front desk)'}
-
-${kbSection ? '════════ KNOWLEDGE BASE (everything your managers have written — your primary source of facts) ════════\n' + kbSection : ''}${linkContext}${guestContextStr}
-${lessons ? '\n════════ MANAGEMENT COACHING (standing orders from your managers — follow them) ════════\n' + lessons : ''}
-
-════════ STYLE ════════
-- Concise and elegant: 2-5 sentences unless the guest asks for detail. No walls of text.
-- Warm, personal, five-star: use the guest's name when known, mirror their tone, one tasteful emoji at most.
-- In-hotel context always: "maintenance" means their hotel room, never cars or homes. You know where they are.
-- End with a helpful next step when natural (an app link from APP NAVIGATION, a venue, or the front desk).
-
-════════ NOW (resort local time, Egypt) ════════
-It is ${nowCairo}. Tomorrow is ${tomorrowCairo}. It is ${dayPart} at the resort.
-GREETINGS: any time-of-day greeting must be "${dayGreeting}" (or its equivalent in the guest's language, e.g. ${dayGreeting === 'Good morning' ? '"Guten Morgen", "صباح الخير"' : dayGreeting === 'Good afternoon' ? '"Guten Tag", "مساء الخير"' : '"Guten Abend", "مساء الخير"'}) — never another part of the day.${dayPart === 'late night' ? ' It is after midnight: never say "Good morning"; keep your voice calm and considerate of the hour.' : ''}
-Use this for "today", "tonight", "tomorrow", "now", "still open?" and any weekday-based schedule (e.g. which restaurants are open tonight) — work out the weekday yourself for other dates.`
-        
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
           headers: {
@@ -13646,18 +13688,349 @@ Use this for "today", "tonight", "tomorrow", "now", "still open?" and any weekda
   }
 })
 
-// API: Get chatbot settings
+// ── Voice concierge ──────────────────────────────────────────────────────────
+// The guest talks to the same concierge brain over OpenAI's Realtime API
+// (WebRTC straight from the phone to OpenAI). This server only mints a
+// short-lived client secret that carries the whole session config, so the API
+// key and the Knowledge Base never reach the browser. The browser posts both
+// sides' transcripts to /api/voice/event, so the call lives in chatbot_messages
+// (channel 'voice') and the Ops app, takeover and escalation see it like a
+// typed chat. Request/response shapes follow the Realtime client_secrets
+// reference as verified on 2026-09-29.
+const VOICE_SESSION_RE = /^guest-[a-z0-9-]{6,60}$/i
+const VOICE_ID_RE = /^[A-Za-z0-9_-]{22}$/
+const VOICE_MODEL_RE = /^gpt-realtime(-[a-z0-9.]+)*$/
+const VOICE_MODEL_DEFAULT = 'gpt-realtime-2.1-mini'
+const VOICE_MODEL_FALLBACKS = ['gpt-realtime-mini', 'gpt-realtime']
+const VOICE_TRANSCRIBE_MODELS = ['gpt-transcribe', 'gpt-4o-mini-transcribe']
+const VOICE_IDLE_SECONDS = 45
+const VOICE_STARTS_PER_SESSION = 8
+const VOICE_STARTS_PER_IP = 40
+const VOICE_EXPIRES_SECONDS = 120
+const VOICE_SETTINGS_SQL = `SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('voice_enabled', 'voice_model', 'voice_daily_minutes', 'voice_max_session_seconds')`
+
+function voiceSettings(rows: any[]): { enabled: boolean; model: string; dailyMinutes: number; maxSeconds: number } {
+  const s: Record<string, string> = {}
+  for (const r of (rows || [])) s[String(r.setting_key)] = String(r.setting_value == null ? '' : r.setting_value)
+  const num = (v: string, d: number) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : d }
+  return {
+    enabled: s.voice_enabled === '1',
+    model: VOICE_MODEL_RE.test(s.voice_model || '') ? s.voice_model : VOICE_MODEL_DEFAULT,
+    dailyMinutes: num(s.voice_daily_minutes, 300),
+    maxSeconds: num(s.voice_max_session_seconds, 300)
+  }
+}
+
+// Model candidates in the order they are tried: the configured one, then the fallbacks.
+function voiceModelPlan(configured: string): string[] {
+  const out = [configured]
+  for (const m of VOICE_MODEL_FALLBACKS) if (out.indexOf(m) < 0) out.push(m)
+  return out
+}
+
+// Which part of a client_secrets request OpenAI refused, when it is one we can
+// retry differently: the model name, the transcription model or the
+// transcription language hint. Anything else is final.
+function voiceRejectedField(status: number, body: any): 'model' | 'transcription' | 'language' | null {
+  if (status !== 400 && status !== 404) return null
+  const err = (body && body.error) || {}
+  const param = String(err.param || '').toLowerCase()
+  const msg = String(err.message || '').toLowerCase()
+  if (param.indexOf('language') >= 0) return 'language'
+  if (param.indexOf('transcription') >= 0 || (/transcri/.test(msg) && /model/.test(msg))) return 'transcription'
+  if (param.indexOf('model') >= 0 || String(err.code || '') === 'model_not_found' || /\bmodel\b/.test(msg)) return 'model'
+  return null
+}
+
+// The POST /v1/realtime/client_secrets body: the whole session lives here so
+// the browser only ever sees the ephemeral key.
+function voiceRealtimeRequest(o: { model: string; transcribeModel: string; language?: string; instructions: string; voice: string; navTargets: string[] }) {
+  const transcription: any = { model: o.transcribeModel }
+  if (o.language) transcription.language = o.language
+  const tools: any[] = []
+  if (o.navTargets.length) {
+    tools.push({
+      type: 'function', name: 'open_app_page',
+      description: 'Open a part of the resort app on the guest\'s screen: a menu, a venue, a booking form, the beach, the map, an information page or the feedback survey. Call it whenever the guest wants to see or do something the app covers, then tell them you have opened it. target must be one of these app:// targets exactly as listed: ' + o.navTargets.join(', '),
+      parameters: {
+        type: 'object',
+        properties: { target: { type: 'string', enum: o.navTargets, description: 'The app:// target to open, copied exactly from APP NAVIGATION' } },
+        required: ['target']
+      }
+    })
+  }
+  tools.push({
+    type: 'function', name: 'register_guest',
+    description: 'Save the guest\'s name and room number as soon as they tell you either one. Leave out whatever they have not given yet.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The guest\'s name as they said it' },
+        room: { type: 'string', description: 'Their room number' }
+      }
+    }
+  })
+  tools.push({
+    type: 'function', name: 'notify_front_desk',
+    description: 'Pass a request to the front desk team: a room service order (list the items), maintenance, housekeeping, amenities to the room, or anything that needs a person. One clear sentence in English including the room number when known; the team sees it immediately.',
+    parameters: {
+      type: 'object',
+      properties: { request: { type: 'string', description: 'What the team should do, with the room number' } },
+      required: ['request']
+    }
+  })
+  return {
+    expires_after: { anchor: 'created_at', seconds: VOICE_EXPIRES_SECONDS },
+    session: {
+      type: 'realtime',
+      model: o.model,
+      instructions: o.instructions,
+      audio: {
+        input: {
+          transcription,
+          turn_detection: { type: 'semantic_vad', create_response: true, interrupt_response: true }
+        },
+        output: { voice: o.voice }
+      },
+      tools,
+      tool_choice: 'auto',
+      max_output_tokens: 600
+    }
+  }
+}
+
+function voiceId(): string {
+  return b64urlBytes(crypto.getRandomValues(new Uint8Array(16)).buffer)
+}
+
+app.post('/api/voice/start', async (c) => {
+  const { DB } = c.env
+  c.header('Cache-Control', 'no-store')
+  try {
+    const b: any = await c.req.json().catch(() => null)
+    const propertyId = Number(b && b.property_id)
+    const sessionId = String((b && b.session_id) || '')
+    if (!Number.isInteger(propertyId) || propertyId <= 0 || !VOICE_SESSION_RE.test(sessionId)) {
+      return c.json({ error: 'bad_input' }, 400)
+    }
+    const convIdIn = b.conversation_id != null && /^\d+$/.test(String(b.conversation_id)) ? Number(b.conversation_id) : null
+    const lang = geLang(b.lang) || 'en'
+    const guest = b.guest_context && typeof b.guest_context === 'object' ? b.guest_context : null
+    const guestName = guest ? String(guest.guest_name || '').trim().slice(0, 80) : ''
+    const guestRoom = guest ? String(guest.room_number || '').trim().slice(0, 20) : ''
+    const ip = String(c.req.header('CF-Connecting-IP') || '').slice(0, 64)
+    if (!c.env.OPENAI_API_KEY) return c.json({ error: 'voice_unavailable', message: 'Voice is not set up yet' }, 503)
+
+    const [settingsRes, capsRes, convRes] = await DB.batch([
+      DB.prepare(VOICE_SETTINGS_SQL),
+      DB.prepare(`
+        SELECT SUM(CASE WHEN session_id = ? THEN 1 ELSE 0 END) AS by_session,
+               SUM(CASE WHEN ip = ? THEN 1 ELSE 0 END) AS by_ip,
+               SUM(COALESCE(seconds, 0)) AS done_seconds,
+               SUM(CASE WHEN ended_at IS NULL THEN 1 ELSE 0 END) AS open_n
+        FROM voice_sessions WHERE property_id = ? AND started_at >= date('now')
+      `).bind(sessionId, ip || '-', propertyId),
+      DB.prepare(`
+        SELECT conversation_id, is_ai_paused FROM chatbot_conversations
+        WHERE session_id = ? AND property_id = ? AND (? IS NULL OR conversation_id = ?)
+        ORDER BY conversation_id DESC LIMIT 1
+      `).bind(sessionId, propertyId, convIdIn, convIdIn)
+    ])
+    const cfg = voiceSettings(settingsRes.results || [])
+    if (!cfg.enabled) return c.json({ error: 'voice_disabled' }, 403)
+
+    // Unfinished calls count as full-length until /end reports their real length
+    const caps: any = (capsRes.results || [])[0] || {}
+    const usedSeconds = Number(caps.done_seconds || 0) + Number(caps.open_n || 0) * cfg.maxSeconds
+    if (Number(caps.by_session || 0) >= VOICE_STARTS_PER_SESSION || (ip && Number(caps.by_ip || 0) >= VOICE_STARTS_PER_IP) || usedSeconds >= cfg.dailyMinutes * 60) {
+      return c.json({ error: 'voice_busy', message: 'Voice is busy right now — please type your question' }, 429)
+    }
+
+    let conv: any = (convRes.results || [])[0] || null
+    if (conv && conv.is_ai_paused === 1) {
+      return c.json({ error: 'staff_active', message: 'A team member is handling this chat' }, 409)
+    }
+    const created = !conv
+    if (created) {
+      const ins = await DB.prepare(`
+        INSERT INTO chatbot_conversations (property_id, session_id, guest_name, room_number, site_lang)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(propertyId, sessionId, guestName || null, guestRoom || null, lang).run()
+      conv = { conversation_id: ins.meta.last_row_id }
+    }
+
+    const brain = await buildConciergePrompt(DB, c.env, propertyId, {
+      guestContext: guest, sessionId, conversationId: conv.conversation_id, mode: 'voice'
+    })
+    const navTargets = Array.from(brain.navValid)
+    const siteLang = normLang(lang)
+    const voice = siteLang === 'ar' ? 'cedar' : 'marin'
+
+    const models = voiceModelPlan(cfg.model)
+    let mi = 0, ti = 0
+    let language: string | undefined = LANG_NAMES[siteLang] ? siteLang : undefined
+    let minted: any = null
+    let lastStatus = 0, lastMessage = ''
+    for (let attempt = 0; attempt < 6 && mi < models.length && ti < VOICE_TRANSCRIBE_MODELS.length; attempt++) {
+      const r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + c.env.OPENAI_API_KEY },
+        body: JSON.stringify(voiceRealtimeRequest({
+          model: models[mi], transcribeModel: VOICE_TRANSCRIBE_MODELS[ti], language,
+          instructions: brain.prompt, voice, navTargets
+        }))
+      })
+      if (r.ok) { minted = await r.json(); break }
+      const errBody: any = await r.json().catch(() => null)
+      lastStatus = r.status
+      lastMessage = String((errBody && errBody.error && errBody.error.message) || '').slice(0, 200)
+      const field = voiceRejectedField(r.status, errBody)
+      if (field === 'model') mi++
+      else if (field === 'transcription') ti++
+      else if (field === 'language' && language) language = undefined
+      else break
+    }
+    if (!minted || typeof minted.value !== 'string') {
+      console.error('voice start: mint failed', lastStatus, lastMessage)
+      return c.json({ error: 'voice_unavailable', message: 'Voice is not available right now — please type your question' }, 502)
+    }
+    const model = String((minted.session && minted.session.model) || models[mi])
+
+    const voiceSessionId = voiceId()
+    const writes = [
+      DB.prepare(`
+        INSERT INTO voice_sessions (voice_session_id, property_id, conversation_id, session_id, model, voice, lang, ip)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(voiceSessionId, propertyId, conv.conversation_id, sessionId, model, voice, lang, ip || null)
+    ]
+    if (!created && (guestName || guestRoom)) {
+      writes.push(DB.prepare(`
+        UPDATE chatbot_conversations
+        SET guest_name = COALESCE(guest_name, ?), room_number = COALESCE(room_number, ?), site_lang = COALESCE(site_lang, ?)
+        WHERE conversation_id = ?
+      `).bind(guestName || null, guestRoom || null, lang, conv.conversation_id))
+    }
+    await DB.batch(writes)
+
+    return c.json({
+      success: true,
+      voice_session_id: voiceSessionId,
+      client_secret: minted.value,
+      expires_at: minted.expires_at,
+      model,
+      voice,
+      conversation_id: conv.conversation_id,
+      max_seconds: cfg.maxSeconds,
+      idle_seconds: VOICE_IDLE_SECONDS,
+      greeting_lang: lang,
+      nav: navTargets
+    })
+  } catch (e) {
+    console.error('voice start', e)
+    return c.json({ error: 'server_error' }, 500)
+  }
+})
+
+// One spoken turn, a tool result or a captured identity. Guest and assistant
+// turns become chatbot_messages rows (channel 'voice'); a front-desk request is
+// stored as a guest message so it rings and escalates like a typed one.
+app.post('/api/voice/event', async (c) => {
+  const { DB } = c.env
+  try {
+    const b: any = await c.req.json().catch(() => null)
+    const id = String((b && b.voice_session_id) || '')
+    const type = String((b && b.type) || '')
+    if (!VOICE_ID_RE.test(id) || ['guest', 'assistant', 'register', 'notify'].indexOf(type) < 0) {
+      return c.json({ error: 'bad_input' }, 400)
+    }
+    const s: any = await DB.prepare(`
+      SELECT vs.conversation_id, vs.ended_at, vs.guest_turns, cc.is_ai_paused,
+             strftime('%s', 'now') - strftime('%s', vs.started_at) AS age,
+             (SELECT setting_value FROM system_settings WHERE setting_key = 'voice_max_session_seconds') AS max_seconds
+      FROM voice_sessions vs
+      LEFT JOIN chatbot_conversations cc ON cc.conversation_id = vs.conversation_id
+      WHERE vs.voice_session_id = ?
+    `).bind(id).first()
+    if (!s) return c.json({ error: 'voice_session_unknown' }, 404)
+    const maxSeconds = parseInt(String(s.max_seconds || ''), 10) || 300
+    if (s.ended_at || Number(s.age || 0) > maxSeconds + 60) return c.json({ error: 'voice_session_ended' }, 410)
+    const paused = s.is_ai_paused === 1
+    const convId = s.conversation_id
+    const writes: any[] = []
+    let ring = false
+    if (type === 'register') {
+      const name = String(b.name || '').trim().slice(0, 80)
+      const room = String(b.room || '').trim().slice(0, 20)
+      if (name && name !== '-') writes.push(DB.prepare('UPDATE chatbot_conversations SET guest_name = ? WHERE conversation_id = ?').bind(name, convId))
+      if (room && room !== '-') writes.push(DB.prepare('UPDATE chatbot_conversations SET room_number = ? WHERE conversation_id = ?').bind(room, convId))
+    } else {
+      const text = String(b.text == null ? (b.request == null ? '' : b.request) : b.text).trim().slice(0, 2000)
+      if (text) {
+        const role = type === 'assistant' ? 'assistant' : 'user'
+        const content = type === 'notify' ? '[Request via voice] ' + text : text
+        writes.push(DB.prepare(`
+          INSERT INTO chatbot_messages (conversation_id, role, content, channel, created_at)
+          VALUES (?, ?, ?, 'voice', CURRENT_TIMESTAMP)
+        `).bind(convId, role, content))
+        if (type === 'guest') writes.push(DB.prepare('UPDATE voice_sessions SET guest_turns = guest_turns + 1 WHERE voice_session_id = ?').bind(id))
+        if (type === 'assistant') writes.push(DB.prepare('UPDATE voice_sessions SET ai_turns = ai_turns + 1 WHERE voice_session_id = ?').bind(id))
+        // Same alerts as the text route: a conversation that has just started
+        // (first spoken turn), a guest talking while staff handle the chat, and
+        // an explicit request for the team. The ring-check cron covers the rest.
+        ring = type === 'notify' || (type === 'guest' && (paused || Number(s.guest_turns || 0) === 0))
+      }
+    }
+    if (writes.length) await DB.batch(writes)
+    if (ring) { try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {} }
+    return c.json({ success: true, paused })
+  } catch (e) {
+    console.error('voice event', e)
+    return c.json({ error: 'server_error' }, 500)
+  }
+})
+
+// Also reachable through navigator.sendBeacon, whose body arrives as text/plain.
+app.post('/api/voice/end', async (c) => {
+  const { DB } = c.env
+  try {
+    let b: any = null
+    try { b = JSON.parse(await c.req.text()) } catch (e) {}
+    const id = String((b && b.voice_session_id) || '')
+    if (!VOICE_ID_RE.test(id)) return c.json({ error: 'bad_input' }, 400)
+    const seconds = Math.max(0, Math.min(86400, Math.round(Number(b.seconds) || 0)))
+    const reason = /^[a-z_]{1,40}$/i.test(String(b.reason || '')) ? String(b.reason).toLowerCase() : 'other'
+    const r = await DB.prepare(`
+      UPDATE voice_sessions
+      SET ended_at = datetime('now'),
+          seconds = MIN(?, COALESCE((SELECT CAST(setting_value AS INTEGER) FROM system_settings WHERE setting_key = 'voice_max_session_seconds'), 300) + 60),
+          ended_reason = ?
+      WHERE voice_session_id = ? AND ended_at IS NULL
+    `).bind(seconds, reason, id).run()
+    return c.json({ success: true, ended: !!(r.meta && r.meta.changes) })
+  } catch (e) {
+    console.error('voice end', e)
+    return c.json({ error: 'server_error' }, 500)
+  }
+})
+
+// API: Get chatbot settings (the voice concierge switches live in system_settings)
 app.get('/api/chatbot/settings/:property_id', async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
-  
+
   try {
-    const settings = await DB.prepare(`
-      SELECT chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color
-      FROM properties
-      WHERE property_id = ?
-    `).bind(property_id).first()
-    
+    const [propRes, voiceRes] = await DB.batch([
+      DB.prepare(`
+        SELECT chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color
+        FROM properties
+        WHERE property_id = ?
+      `).bind(property_id),
+      DB.prepare(VOICE_SETTINGS_SQL)
+    ])
+    const row = (propRes.results || [])[0] || null
+    const voice = voiceSettings(voiceRes.results || [])
+    const settings = row ? { ...row, voice_enabled: voice.enabled ? 1 : 0, voice_model: voice.model, voice_daily_minutes: voice.dailyMinutes } : row
+
     return c.json({ success: true, settings })
   } catch (error) {
     console.error('Get chatbot settings error:', error)
@@ -13677,21 +14050,41 @@ app.post('/api/admin/chatbot/settings', async (c) => {
   
   try {
     const body = await c.req.json()
-    const { chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color } = body
-    
-    // Handle undefined/null values - D1 doesn't accept undefined
-    const enabled = chatbot_enabled ? 1 : 0
-    const greeting = chatbot_greeting_en || null
-    const name = chatbot_name || null
-    const avatar = chatbot_avatar_url || null
-    const color = chatbot_primary_color || null
-    
-    await DB.prepare(`
-      UPDATE properties
-      SET chatbot_enabled = ?, chatbot_greeting_en = ?, chatbot_name = ?, chatbot_avatar_url = ?, chatbot_primary_color = ?
-      WHERE property_id = ?
-    `).bind(enabled, greeting, name, avatar, color, property_id).run()
-    
+    const { chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color, voice_enabled, voice_model } = body
+
+    // The voice switches may arrive on their own; the chatbot columns are only
+    // rewritten when the form sends them.
+    if ([chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color].some(v => v !== undefined)) {
+      // Handle undefined/null values - D1 doesn't accept undefined
+      const enabled = chatbot_enabled ? 1 : 0
+      const greeting = chatbot_greeting_en || null
+      const name = chatbot_name || null
+      const avatar = chatbot_avatar_url || null
+      const color = chatbot_primary_color || null
+
+      await DB.prepare(`
+        UPDATE properties
+        SET chatbot_enabled = ?, chatbot_greeting_en = ?, chatbot_name = ?, chatbot_avatar_url = ?, chatbot_primary_color = ?
+        WHERE property_id = ?
+      `).bind(enabled, greeting, name, avatar, color, property_id).run()
+    }
+
+    const writes: [string, string, string][] = []
+    if (voice_enabled !== undefined) {
+      const on = voice_enabled === true || voice_enabled === 1 || voice_enabled === '1' || voice_enabled === 'true'
+      writes.push(['voice_enabled', on ? '1' : '0', 'Guest voice concierge (talk to the AI) on/off'])
+    }
+    if (voice_model !== undefined) {
+      if (!VOICE_MODEL_RE.test(String(voice_model))) return c.json({ error: 'bad_model' }, 400)
+      writes.push(['voice_model', String(voice_model), 'OpenAI Realtime model for the voice concierge'])
+    }
+    if (writes.length) {
+      await DB.batch(writes.map((w) => DB.prepare(`
+        INSERT INTO system_settings (setting_key, setting_value, description, updated_at) VALUES (?, ?, ?, datetime('now'))
+        ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at
+      `).bind(w[0], w[1], w[2])))
+    }
+
     return c.json({ success: true })
   } catch (error) {
     console.error('Update chatbot settings error:', error)
@@ -13723,11 +14116,12 @@ async function chatbotMessages(c: any, propertyId: string) {
     
     // Get messages using conversation_id
     const messages = await DB.prepare(`
-      SELECT 
+      SELECT
         message_id,
         conversation_id,
         role,
         content,
+        channel,
         created_at
       FROM chatbot_messages
       WHERE conversation_id = ?
