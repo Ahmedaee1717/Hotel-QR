@@ -24619,12 +24619,10 @@ window.luxTogglePassForm = function() {
           #chatWindow .text-gray-500 { color: rgba(246, 240, 227, 0.5) !important; }
 
           /* ── Modals: ivory paper + serif ── */
-          #infoMenuModal .bg-white, #infoPageModal .bg-white, #moodCheckModal .bg-white,
-          #serviceModal .bg-white, #voiceCallModal .bg-white, #mapModal .bg-white {
+          #infoMenuModal .bg-white, #infoPageModal .bg-white, #moodCheckModal .bg-white, #mapModal .bg-white {
             background: var(--lux-ivory) !important;
           }
-          #infoMenuModal h2, #infoPageModal h2, #moodCheckModal h2, #serviceModal h2,
-          #mapModal h2, #voiceCallModal h2 {
+          #infoMenuModal h2, #infoPageModal h2, #moodCheckModal h2, #mapModal h2 {
             font-family: var(--lux-serif) !important;
           }
           #mapModal h2 { color: var(--lux-card-ink); }
@@ -28763,11 +28761,6 @@ window.luxTogglePassForm = function() {
                 
                 // Load feedback form for homepage (if exists)
                 loadHomepageFeedbackForm();
-                
-                // Load service types now that propertyData is available
-                if (window.loadServiceTypes) {
-                    window.loadServiceTypes();
-                }
                 
                 // Load hotel offerings with language
                 const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}?lang=\${currentLanguage}\`);
@@ -33182,6 +33175,88 @@ window.luxTogglePassForm = function() {
           }
         </style>
         
+        <style>
+          /* ── Voice concierge: Talk button, full-screen call, floating pill ── */
+          .voice-talk-btn {
+            background: var(--lux-gold-grad, linear-gradient(135deg, #e9cd76 0%, #D4AF37 45%, #b08c2c 100%));
+            color: #2a1a05;
+            box-shadow: 0 6px 18px rgba(212, 175, 55, 0.35);
+          }
+          .voice-talk-btn[hidden] { display: none !important; }
+          #voiceScreen {
+            position: fixed; inset: 0; z-index: 1300;
+            display: flex; flex-direction: column;
+            padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom, 0px) + 18px);
+            background: radial-gradient(ellipse at 50% 30%, #2b2012 0%, #14110b 55%, #0a0907 100%);
+            color: #f6f0e3; text-align: center; overflow: hidden;
+            -webkit-user-select: none; user-select: none;
+          }
+          #voiceScreen[hidden], #voiceScreen.is-minimised { display: none; }
+          .voice-top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+          .voice-timer { font-variant-numeric: tabular-nums; font-size: 0.9rem; letter-spacing: 0.08em; color: rgba(246, 240, 227, 0.55); }
+          .voice-x {
+            width: 44px; height: 44px; border-radius: 50%; font-size: 1.1rem;
+            border: 1px solid rgba(246, 240, 227, 0.18); background: rgba(255, 255, 255, 0.04); color: rgba(246, 240, 227, 0.85);
+          }
+          .voice-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+          .voice-orb-wrap { position: relative; width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; }
+          .voice-orb {
+            width: 150px; height: 150px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #fbe9a6 0%, #e6c46a 30%, #c59a35 62%, #8a6a1e 100%);
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.45), 0 0 120px rgba(212, 175, 55, 0.18), inset 0 -14px 30px rgba(0, 0, 0, 0.25);
+            transform: scale(calc(1 + var(--lvl, 0) * 0.32));
+            transition: transform 0.08s linear, opacity 0.4s ease, filter 0.4s ease;
+            will-change: transform;
+          }
+          .voice-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(233, 205, 118, 0.55); opacity: 0; pointer-events: none; }
+          #voiceScreen.is-connecting .voice-orb { opacity: 0.45; filter: saturate(0.5); animation: voiceDim 1.6s ease-in-out infinite; }
+          #voiceScreen.is-listening .voice-orb { animation: voiceBreathe 3.2s ease-in-out infinite; }
+          #voiceScreen.is-speaking .voice-ring { animation: voiceRipple 1.8s ease-out infinite; }
+          #voiceScreen.is-speaking .voice-ring-2 { animation-delay: 0.6s; }
+          #voiceScreen.is-speaking .voice-ring-3 { animation-delay: 1.2s; }
+          #voiceScreen.is-muted .voice-orb { opacity: 0.55; filter: grayscale(0.6); animation: none; }
+          @keyframes voiceBreathe {
+            0%, 100% { box-shadow: 0 0 40px rgba(212, 175, 55, 0.45), 0 0 120px rgba(212, 175, 55, 0.18), inset 0 -14px 30px rgba(0, 0, 0, 0.25); }
+            50% { box-shadow: 0 0 60px rgba(212, 175, 55, 0.65), 0 0 160px rgba(212, 175, 55, 0.28), inset 0 -14px 30px rgba(0, 0, 0, 0.25); }
+          }
+          @keyframes voiceRipple { 0% { transform: scale(0.75); opacity: 0.8; } 100% { transform: scale(1.35); opacity: 0; } }
+          @keyframes voiceDim { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.6; } }
+          .voice-status { font-family: var(--lux-serif, Georgia, serif); font-size: 1.35rem; letter-spacing: 0.02em; color: #f0d98c; min-height: 1.8rem; }
+          .voice-captions { width: 100%; max-width: 420px; min-height: 96px; display: flex; flex-direction: column; gap: 10px; }
+          .voice-cap { font-size: 0.98rem; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+          .voice-cap-guest { color: rgba(246, 240, 227, 0.55); font-style: italic; }
+          .voice-cap-ai { color: #f6f0e3; }
+          .voice-controls { display: flex; justify-content: center; gap: 14px; padding-top: 8px; }
+          .voice-ctl {
+            display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; padding: 10px 4px; border-radius: 18px;
+            border: 1px solid rgba(246, 240, 227, 0.14); background: rgba(255, 255, 255, 0.05); color: #f6f0e3; font-size: 0.72rem; letter-spacing: 0.04em;
+          }
+          .voice-ctl i { font-size: 1.25rem; color: #f0d98c; }
+          .voice-ctl.is-on { background: rgba(212, 175, 55, 0.22); border-color: rgba(212, 175, 55, 0.6); }
+          .voice-ctl-end { background: rgba(190, 40, 40, 0.28); border-color: rgba(255, 110, 110, 0.35); }
+          .voice-ctl-end i { color: #ff8a8a; }
+          .voice-foot { margin-top: 14px; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(246, 240, 227, 0.35); }
+          #voicePill {
+            position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); z-index: 10001;
+            display: flex; align-items: center; gap: 10px; padding: 12px 20px; border: 0; border-radius: 999px; white-space: nowrap;
+            background: var(--lux-gold-grad, linear-gradient(135deg, #e9cd76 0%, #D4AF37 45%, #b08c2c 100%)); color: #2a1a05; font-weight: 700; font-size: 0.9rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+          }
+          #voicePill[hidden] { display: none; }
+          .voice-pill-dot { width: 10px; height: 10px; border-radius: 50%; background: #1f7a3a; animation: voicePillPulse 1.6s infinite; }
+          @keyframes voicePillPulse { 0% { box-shadow: 0 0 0 0 rgba(31, 122, 58, 0.55); } 100% { box-shadow: 0 0 0 10px rgba(31, 122, 58, 0); } }
+          @media (max-height: 640px) {
+            .voice-orb-wrap { width: 150px; height: 150px; }
+            .voice-orb { width: 112px; height: 112px; }
+            .voice-captions { min-height: 72px; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .voice-orb, .voice-ring, .voice-pill-dot { animation: none !important; transition: none !important; }
+            .voice-orb { transform: none !important; }
+            #voiceScreen.is-speaking .voice-ring { opacity: 0.5; transform: scale(1.1); }
+          }
+        </style>
+
         <!-- AI Chatbot Widget -->
         <div id="chatbotWidget" style="display: none;">
           <!-- Chat Button -->
@@ -33218,8 +33293,8 @@ window.luxTogglePassForm = function() {
             <div class="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
               <div class="flex gap-2">
                 <input type="text" id="chatInput" placeholder="Ask me anything, in any language…" style="font-size: 16px;" class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
-                <button id="callServiceBtn" class="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center hover:scale-105 transition shadow-lg" title="Call Service">
-                  <i class="fas fa-phone text-lg"></i>
+                <button id="talkBtn" class="voice-talk-btn w-12 h-12 rounded-full flex items-center justify-center hover:scale-105 transition shadow-lg" title="Talk to the concierge" aria-label="Talk" hidden>
+                  <i class="fas fa-microphone text-lg"></i>
                 </button>
                 <button id="sendChatBtn" class="w-12 h-12 rounded-full text-white flex items-center justify-center hover:scale-105 transition" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                   <i class="fas fa-paper-plane"></i>
@@ -33230,6 +33305,34 @@ window.luxTogglePassForm = function() {
               </p>
             </div>
           </div>
+
+          <!-- Voice concierge: full-screen call above the chat and its sheets -->
+          <div id="voiceScreen" hidden>
+            <div class="voice-top">
+              <span class="voice-timer" id="voiceTimer">0:00</span>
+              <button type="button" class="voice-x" id="voiceCloseBtn" aria-label="End"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="voice-stage">
+              <div class="voice-orb-wrap">
+                <div class="voice-ring"></div>
+                <div class="voice-ring voice-ring-2"></div>
+                <div class="voice-ring voice-ring-3"></div>
+                <div class="voice-orb" id="voiceOrb"></div>
+              </div>
+              <div class="voice-status" id="voiceStatus">Connecting…</div>
+              <div class="voice-captions">
+                <div class="voice-cap voice-cap-guest" id="voiceCapGuest"></div>
+                <div class="voice-cap voice-cap-ai" id="voiceCapAi"></div>
+              </div>
+            </div>
+            <div class="voice-controls">
+              <button type="button" class="voice-ctl" id="voiceMuteBtn"><i class="fas fa-microphone"></i><span>Mute</span></button>
+              <button type="button" class="voice-ctl" id="voiceTypeBtn"><i class="fas fa-keyboard"></i><span>Type instead</span></button>
+              <button type="button" class="voice-ctl voice-ctl-end" id="voiceEndBtn"><i class="fas fa-phone-slash"></i><span>End</span></button>
+            </div>
+            <div class="voice-foot" id="voiceFoot">Powered by AI · 35+ languages</div>
+          </div>
+          <button type="button" id="voicePill" hidden><span class="voice-pill-dot"></span><span id="voicePillLabel">Talking — tap to return</span></button>
         </div>
         
         <script>
@@ -33241,10 +33344,7 @@ window.luxTogglePassForm = function() {
           const chatMessages = document.getElementById('chatMessages');
           const chatInput = document.getElementById('chatInput');
           const sendChatBtn = document.getElementById('sendChatBtn');
-          const callServiceBtn = document.getElementById('callServiceBtn');
-          // May not exist on this page — declared so references never throw (this
-          // ReferenceError used to abort initChatbot before the greeting was added)
-          const voiceInputBtn = document.getElementById('voiceInputBtn');
+          const talkBtn = document.getElementById('talkBtn');
 
           // Localized label on the chat button (kept dead-simple for guests)
           (function() {
@@ -33300,320 +33400,6 @@ window.luxTogglePassForm = function() {
           let chatConversationId = null;
           let chatSessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
           
-          // Voice capabilities - Using OpenAI Whisper + TTS
-          let isRecording = false;
-          let isSpeaking = false;
-          let mediaRecorder = null;
-          let audioChunks = [];
-          let detectedLanguage = 'en';
-          let recordingStartTime = 0;
-          
-          // Start recording audio using MediaRecorder with auto-stop on silence
-          async function startRecording() {
-            try {
-              // Request high-quality audio with better settings for Arabic speech recognition
-              const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                  sampleRate: 48000 // Higher sample rate for better Arabic phoneme capture
-                }
-              });
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const source = audioContext.createMediaStreamSource(stream);
-              const analyser = audioContext.createAnalyser();
-              analyser.fftSize = 2048;
-              source.connect(analyser);
-              
-              const bufferLength = analyser.frequencyBinCount;
-              const dataArray = new Uint8Array(bufferLength);
-              
-              // Use better audio quality for Whisper
-              const options = {
-                mimeType: 'audio/webm;codecs=opus',
-                audioBitsPerSecond: 128000 // Higher quality for better transcription
-              };
-              
-              // Fallback if opus not supported
-              if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options.mimeType = 'audio/webm';
-              }
-              
-              mediaRecorder = new MediaRecorder(stream, options);
-              audioChunks = [];
-              
-              console.log('🎤 Recording with:', options.mimeType, 'at', options.audioBitsPerSecond, 'bps');
-              
-              let silenceStart = null;
-              const silenceThreshold = 10; // Lower = more sensitive to silence (was 20)
-              const silenceDuration = 1000; // Stop after 1s of silence (was 1500ms)
-              let hasSpoken = false;
-              recordingStartTime = Date.now(); // Set outer scope variable
-              const minRecordingDuration = 500; // Minimum 500ms (was 800ms)
-              const maxRecordingDuration = 10000; // Maximum 10s to prevent infinite recording
-              
-              // Monitor audio level for silence detection
-              function checkAudioLevel() {
-                if (!isRecording) return;
-                
-                analyser.getByteTimeDomainData(dataArray);
-                
-                // Calculate volume
-                let sum = 0;
-                for (let i = 0; i < bufferLength; i++) {
-                  const value = Math.abs(dataArray[i] - 128);
-                  sum += value;
-                }
-                const average = sum / bufferLength;
-                
-                // Force stop after max duration
-                if (Date.now() - recordingStartTime > maxRecordingDuration) {
-                  console.log('⏱️ Max recording duration reached');
-                  stopRecording();
-                  return;
-                }
-                
-                // Detect speech vs silence
-                if (average > silenceThreshold) {
-                  hasSpoken = true;
-                  silenceStart = null;
-                } else if (hasSpoken) {
-                  // User has spoken, now checking for silence
-                  if (!silenceStart) {
-                    silenceStart = Date.now();
-                  } else if (Date.now() - silenceStart > silenceDuration) {
-                    // Only auto-stop if minimum duration has passed
-                    if (Date.now() - recordingStartTime >= minRecordingDuration) {
-                      console.log('🔇 Auto-stop: Silence detected');
-                      stopRecording();
-                      return;
-                    }
-                  }
-                }
-                
-                requestAnimationFrame(checkAudioLevel);
-              }
-              
-              mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
-              };
-              
-              mediaRecorder.onstop = async () => {
-                console.log('📼 MediaRecorder stopped, processing audio...');
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                
-                // Clean up media stream first
-                stream.getTracks().forEach(track => track.stop());
-                
-                // Close audio context
-                try {
-                  await audioContext.close();
-                } catch (e) {
-                  console.warn('AudioContext close error:', e);
-                }
-                
-                // Transcribe audio
-                await transcribeAudio(audioBlob);
-              };
-              
-              mediaRecorder.start();
-              isRecording = true;
-              voiceInputBtn.innerHTML = '<i class="fas fa-stop-circle" style="color: #ef4444;"></i>';
-              voiceInputBtn.title = 'Click to stop recording OR wait for auto-stop after silence';
-              voiceInputBtn.style.background = 'rgba(239, 68, 68, 0.2)';
-              chatInput.placeholder = '🎤 Recording... Click mic to stop OR it will auto-stop after 1s of silence';
-              
-              // Start monitoring audio level
-              checkAudioLevel();
-            } catch (error) {
-              console.error('Microphone error:', error);
-              addMessage('⚠️ Microphone access denied. Please allow microphone access in your browser settings.', 'assistant');
-              resetVoiceButton();
-            }
-          }
-          
-          // Stop recording
-          function stopRecording() {
-            if (mediaRecorder && isRecording) {
-              const recordingDuration = Date.now() - recordingStartTime;
-              console.log('🎤 Recording stopped. Duration:', recordingDuration, 'ms');
-              
-              // Set flag immediately to prevent double-stop
-              isRecording = false;
-              
-              // Update UI immediately
-              const primaryColor = window.chatbotPrimaryColor || '#667eea';
-              voiceInputBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-              voiceInputBtn.title = 'Processing...';
-              voiceInputBtn.disabled = true; // Disable button during processing
-              chatInput.placeholder = '⏳ Processing audio...';
-              
-              // Stop the recorder
-              try {
-                mediaRecorder.stop();
-              } catch (e) {
-                console.error('Error stopping recorder:', e);
-                resetVoiceButton();
-              }
-            }
-          }
-          
-          // Reset voice button to initial state
-          function resetVoiceButton() {
-            isRecording = false;
-            const primaryColor = window.chatbotPrimaryColor || '#667eea';
-            voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-            voiceInputBtn.title = 'Voice Input';
-            voiceInputBtn.disabled = false;
-            voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
-            chatInput.placeholder = window.chatPlaceholder || 'Ask me anything, in any language…';
-          }
-          
-          // Transcribe audio using OpenAI Whisper
-          async function transcribeAudio(audioBlob) {
-            try {
-              const formData = new FormData();
-              formData.append('audio', audioBlob, 'recording.webm');
-              
-              console.log('📤 Sending audio to transcribe API, size:', audioBlob.size, 'bytes');
-              
-              const response = await fetch('/api/voice/transcribe', {
-                method: 'POST',
-                body: formData
-              });
-              
-              const data = await response.json();
-              console.log('📥 Transcribe response:', data);
-              
-              if (data.success) {
-                chatInput.value = data.text;
-                detectedLanguage = data.language || 'en';
-                console.log('✅ Transcribed:', data.text, '| Language:', detectedLanguage, '| Audio size:', audioBlob.size);
-                chatInput.focus();
-                
-                // Auto-send quickly for seamless experience (500ms instead of 1500ms)
-                setTimeout(() => {
-                  if (chatInput.value.trim() === data.text.trim()) {
-                    console.log('📤 Auto-sending message... (language detection disabled for voice)');
-                    sendMessage(true, 'en'); // Always use 'en' for voice - AI will detect language from message content
-                  }
-                }, 500);
-              } else {
-                addMessage('❌ Failed to transcribe audio. Please try again.', 'assistant');
-              }
-            } catch (error) {
-              console.error('Transcription error:', error);
-              addMessage('❌ Failed to transcribe audio. Please try again.', 'assistant');
-            } finally {
-              // resetVoiceButton() already called above, handles all UI reset
-            }
-          }
-          
-          // Call service button handler - opens At Your Service modal
-          if (callServiceBtn) {
-            callServiceBtn.addEventListener('click', () => {
-              console.log('📞 Call button clicked from chat!');
-              // Close chat window
-              if (chatbotWidget) {
-                chatbotWidget.classList.add('hidden');
-              }
-              // Open service modal
-              if (window.openServiceMenu) {
-                window.openServiceMenu();
-              } else {
-                console.error('❌ openServiceMenu function not found!');
-                alert('Service menu is not available. Please try again.');
-              }
-            });
-          }
-          
-          // Text-to-speech using OpenAI TTS (natural AI voices)
-          let currentAudio = null;
-          
-          async function speakText(text, button, language = 'en') {
-            // If already speaking, stop it
-            if (currentAudio) {
-              currentAudio.pause();
-              currentAudio = null;
-              isSpeaking = false;
-              if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
-              return;
-            }
-            
-            try {
-              if (button) button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-              
-              console.log('🔊 Requesting TTS for:', text.substring(0, 50), 'Language:', language);
-              
-              // Call OpenAI TTS API
-              const response = await fetch('/api/voice/synthesize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text, language })
-              });
-              
-              if (!response.ok) {
-                console.error('TTS API failed:', response.status, response.statusText);
-                throw new Error('TTS failed: ' + response.statusText);
-              }
-              
-              const audioBlob = await response.blob();
-              console.log('✅ Received audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
-              
-              const audioUrl = URL.createObjectURL(audioBlob);
-              
-              currentAudio = new Audio(audioUrl);
-              
-              // Critical: Set volume and preload
-              currentAudio.volume = 1.0;
-              currentAudio.preload = 'auto';
-              
-              currentAudio.onloadeddata = () => {
-                console.log('✅ Audio loaded, duration:', currentAudio.duration);
-              };
-              
-              currentAudio.onplay = () => {
-                console.log('▶️ Audio playing');
-                isSpeaking = true;
-                if (button) button.innerHTML = '<i class="fas fa-stop-circle"></i>';
-              };
-              
-              currentAudio.onended = () => {
-                console.log('⏹️ Audio ended');
-                isSpeaking = false;
-                currentAudio = null;
-                if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
-                URL.revokeObjectURL(audioUrl);
-              };
-              
-              currentAudio.onerror = (e) => {
-                console.error('❌ Audio playback error:', e);
-                isSpeaking = false;
-                currentAudio = null;
-                if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
-                URL.revokeObjectURL(audioUrl);
-                addMessage('⚠️ Audio playback failed. Click the speaker icon to try again.', 'assistant');
-              };
-              
-              // Try to play - handle autoplay restrictions
-              try {
-                await currentAudio.play();
-                console.log('✅ Audio.play() succeeded');
-              } catch (playError) {
-                console.error('❌ Audio.play() failed:', playError);
-                // Show message to user
-                if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
-                addMessage('🔊 Click the speaker icon to hear the response (browser blocked autoplay).', 'assistant');
-              }
-            } catch (error) {
-              console.error('❌ TTS error:', error);
-              isSpeaking = false;
-              if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
-              addMessage('⚠️ Voice synthesis failed: ' + error.message, 'assistant');
-            }
-          }
-          
           // Chat chrome in the guest's chosen language: greeting, placeholder,
           // tagline and footer. English is used as-is; other languages go
           // through the cached translator once, then are instant.
@@ -33654,7 +33440,7 @@ window.luxTogglePassForm = function() {
             // arrived — swap the greeting in place while it's the only message.
             if (chatMessages.children.length === 1) {
               var g = chatMessages.querySelector('[data-message-id="greeting"]');
-              if (g) { g.remove(); addMessage(out[0], 'assistant', false, 'en', 'greeting'); }
+              if (g) { g.remove(); addMessage(out[0], 'assistant', 'greeting'); }
             }
             window.chatPlaceholder = out[1];
             if (chatInput) chatInput.placeholder = out[1];
@@ -33687,9 +33473,13 @@ window.luxTogglePassForm = function() {
                   if (sendBtn) {
                     sendBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
                   }
-                  if (voiceInputBtn) {
-                    voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
+                  // Voice needs a mic + WebRTC; the admin switch (when the settings
+                  // carry it) and a voice_disabled answer from /api/voice/start hide it too
+                  if (talkBtn) {
+                    const voiceOff = data.settings.voice_enabled !== undefined && String(data.settings.voice_enabled) === '0';
+                    talkBtn.hidden = voiceOff || !voiceSupported();
                   }
+                  applyVoiceLabels();
                   
                   // Store color for message bubbles
                   window.chatbotPrimaryColor = primaryColor;
@@ -33699,11 +33489,16 @@ window.luxTogglePassForm = function() {
                   window.chatbotGreetingText = greeting;
                   await localizeChatChrome(greeting);
                   if (chatMessages.children.length === 0) {
-                    addMessage(window.chatbotGreetingText || greeting, 'assistant', false, 'en', 'greeting');
+                    addMessage(window.chatbotGreetingText || greeting, 'assistant', 'greeting');
                   }
                 }
               } catch (error) {
                 console.error('Chatbot init error:', error);
+              }
+              // The hero "At Your Service" chip opens this chat — no chat, no chip
+              if (chatbotWidget.style.display !== 'block') {
+                const serviceChip = document.getElementById('serviceButton');
+                if (serviceChip) serviceChip.style.display = 'none';
               }
             }
             
@@ -33727,7 +33522,7 @@ window.luxTogglePassForm = function() {
                 if (window.luxTrack) luxTrack('chat_open');
                 // Never show an empty chat — greet if nothing is there yet
                 if (chatMessages.children.length === 0) {
-                  addMessage(window.chatbotGreetingText || 'Hi! How can I help you today?', 'assistant', false, 'en', 'greeting');
+                  addMessage(window.chatbotGreetingText || 'Hi! How can I help you today?', 'assistant', 'greeting');
                 }
                 if (window.innerWidth < 768) {
                   // Fit the visible screen; don't pop the keyboard until the guest taps the field
@@ -33800,7 +33595,7 @@ window.luxTogglePassForm = function() {
               navigateFromChat(a.getAttribute('data-app') || '');
             });
             
-            function addMessage(text, role, autoSpeak = false, language = 'en', messageId = null) {
+            function addMessage(text, role, messageId = null) {
               const messageDiv = document.createElement('div');
               messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
               if (messageId) messageDiv.dataset.messageId = messageId;
@@ -33826,46 +33621,6 @@ window.luxTogglePassForm = function() {
                 // Bot messages can have markdown links
                 const htmlContent = parseMarkdownLinks(text);
                 bubble.innerHTML = htmlContent.replace(/\\n/g, '<br>'); // Preserve line breaks
-                
-                // Add speaker button for bot messages - using OpenAI TTS
-                const speakerBtn = document.createElement('button');
-                speakerBtn.className = 'ml-2 text-gray-500 hover:text-purple-600 transition text-sm';
-                speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                speakerBtn.title = 'Listen with AI voice (natural sound)';
-                speakerBtn.onclick = function() {
-                  // Remove markdown links for speech (extract only text)
-                  const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
-                  speakText(cleanText, speakerBtn, language);
-                };
-                bubble.appendChild(speakerBtn);
-                
-                // Auto-speak if voice input was used
-                if (autoSpeak) {
-                  const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
-                  // IMMEDIATE call - try to preserve gesture, but mobile may still block
-                  speakText(cleanText, speakerBtn, language).catch(err => {
-                    console.warn('Auto-play blocked on mobile:', err);
-                    // Show visual prompt to click speaker button
-                    speakerBtn.classList.add('animate-pulse');
-                    speakerBtn.style.color = '#ef4444';
-                    speakerBtn.style.fontSize = '1.2rem';
-                    speakerBtn.title = '🔊 Click to hear response!';
-                    
-                    // Add a small notification bubble
-                    const notification = document.createElement('span');
-                    notification.className = 'text-xs text-red-500 ml-1 animate-pulse';
-                    notification.textContent = '👆 Tap to hear';
-                    speakerBtn.parentElement?.appendChild(notification);
-                    
-                    // Remove notification after click
-                    speakerBtn.addEventListener('click', () => {
-                      notification.remove();
-                      speakerBtn.classList.remove('animate-pulse');
-                      speakerBtn.style.color = '';
-                      speakerBtn.style.fontSize = '';
-                    }, { once: true });
-                  });
-                }
               }
               
               messageDiv.appendChild(bubble);
@@ -33892,9 +33647,9 @@ window.luxTogglePassForm = function() {
                     
                     // Add message based on role
                     if (msg.role === 'admin') {
-                      addMessage(msg.content, 'admin', false, 'en', msg.message_id);
+                      addMessage(msg.content, 'admin', msg.message_id);
                     } else if (msg.role === 'system') {
-                      addMessage(msg.content, 'assistant', false, 'en', msg.message_id);
+                      addMessage(msg.content, 'assistant', msg.message_id);
                     }
                     
                     // Update last message ID
@@ -33921,16 +33676,78 @@ window.luxTogglePassForm = function() {
               }
             }
             
+            // Name, room and tier benefits from a linked pass — context for the AI
+            function buildGuestContext() {
+              const guestSession = getGuestSession()
+              console.log('👤 Guest session from localStorage:', guestSession)
+              let guest_context = null
+
+              // Get tier benefits from variable or localStorage
+              let benefitsData = tierBenefitsData
+              if (!benefitsData) {
+                const stored = localStorage.getItem('tierBenefitsData')
+                if (stored) {
+                  try {
+                    benefitsData = JSON.parse(stored)
+                    console.log('📦 Loaded tier benefits from localStorage')
+                  } catch (e) {
+                    console.error('Failed to parse stored tier benefits:', e)
+                  }
+                }
+              }
+
+              console.log('🔍 Chatbot Context Check:', {
+                hasGuestSession: !!guestSession,
+                hasBenefitsData: !!benefitsData,
+                guestName: guestSession?.full_name,
+                tierName: benefitsData?.tier?.name
+              })
+
+              if (guestSession && benefitsData) {
+                // Build benefits summary
+                const benefitsSummary = []
+                const categories = ['dining', 'drinks', 'recreation', 'services', 'amenities']
+
+                categories.forEach(cat => {
+                  const benefits = benefitsData.benefits[cat] || []
+                  if (benefits.length > 0) {
+                    benefitsSummary.push(cat.toUpperCase() + ':')
+                    benefits.forEach(b => {
+                      const name = b.display_name || b.venue_name || b.benefit_type || ''
+                      const access = b.access_level || 'unlimited'
+                      benefitsSummary.push('  - ' + name + ' (' + access + ')')
+                    })
+                  }
+                })
+
+                guest_context = {
+                  guest_name: guestSession.full_name,
+                  room_number: guestSession.room_number,
+                  tier_name: benefitsData.tier.name,
+                  tier_color: benefitsData.tier.color,
+                  benefits_summary: benefitsSummary.join('\\n')
+                }
+
+                console.log('✅ Guest context built:', guest_context)
+              } else {
+                console.log('⚠️ No guest context available - missing:', {
+                  guestSession: !guestSession,
+                  benefitsData: !benefitsData
+                })
+              }
+              return guest_context
+            }
+
             // Send message
-            async function sendMessage(fromVoiceInput = false, language = 'en') {
+            async function sendMessage() {
               const message = chatInput.value.trim();
               if (!message) return;
-              
+
               // Add user message
               addMessage(message, 'user');
               chatInput.value = '';
               chatInput.placeholder = window.chatPlaceholder || 'Ask me anything, in any language…';
-              
+
               // Show typing indicator
               const typingDiv = document.createElement('div');
               typingDiv.id = 'typing';
@@ -33938,67 +33755,10 @@ window.luxTogglePassForm = function() {
               typingDiv.innerHTML = '<div class="bg-white border border-gray-200 px-4 py-2 rounded-2xl rounded-tl-none"><i class="fas fa-ellipsis-h animate-pulse"></i></div>';
               chatMessages.appendChild(typingDiv);
               chatMessages.scrollTop = chatMessages.scrollHeight;
-              
+
               try {
-                // Get guest session data for context
-                const guestSession = getGuestSession()
-                console.log('👤 Guest session from localStorage:', guestSession)
-                let guest_context = null
-                
-                // Get tier benefits from variable or localStorage
-                let benefitsData = tierBenefitsData
-                if (!benefitsData) {
-                  const stored = localStorage.getItem('tierBenefitsData')
-                  if (stored) {
-                    try {
-                      benefitsData = JSON.parse(stored)
-                      console.log('📦 Loaded tier benefits from localStorage')
-                    } catch (e) {
-                      console.error('Failed to parse stored tier benefits:', e)
-                    }
-                  }
-                }
-                
-                console.log('🔍 Chatbot Context Check:', {
-                  hasGuestSession: !!guestSession,
-                  hasBenefitsData: !!benefitsData,
-                  guestName: guestSession?.full_name,
-                  tierName: benefitsData?.tier?.name
-                })
-                
-                if (guestSession && benefitsData) {
-                  // Build benefits summary
-                  const benefitsSummary = []
-                  const categories = ['dining', 'drinks', 'recreation', 'services', 'amenities']
-                  
-                  categories.forEach(cat => {
-                    const benefits = benefitsData.benefits[cat] || []
-                    if (benefits.length > 0) {
-                      benefitsSummary.push(cat.toUpperCase() + ':')
-                      benefits.forEach(b => {
-                        const name = b.display_name || b.venue_name || b.benefit_type || ''
-                        const access = b.access_level || 'unlimited'
-                        benefitsSummary.push('  - ' + name + ' (' + access + ')')
-                      })
-                    }
-                  })
-                  
-                  guest_context = {
-                    guest_name: guestSession.full_name,
-                    room_number: guestSession.room_number,
-                    tier_name: benefitsData.tier.name,
-                    tier_color: benefitsData.tier.color,
-                    benefits_summary: benefitsSummary.join('\\n')
-                  }
-                  
-                  console.log('✅ Guest context built:', guest_context)
-                } else {
-                  console.log('⚠️ No guest context available - missing:', {
-                    guestSession: !guestSession,
-                    benefitsData: !benefitsData
-                  })
-                }
-                
+                const guest_context = buildGuestContext()
+
                 const requestBody = {
                   property_id: window.propertyData.property_id,
                   session_id: chatSessionId,
@@ -34007,28 +33767,28 @@ window.luxTogglePassForm = function() {
                   guest_context: guest_context,
                   site_lang: (window.currentLanguage || 'en')
                 }
-                
+
                 console.log('📤 Sending to API:', {
                   has_guest_context: !!guest_context,
                   guest_name: guest_context?.guest_name,
                   tier_name: guest_context?.tier_name,
                   full_context: guest_context  // Log full object
                 })
-                
+
                 const response = await fetch('/api/chatbot/chat', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(requestBody)
                 });
-                
+
                 const data = await response.json();
-                
+
                 // Remove typing indicator
                 document.getElementById('typing')?.remove();
-                
+
                 if (data.success) {
                   chatConversationId = data.conversation_id;
-                  
+
                   // Track message IDs to prevent duplicates
                   if (data.user_message_id && data.user_message_id > lastMessageId) {
                     lastMessageId = data.user_message_id;
@@ -34036,26 +33796,488 @@ window.luxTogglePassForm = function() {
                   if (data.assistant_message_id && data.assistant_message_id > lastMessageId) {
                     lastMessageId = data.assistant_message_id;
                   }
-                  
-                  addMessage(data.response, 'assistant', fromVoiceInput, language);
+
+                  addMessage(data.response, 'assistant');
                 } else if (response.status === 429) {
-                  addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant', fromVoiceInput, language);
+                  addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant');
                 } else {
-                  addMessage('Sorry, I encountered an error. Please try again.', 'assistant', fromVoiceInput, language);
+                  addMessage('Sorry, I encountered an error. Please try again.', 'assistant');
                 }
               } catch (error) {
                 console.error('Chat error:', error);
                 document.getElementById('typing')?.remove();
-                addMessage('Sorry, I am unable to respond right now. Please try again later.', 'assistant', fromVoiceInput, language);
+                addMessage('Sorry, I am unable to respond right now. Please try again later.', 'assistant');
               }
             }
             
-          sendChatBtn.addEventListener('click', sendMessage);
+          sendChatBtn.addEventListener('click', () => sendMessage());
           chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
               sendMessage();
             }
           });
+
+          // ── Voice concierge ──────────────────────────────────────────────────
+          // Live speech-to-speech: /api/voice/start mints a short-lived OpenAI
+          // client secret whose session already carries the concierge brain, the
+          // phone then talks to OpenAI directly over WebRTC, and every spoken turn
+          // is posted back (/api/voice/event) so staff see it in the same
+          // conversation. The transport is injectable so the event handling can
+          // be exercised without a real call (window.voiceConcierge.transportFactory).
+          const VOICE_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
+          // Realtime errors that do not mean the call is broken
+          const VOICE_BENIGN_ERRORS = ['conversation_already_has_active_response', 'response_cancel_not_active', 'input_audio_buffer_commit_empty'];
+          const VOICE_LANG_NAMES = { en: 'English', ar: 'Egyptian Arabic', de: 'German', ru: 'Russian', uk: 'Ukrainian', pl: 'Polish', cs: 'Czech', it: 'Italian', fr: 'French', es: 'Spanish' };
+          // Fallback allow-list when /start sends no nav catalogue (mirrors navigateFromChat)
+          const VOICE_NAV_KINDS = ['room-service', 'section', 'offering', 'beach', 'map', 'info', 'feedback', 'activity', 'home'];
+          const voiceUi = {
+            screen: document.getElementById('voiceScreen'),
+            status: document.getElementById('voiceStatus'),
+            capGuest: document.getElementById('voiceCapGuest'),
+            capAi: document.getElementById('voiceCapAi'),
+            timer: document.getElementById('voiceTimer'),
+            orb: document.getElementById('voiceOrb'),
+            mute: document.getElementById('voiceMuteBtn'),
+            type: document.getElementById('voiceTypeBtn'),
+            end: document.getElementById('voiceEndBtn'),
+            close: document.getElementById('voiceCloseBtn'),
+            pill: document.getElementById('voicePill'),
+            pillLabel: document.getElementById('voicePillLabel'),
+            foot: document.getElementById('voiceFoot')
+          };
+          let vc = null; // the active call; null when idle
+
+          function vT(s) { return (typeof luxT === 'function') ? luxT(s) : s; }
+          function voiceSupported() {
+            return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.RTCPeerConnection && window.MediaStream);
+          }
+          function fmtVoiceTime(seconds) {
+            var s = Math.max(0, Math.floor(seconds));
+            return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+          }
+          // Labels follow the guest's language once the shared dictionary (luxT) is filled
+          function applyVoiceLabels() {
+            if (talkBtn) { talkBtn.title = vT('Talk to the concierge'); talkBtn.setAttribute('aria-label', vT('Talk')); }
+            voiceUi.mute.querySelector('span').textContent = vT(vc && vc.muted ? 'Unmute' : 'Mute');
+            voiceUi.type.querySelector('span').textContent = vT('Type instead');
+            voiceUi.end.querySelector('span').textContent = vT('End');
+            voiceUi.close.setAttribute('aria-label', vT('End'));
+            voiceUi.foot.textContent = vT('Powered by AI · 35+ languages');
+            voiceUi.pillLabel.textContent = vT('Talking — tap to return');
+          }
+          function ensureChatOpen() {
+            if (chatWindow.classList.contains('hidden')) chatButton.click();
+          }
+          function addChatNote(text) {
+            var n = document.createElement('div');
+            n.className = 'text-center text-xs text-gray-500 py-1';
+            n.textContent = text;
+            chatMessages.appendChild(n);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
+
+          // WebRTC layer: mic track out; remote audio and the 'oai-events' data channel in
+          function voiceWebRtcTransport() {
+            var pc = null, dc = null;
+            return {
+              connect: async function (o) {
+                pc = new RTCPeerConnection();
+                o.stream.getAudioTracks().forEach(function (t) { pc.addTrack(t, o.stream); });
+                pc.ontrack = function (e) { o.onTrack((e.streams && e.streams[0]) || new MediaStream([e.track])); };
+                pc.onconnectionstatechange = function () {
+                  if (pc && (pc.connectionState === 'failed' || pc.connectionState === 'closed')) o.onClose();
+                };
+                dc = pc.createDataChannel('oai-events');
+                dc.onopen = function () { o.onOpen(); };
+                dc.onclose = function () { o.onClose(); };
+                dc.onmessage = function (e) {
+                  var ev = null;
+                  try { ev = JSON.parse(e.data); } catch (x) { return; }
+                  if (ev && ev.type) o.onEvent(ev);
+                };
+                var offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                var r = await fetch(VOICE_REALTIME_CALLS_URL, {
+                  method: 'POST',
+                  headers: { 'Authorization': 'Bearer ' + o.secret, 'Content-Type': 'application/sdp' },
+                  body: offer.sdp
+                });
+                if (!r.ok) throw new Error('realtime calls HTTP ' + r.status);
+                await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+              },
+              send: function (ev) {
+                if (!dc || dc.readyState !== 'open') return false;
+                dc.send(JSON.stringify(ev));
+                return true;
+              },
+              close: function () {
+                if (dc) { dc.onclose = null; dc.onmessage = null; try { dc.close(); } catch (e) {} }
+                if (pc) { pc.onconnectionstatechange = null; pc.ontrack = null; try { pc.close(); } catch (e) {} }
+                dc = null; pc = null;
+              }
+            };
+          }
+
+          function setVoiceState(state) {
+            if (!vc) return;
+            vc.state = state;
+            voiceUi.screen.classList.toggle('is-connecting', state === 'connecting');
+            voiceUi.screen.classList.toggle('is-listening', state === 'listening');
+            voiceUi.screen.classList.toggle('is-speaking', state === 'speaking');
+            var label = state === 'connecting' ? 'Connecting…' : state === 'speaking' ? 'Speaking…' : (vc.muted ? 'Paused' : 'Listening…');
+            voiceUi.status.textContent = vT(label);
+          }
+          function resetVoiceIdle(call) {
+            clearTimeout(call.timers.idle);
+            var secs = Math.max(15, Number(call.session && call.session.idle_seconds) || 45);
+            call.timers.idle = setTimeout(function () { endVoiceCall('idle'); }, secs * 1000);
+          }
+          // Mic level drives the orb's breathing while the guest is being heard
+          function startVoiceLevelMeter(call) {
+            if (!call.audioCtx || !call.stream) return;
+            try {
+              var an = call.audioCtx.createAnalyser();
+              an.fftSize = 512;
+              an.smoothingTimeConstant = 0.6;
+              call.audioCtx.createMediaStreamSource(call.stream).connect(an);
+              var buf = new Uint8Array(an.fftSize);
+              var tick = function () {
+                if (vc !== call) return;
+                var lvl = 0;
+                if (call.state === 'listening' && !call.muted) {
+                  an.getByteTimeDomainData(buf);
+                  var sum = 0;
+                  for (var i = 0; i < buf.length; i++) { var d = (buf[i] - 128) / 128; sum += d * d; }
+                  lvl = Math.min(1, Math.sqrt(sum / buf.length) * 4);
+                }
+                voiceUi.orb.style.setProperty('--lvl', lvl.toFixed(3));
+                call.levelRaf = requestAnimationFrame(tick);
+              };
+              call.levelRaf = requestAnimationFrame(tick);
+            } catch (e) {}
+          }
+
+          async function startVoiceCall() {
+            if (vc || !voiceSupported()) return;
+            var call = { state: 'connecting', session: null, transport: null, stream: null, audioEl: null, audioCtx: null,
+              connectedAt: 0, timers: {}, muted: false, aiText: '', guestDraft: '', handledCalls: {}, levelRaf: 0 };
+            vc = call;
+            applyVoiceLabels();
+            voiceUi.capGuest.textContent = '';
+            voiceUi.capAi.textContent = '';
+            voiceUi.timer.textContent = '0:00';
+            voiceUi.mute.classList.remove('is-on');
+            voiceUi.mute.querySelector('i').className = 'fas fa-microphone';
+            voiceUi.screen.classList.remove('is-muted', 'is-minimised');
+            voiceUi.pill.hidden = true;
+            voiceUi.screen.hidden = false;
+            setVoiceState('connecting');
+            if (window.luxTrack) luxTrack('voice_start');
+
+            // iOS/WebKit only plays media that was started inside the tap: create the
+            // output element and the AudioContext now, before the first await.
+            var audioEl = document.createElement('audio');
+            audioEl.autoplay = true;
+            audioEl.setAttribute('playsinline', '');
+            voiceUi.screen.appendChild(audioEl);
+            audioEl.play().catch(function () {});
+            call.audioEl = audioEl;
+            try {
+              var AC = window.AudioContext || window.webkitAudioContext;
+              if (AC) { call.audioCtx = new AC(); call.audioCtx.resume().catch(function () {}); }
+            } catch (e) {}
+
+            try {
+              call.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+            } catch (e) {
+              if (vc === call) endVoiceCall('mic_denied', vT('Please allow the microphone to talk to the concierge'));
+              return;
+            }
+            if (vc !== call) { // ended while the permission prompt was up
+              call.stream.getTracks().forEach(function (t) { t.stop(); });
+              return;
+            }
+
+            var data = null;
+            try {
+              var res = await fetch('/api/voice/start', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  property_id: window.propertyData.property_id,
+                  session_id: chatSessionId,
+                  conversation_id: chatConversationId,
+                  lang: window.currentLanguage || 'en',
+                  guest_context: buildGuestContext()
+                })
+              });
+              data = await res.json();
+            } catch (e) {}
+            if (vc !== call) { // ended while the secret was being minted: close the server's row
+              if (data && data.voice_session_id) postVoiceEnd(data.voice_session_id, 0, 'cancelled');
+              return;
+            }
+            if (!data || !data.success || !data.client_secret) {
+              var err = (data && data.error) || '';
+              if (err === 'voice_disabled') {
+                if (talkBtn) talkBtn.hidden = true;
+                endVoiceCall('start_failed', vT('Voice is not available right now — please type your question'));
+              } else if (err === 'voice_busy') {
+                endVoiceCall('start_failed', vT('Voice is busy right now — please type your question'));
+              } else if (err === 'staff_active') {
+                endVoiceCall('start_failed', vT('A team member has joined — continue by text'));
+              } else {
+                endVoiceCall('start_failed', vT('Something went wrong with the voice call — please type your question'));
+              }
+              return;
+            }
+            call.session = data;
+            if (data.conversation_id) chatConversationId = data.conversation_id;
+            call.timers.max = setTimeout(function () { endVoiceCall('max'); }, Math.max(30, Number(data.max_seconds) || 300) * 1000);
+            call.timers.connectGuard = setTimeout(function () {
+              if (vc === call && !call.connectedAt) endVoiceCall('error', vT('Something went wrong with the voice call — please type your question'));
+            }, 20000);
+
+            call.transport = window.voiceConcierge.transportFactory();
+            try {
+              await call.transport.connect({
+                secret: data.client_secret,
+                stream: call.stream,
+                onTrack: function (remote) {
+                  if (vc !== call) return;
+                  audioEl.srcObject = remote;
+                  audioEl.play().catch(function () {});
+                },
+                onOpen: function () { if (vc === call) voiceConnected(call); },
+                onClose: function () { if (vc === call) endVoiceCall('closed'); },
+                onEvent: function (ev) { if (vc === call) handleVoiceServerEvent(ev); }
+              });
+            } catch (e) {
+              console.error('voice connect', e);
+              if (vc === call) endVoiceCall('error', vT('Something went wrong with the voice call — please type your question'));
+            }
+          }
+
+          function voiceConnected(call) {
+            clearTimeout(call.timers.connectGuard);
+            call.connectedAt = Date.now();
+            setVoiceState('listening');
+            startVoiceLevelMeter(call);
+            call.timers.tick = setInterval(function () {
+              voiceUi.timer.textContent = fmtVoiceTime((Date.now() - call.connectedAt) / 1000);
+            }, 1000);
+            resetVoiceIdle(call);
+            var lang = String(call.session.greeting_lang || window.currentLanguage || 'en');
+            call.transport.send({ type: 'response.create', response: {
+              instructions: 'Greet the guest briefly in ' + (VOICE_LANG_NAMES[lang] || lang) + ' (one sentence), say you are the Old Palace concierge and ask how you can help.'
+            } });
+          }
+
+          // A beacon survives the page going away; keepalive covers every other end
+          function postVoiceEnd(voiceSessionId, seconds, reason) {
+            var payload = JSON.stringify({ voice_session_id: voiceSessionId, seconds: seconds, reason: reason });
+            if (reason === 'unload' && navigator.sendBeacon) {
+              navigator.sendBeacon('/api/voice/end', new Blob([payload], { type: 'application/json' }));
+            } else {
+              fetch('/api/voice/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(function () {});
+            }
+          }
+          function postVoiceEvent(call, body) {
+            body.voice_session_id = call.session.voice_session_id;
+            return fetch('/api/voice/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true })
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                // Staff took the chat over: hang up; the text chat's polling shows their reply
+                if (d && d.paused && vc === call) endVoiceCall('staff', vT('A team member has joined — continue by text'));
+              })
+              .catch(function () {});
+          }
+
+          function handleVoiceServerEvent(ev) {
+            var call = vc;
+            if (!call || !ev) return;
+            switch (ev.type) {
+              case 'input_audio_buffer.speech_started':
+                call.guestDraft = '';
+                voiceUi.capGuest.textContent = '…';
+                setVoiceState('listening');
+                resetVoiceIdle(call);
+                break;
+              case 'conversation.item.input_audio_transcription.delta':
+                if (ev.delta) { call.guestDraft += ev.delta; voiceUi.capGuest.textContent = call.guestDraft; }
+                break;
+              case 'conversation.item.input_audio_transcription.completed': {
+                var said = String(ev.transcript || '').trim();
+                call.guestDraft = '';
+                if (said) {
+                  voiceUi.capGuest.textContent = said;
+                  addMessage(said, 'user');
+                  postVoiceEvent(call, { type: 'guest', text: said });
+                } else if (voiceUi.capGuest.textContent === '…') {
+                  voiceUi.capGuest.textContent = '';
+                }
+                resetVoiceIdle(call);
+                break;
+              }
+              case 'response.created':
+                call.aiText = '';
+                break;
+              case 'output_audio_buffer.started':
+                setVoiceState('speaking');
+                resetVoiceIdle(call);
+                break;
+              case 'response.output_audio_transcript.delta':
+                if (ev.delta) { call.aiText += ev.delta; voiceUi.capAi.textContent = call.aiText; }
+                if (call.state !== 'speaking') setVoiceState('speaking');
+                resetVoiceIdle(call);
+                break;
+              case 'response.output_audio_transcript.done':
+                flushVoiceAssistantTurn(call, ev.transcript);
+                break;
+              case 'output_audio_buffer.stopped':
+              case 'output_audio_buffer.cleared':
+                setVoiceState('listening');
+                break;
+              case 'response.function_call_arguments.done':
+                runVoiceTool(call, ev.call_id, ev.name, ev.arguments);
+                break;
+              case 'response.done': {
+                var out = (ev.response && ev.response.output) || [];
+                out.forEach(function (item) {
+                  if (item && item.type === 'function_call') runVoiceTool(call, item.call_id, item.name, item.arguments);
+                });
+                // A response cut short by barge-in may never send transcript.done: keep what was said
+                flushVoiceAssistantTurn(call, '');
+                if (ev.response && ev.response.status === 'failed') console.error('voice response failed', ev.response.status_details);
+                break;
+              }
+              case 'error': {
+                var code = (ev.error && ev.error.code) || '';
+                console.error('voice error', ev.error);
+                if (VOICE_BENIGN_ERRORS.indexOf(code) === -1) endVoiceCall('error', vT('Something went wrong with the voice call — please type your question'));
+                break;
+              }
+            }
+          }
+          function flushVoiceAssistantTurn(call, transcript) {
+            var spoken = String(transcript || call.aiText || '').trim();
+            call.aiText = '';
+            if (!spoken) return;
+            voiceUi.capAi.textContent = spoken;
+            addMessage(spoken, 'assistant');
+            postVoiceEvent(call, { type: 'assistant', text: spoken });
+            resetVoiceIdle(call);
+          }
+
+          function runVoiceTool(call, callId, name, argsJson) {
+            if (!callId || call.handledCalls[callId]) return;
+            call.handledCalls[callId] = true;
+            var args = {};
+            try { args = JSON.parse(argsJson || '{}') || {}; } catch (e) {}
+            var result;
+            if (name === 'open_app_page') {
+              var target = String(args.target || '').trim();
+              if (target && target.indexOf('app://') !== 0) target = 'app://' + target;
+              var path = target.slice(6).replace(/[^A-Za-z0-9\\/_\\-:.%]/g, '');
+              var nav = call.session.nav;
+              var allowed = Array.isArray(nav) ? nav : Object.keys(nav || {});
+              var known = allowed.length ? allowed.indexOf(target) !== -1 : VOICE_NAV_KINDS.indexOf(path.split('/')[0]) !== -1;
+              if (!path || !known) {
+                result = { ok: false, error: 'unknown_target', hint: 'Use only the app:// targets listed in your instructions.' };
+              } else {
+                try { navigateFromChat(path); minimiseVoiceScreen(); result = { ok: true, opened: target }; }
+                catch (e) { result = { ok: false, error: 'navigation_failed' }; }
+              }
+            } else if (name === 'register_guest') {
+              var guestName = String(args.name || '').trim().slice(0, 80);
+              var room = String(args.room || '').trim().slice(0, 20);
+              if (!guestName && !room) {
+                result = { ok: false, error: 'missing_name_or_room' };
+              } else {
+                postVoiceEvent(call, { type: 'register', name: guestName, room: room });
+                result = { ok: true, name: guestName, room: room };
+              }
+            } else if (name === 'notify_front_desk') {
+              var request = String(args.request || '').trim().slice(0, 500);
+              if (!request) {
+                result = { ok: false, error: 'missing_request' };
+              } else {
+                postVoiceEvent(call, { type: 'notify', text: request });
+                result = { ok: true, message: 'The front desk has been notified and will follow up.' };
+              }
+            } else {
+              result = { ok: false, error: 'unknown_tool' };
+            }
+            call.transport.send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify(result) } });
+            call.transport.send({ type: 'response.create' });
+          }
+
+          // While a sheet the concierge opened is on screen, the call shrinks to a pill
+          function minimiseVoiceScreen() {
+            voiceUi.screen.classList.add('is-minimised');
+            voiceUi.pill.hidden = false;
+          }
+          function restoreVoiceScreen() {
+            if (!vc) return;
+            voiceUi.screen.classList.remove('is-minimised');
+            voiceUi.pill.hidden = true;
+          }
+          function toggleVoiceMute() {
+            if (!vc || !vc.stream) return;
+            vc.muted = !vc.muted;
+            vc.stream.getAudioTracks().forEach(function (t) { t.enabled = !vc.muted; });
+            voiceUi.screen.classList.toggle('is-muted', vc.muted);
+            voiceUi.mute.classList.toggle('is-on', vc.muted);
+            voiceUi.mute.querySelector('i').className = vc.muted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+            voiceUi.mute.querySelector('span').textContent = vT(vc.muted ? 'Unmute' : 'Mute');
+            setVoiceState(vc.state);
+          }
+
+          function endVoiceCall(reason, note) {
+            var call = vc;
+            if (!call) return;
+            vc = null;
+            Object.keys(call.timers).forEach(function (k) { clearTimeout(call.timers[k]); clearInterval(call.timers[k]); });
+            if (call.levelRaf) cancelAnimationFrame(call.levelRaf);
+            if (call.transport) { try { call.transport.close(); } catch (e) {} }
+            if (call.stream) call.stream.getTracks().forEach(function (t) { t.stop(); });
+            if (call.audioEl) { try { call.audioEl.pause(); call.audioEl.srcObject = null; } catch (e) {} call.audioEl.remove(); }
+            if (call.audioCtx) { try { call.audioCtx.close(); } catch (e) {} }
+            voiceUi.screen.hidden = true;
+            voiceUi.screen.classList.remove('is-connecting', 'is-listening', 'is-speaking', 'is-muted', 'is-minimised');
+            voiceUi.pill.hidden = true;
+            voiceUi.orb.style.setProperty('--lvl', '0');
+            var seconds = call.connectedAt ? Math.round((Date.now() - call.connectedAt) / 1000) : 0;
+            if (call.session && call.session.voice_session_id) postVoiceEnd(call.session.voice_session_id, seconds, reason);
+            if (window.luxTrack) luxTrack('voice_end', reason);
+            if (reason === 'unload') return;
+            if (reason === 'type' || reason === 'staff') ensureChatOpen();
+            if (note) addChatNote(note);
+            else if (call.connectedAt) addChatNote(vT('Voice call ended') + ' · ' + fmtVoiceTime(seconds));
+            if (reason === 'type') chatInput.focus();
+          }
+
+          document.addEventListener('visibilitychange', function () {
+            if (!vc) return;
+            if (document.hidden) vc.timers.hidden = setTimeout(function () { endVoiceCall('hidden'); }, 20000);
+            else clearTimeout(vc.timers.hidden);
+          });
+          window.addEventListener('pagehide', function () { if (vc) endVoiceCall('unload'); });
+          if (talkBtn) talkBtn.addEventListener('click', function () { startVoiceCall(); });
+          voiceUi.end.addEventListener('click', function () { endVoiceCall('user'); });
+          voiceUi.close.addEventListener('click', function () { endVoiceCall('user'); });
+          voiceUi.type.addEventListener('click', function () { endVoiceCall('type'); });
+          voiceUi.mute.addEventListener('click', toggleVoiceMute);
+          voiceUi.pill.addEventListener('click', restoreVoiceScreen);
+          chatButton.addEventListener('click', applyVoiceLabels);
+
+          window.voiceConcierge = {
+            transportFactory: voiceWebRtcTransport,
+            start: startVoiceCall,
+            end: endVoiceCall,
+            handleServerEvent: handleVoiceServerEvent,
+            get state() { return vc ? vc.state : 'idle'; },
+            get session() { return vc ? vc.session : null; }
+          };
         </script>
 
         <!-- Daily Mood Check Modal -->
@@ -34225,101 +34447,8 @@ window.luxTogglePassForm = function() {
             });
         </script>
         
-        <!-- At Your Service Modal -->
-        <div id="serviceModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" style="z-index: 9999;">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
-                <div class="sticky top-0 z-10 p-6 border-b flex justify-between items-center" style="background: linear-gradient(135deg, var(--primary-color, #972626), var(--secondary-color, #6B1529));">
-                    <div class="flex items-center gap-3 text-white">
-                        <i class="fas fa-concierge-bell text-2xl"></i>
-                        <h2 class="text-2xl font-bold">At Your Service</h2>
-                    </div>
-                    <button onclick="closeServiceMenu()" class="text-white hover:bg-white/20 rounded-lg p-2 transition-all">
-                        <i class="fas fa-times text-2xl"></i>
-                    </button>
-                </div>
-                <div id="serviceModalContent" class="p-6"></div>
-            </div>
-        </div>
-
-        <!-- AI Voice Call Modal -->
-        <div id="voiceCallModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" style="z-index: 10000;">
-            <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full relative overflow-hidden">
-                <!-- Animated Background -->
-                <div class="absolute inset-0 bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 opacity-10 animate-pulse"></div>
-                
-                <!-- Modal Content -->
-                <div class="relative z-10">
-                    <!-- Header -->
-                    <div class="p-6 border-b bg-gradient-to-r from-red-600 to-red-800">
-                        <div class="flex justify-between items-center text-white">
-                            <div class="flex items-center gap-3">
-                                <i class="fas fa-concierge-bell text-2xl"></i>
-                                <div>
-                                    <h2 class="text-2xl font-bold">Nadia, Your Concierge</h2>
-                                    <p class="text-xs text-red-100">Personal assistance in any language</p>
-                                </div>
-                            </div>
-                            <button onclick="endVoiceCall()" class="hover:bg-white/20 rounded-lg p-2 transition-all">
-                                <i class="fas fa-times text-xl"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Body -->
-                    <div class="p-8 text-center">
-                        <!-- Voice Animation -->
-                        <div id="voiceAnimation" class="mb-6 relative h-40 flex items-center justify-center">
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="w-32 h-32 bg-gradient-to-br from-red-500 to-red-700 rounded-full flex items-center justify-center shadow-2xl" id="voiceCircle">
-                                    <i class="fas fa-microphone text-white text-4xl" id="voiceIcon"></i>
-                                </div>
-                            </div>
-                            <!-- Sound Wave Rings -->
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="w-40 h-40 border-4 border-red-400 rounded-full animate-ping opacity-20"></div>
-                            </div>
-                            <div class="absolute inset-0 flex items-center justify-center" style="animation-delay: 0.5s;">
-                                <div class="w-48 h-48 border-4 border-amber-400 rounded-full animate-ping opacity-10"></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Status Text -->
-                        <div id="voiceStatus" class="mb-6">
-                            <h3 class="text-xl font-bold text-gray-800 mb-2">Connecting to Nadia...</h3>
-                            <p class="text-gray-600 text-sm">Please wait while we connect you</p>
-                        </div>
-                        
-                        <!-- Transcript Display -->
-                        <div id="voiceTranscript" class="hidden mb-6 p-4 bg-gray-50 rounded-lg text-left max-h-40 overflow-y-auto">
-                            <p class="text-sm text-gray-700"></p>
-                        </div>
-                        
-                        <!-- Controls -->
-                        <div class="flex gap-3 justify-center">
-                            <button id="muteBtn" onclick="toggleMute()" class="hidden px-6 py-3 bg-yellow-500 text-white rounded-full font-semibold hover:bg-yellow-600 transition-all shadow-lg">
-                                <i class="fas fa-microphone-slash mr-2"></i>Mute
-                            </button>
-                            <button onclick="endVoiceCall()" class="px-6 py-3 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition-all shadow-lg">
-                                <i class="fas fa-phone-slash mr-2"></i>End Call
-                            </button>
-                        </div>
-                        
-                        <!-- Tips -->
-                        <div class="mt-6 p-4 bg-blue-50 rounded-lg text-left">
-                            <p class="text-xs text-gray-600">
-                                <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
-                                <strong>Tip:</strong> Speak naturally! Tell the AI assistant what service you need, and they'll help you book it.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <script>
-        let serviceTypes = [];
-        
-        // Get guest session helper
+        // Guest pass session (name, room, tier) — read by the chat for its AI context
         function getGuestSession() {
             const session = localStorage.getItem('guestPassSession');
             if (session) {
@@ -34331,1102 +34460,16 @@ window.luxTogglePassForm = function() {
             }
             return null;
         }
-        
-        // Get property ID helper - fetches from propertyData which is loaded later
-        function getPropertyId() {
-            return window.propertyData?.property_id || '1';
-        }
 
-        window.loadServiceTypes = async function() {
-            try {
-                const propertyId = getPropertyId();
-                console.log('📡 Loading service types for property:', propertyId);
-                const response = await fetch('/api/service-types?property_id=' + propertyId);
-                const data = await response.json();
-                console.log('📥 Service types response:', data);
-                if (data.success) {
-                    serviceTypes = data.service_types;
-                    console.log('✅ Loaded', serviceTypes.length, 'service types');
-                } else {
-                    console.error('❌ Failed to load service types:', data);
-                }
-            } catch (error) {
-                console.error('💥 Load service types error:', error);
-            }
-        }
-
-        window.openServiceMenu = function() {
-            console.log('🔔 Service button clicked!');
-            const guest = getGuestSession();
-            console.log('👤 Guest session:', guest);
-            
-            if (!guest) {
-                console.log('❌ No guest session found');
-                alert('Please link your guest pass first to request services');
-                return;
-            }
-            
-            console.log('✅ Opening service modal...');
-            console.log('📦 Service types loaded:', serviceTypes.length);
-            
-            // Prevent body scroll
-            document.body.style.overflow = 'hidden';
-            
-            const modal = document.getElementById('serviceModal');
-            if (modal) {
-                modal.classList.remove('hidden');
-                console.log('✅ Modal opened');
-            } else {
-                console.error('❌ Modal element not found!');
-            }
-            
-            renderServiceTypes();
-        }
-
-        // Open service modal from chat widget
-        window.openServiceModalFromChat = function() {
-            console.log('📞 Call button clicked from chat!');
-            // Close chat widget first
-            const chatWidget = document.getElementById('chatWidget');
-            if (chatWidget) {
-                chatWidget.classList.add('hidden');
-            }
-            // Open service modal
-            window.openServiceMenu();
-        }
-
-        window.closeServiceMenu = function() {
-            // Re-enable body scroll
-            document.body.style.overflow = '';
-            
-            document.getElementById('serviceModal').classList.add('hidden');
-        }
-
-        function renderServiceTypes() {
-            console.log('🎨 Rendering service types, count:', serviceTypes.length);
-            const content = document.getElementById('serviceModalContent');
-            
-            if (!content) {
-                console.error('❌ serviceModalContent element not found!');
-                return;
-            }
-            
-            if (serviceTypes.length === 0) {
-                console.log('⚠️ No service types available');
-                content.innerHTML = '<p class="text-gray-500 text-center py-8">No services available at this time.</p>';
-                return;
-            }
-            
-            console.log('✅ Rendering', serviceTypes.length, 'services');
-            
-            // Elegant Nadia Voice Assistant Button
-            content.innerHTML = 
-                '<div class="mb-8">' +
-                    '<button onclick="startGeneralVoiceCall()" class="group relative w-full overflow-hidden bg-gradient-to-br from-red-600 via-red-700 to-red-900 text-white rounded-2xl shadow-2xl hover:shadow-[0_20px_60px_rgba(185,28,28,0.4)] transition-all duration-300 transform hover:scale-[1.02]">' +
-                        // Animated shine effect
-                        '<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>' +
-                        // Golden accent border
-                        '<div class="absolute inset-0 rounded-2xl border-2 border-amber-400/30"></div>' +
-                        // Content
-                        '<div class="relative p-8">' +
-                            '<div class="flex items-center justify-between">' +
-                                '<div class="flex items-center gap-5">' +
-                                    '<div class="relative">' +
-                                        '<div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform duration-300">' +
-                                            '<i class="fas fa-concierge-bell text-2xl text-white"></i>' +
-                                        '</div>' +
-                                        '<div class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>' +
-                                    '</div>' +
-                                    '<div class="text-left">' +
-                                        '<div class="text-2xl font-bold mb-1">' +
-                                            '<span>Call Nadia, Your Personal Concierge</span>' +
-                                        '</div>' +
-                                        '<div class="text-sm text-red-100">Available 24/7 • Speak in any language • Instant assistance</div>' +
-                                    '</div>' +
-                                '</div>' +
-                                '<div class="hidden sm:block">' +
-                                    '<i class="fas fa-chevron-right text-2xl text-amber-300 group-hover:translate-x-1 transition-transform"></i>' +
-                                '</div>' +
-                            '</div>' +
-                        '</div>' +
-                    '</button>' +
-                '</div>' +
-                '<div class="mb-6">' +
-                    '<div class="flex items-center gap-3 mb-6">' +
-                        '<div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>' +
-                        '<p class="text-gray-600 font-medium text-sm uppercase tracking-wider">Or Choose a Service</p>' +
-                        '<div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
-                serviceTypes.map(service => {
-                    return '<button onclick="showServiceRequestForm(' + service.service_type_id + ')" class="p-6 border-2 rounded-xl hover:shadow-lg transition-all text-left group" style="border-color: ' + service.service_color + '20; background: ' + service.service_color + '05;">' +
-                        '<div class="flex items-start gap-4">' +
-                            '<div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition" style="background: ' + service.service_color + '; color: white;">' +
-                                '<i class="fas ' + service.service_icon + ' text-xl"></i>' +
-                            '</div>' +
-                            '<div class="flex-1">' +
-                                '<h3 class="font-bold text-lg mb-1">' + service.service_name + '</h3>' +
-                                '<p class="text-sm text-gray-600 mb-2">' + (service.description || '') + '</p>' +
-                                '<p class="text-xs" style="color: ' + service.service_color + ';">' +
-                                    '<i class="fas fa-clock mr-1"></i>Response time: ~' + service.estimated_response_minutes + ' min' +
-                                '</p>' +
-                            '</div>' +
-                        '</div>' +
-                    '</button>';
-                }).join('') +
-            '</div>';
-        }
-
-        function showServiceRequestForm(serviceTypeId) {
-            const service = serviceTypes.find(s => s.service_type_id === serviceTypeId);
-            const guest = getGuestSession();
-            
-            const content = document.getElementById('serviceModalContent');
-            content.innerHTML = 
-                '<button onclick="renderServiceTypes()" class="mb-4 text-gray-600 hover:text-gray-900 flex items-center gap-2">' +
-                    '<i class="fas fa-arrow-left"></i> Back to Services' +
-                '</button>' +
-                '<div class="bg-gradient-to-br p-6 rounded-xl mb-6" style="background: linear-gradient(135deg, ' + service.service_color + '15, ' + service.service_color + '05);">' +
-                    '<div class="flex items-center gap-4 mb-3">' +
-                        '<div class="w-16 h-16 rounded-xl flex items-center justify-center" style="background: ' + service.service_color + '; color: white;">' +
-                            '<i class="fas ' + service.service_icon + ' text-2xl"></i>' +
-                        '</div>' +
-                        '<div>' +
-                            '<h3 class="text-2xl font-bold">' + service.service_name + '</h3>' +
-                            '<p class="text-gray-600">' + (service.description || '') + '</p>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<!-- AI Voice Call Option -->' +
-                '<div class="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-6">' +
-                    '<div class="flex items-start gap-4">' +
-                        '<div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">' +
-                            '<i class="fas fa-phone-volume text-white text-xl"></i>' +
-                        '</div>' +
-                        '<div class="flex-1">' +
-                            '<h4 class="text-lg font-bold text-gray-800 mb-1">🎙️ Speak to AI Assistant</h4>' +
-                            '<p class="text-sm text-gray-600 mb-3">Prefer to talk? Call our AI assistant with natural voice - like speaking to our staff! Just describe what you need.</p>' +
-                            '<button onclick="startVoiceServiceRequest(' + serviceTypeId + ', &quot;' + service.service_name.replace(/"/g, '&quot;') + '&quot;)" ' +
-                                'class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2">' +
-                                '<i class="fas fa-phone-alt animate-pulse"></i>' +
-                                '<span>Start Voice Call</span>' +
-                            '</button>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<div class="relative mb-6">' +
-                    '<div class="absolute inset-0 flex items-center"><div class="w-full border-t-2 border-gray-200"></div></div>' +
-                    '<div class="relative flex justify-center text-sm">' +
-                        '<span class="px-4 bg-white text-gray-500 font-medium">OR FILL OUT THE FORM</span>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<form id="serviceRequestForm" onsubmit="submitServiceRequest(event, ' + serviceTypeId + ')" class="space-y-4">' +
-                    '<div><label class="block font-semibold mb-2">Guest Name</label>' +
-                    '<input type="text" name="guest_name" value="' + (guest.full_name || '') + '" readonly class="w-full px-4 py-3 border-2 rounded-lg bg-gray-50"></div>' +
-                    '<div><label class="block font-semibold mb-2">Room Number</label>' +
-                    '<input type="text" name="room_number" value="' + (guest.room_number || '') + '" readonly class="w-full px-4 py-3 border-2 rounded-lg bg-gray-50"></div>' +
-                    '<div><label class="block font-semibold mb-2">Phone Number (Optional)</label>' +
-                    '<input type="tel" name="guest_phone" placeholder="Your phone number" class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 outline-none"></div>' +
-                    '<div><label class="block font-semibold mb-2">Request Details</label>' +
-                    '<textarea name="request_details" rows="4" placeholder="Please describe what you need..." class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 outline-none" required></textarea></div>' +
-                    '<div><label class="block font-semibold mb-2">Priority</label>' +
-                    '<select name="priority" class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 outline-none">' +
-                        '<option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>' +
-                    '</select></div>' +
-                    '<button type="submit" class="w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg hover:opacity-90 transition" style="background: ' + service.service_color + ';">' +
-                        '<i class="fas fa-paper-plane mr-2"></i>Submit Request' +
-                    '</button>' +
-                '</form>';
-        }
-
-        async function submitServiceRequest(event, serviceTypeId) {
-            event.preventDefault();
-            const form = event.target;
-            const formData = new FormData(form);
-            const guest = getGuestSession();
-            
-            const data = {
-                service_type_id: serviceTypeId,
-                pass_id: guest.pass_id,
-                guest_name: formData.get('guest_name'),
-                room_number: formData.get('room_number'),
-                guest_phone: formData.get('guest_phone'),
-                request_details: formData.get('request_details'),
-                priority: formData.get('priority')
-            };
-            
-            try {
-                const propertyId = getPropertyId();
-                const response = await fetch('/api/service-requests', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-Property-ID': propertyId},
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    if (typeof confetti !== 'undefined') {
-                        confetti({particleCount: 100, spread: 70, origin: {y: 0.6}});
-                    }
-                    
-                    const service = serviceTypes.find(s => s.service_type_id === serviceTypeId);
-                    const content = document.getElementById('serviceModalContent');
-                    content.innerHTML = 
-                        '<div class="text-center py-12">' +
-                            '<div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background: ' + service.service_color + '20;">' +
-                                '<i class="fas fa-check-circle text-5xl" style="color: ' + service.service_color + ';"></i>' +
-                            '</div>' +
-                            '<h3 class="text-2xl font-bold mb-3">Request Submitted Successfully!</h3>' +
-                            '<p class="text-gray-600 mb-2">Request ID: <strong>#' + result.request_id + '</strong></p>' +
-                            '<p class="text-gray-600 mb-6">Our team will respond within ' + service.estimated_response_minutes + ' minutes</p>' +
-                            '<button onclick="closeServiceMenu()" class="px-8 py-3 rounded-xl text-white font-semibold" style="background: ' + service.service_color + ';">Close</button>' +
-                        '</div>';
-                } else {
-                    alert('Failed to submit request: ' + (result.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Submit service request error:', error);
-                alert('Failed to submit request. Please try again.');
-            }
-        }
-
-        // ========================================
-        // AI VOICE CALL FUNCTIONS - OpenAI Realtime API
-        // ========================================
-        
-        let voiceCallActive = false;
-        let voiceCallData = {
-            serviceTypeId: null,
-            serviceName: '',
-            transcript: '',
-            isMuted: false,
-            ws: null,
-            audioContext: null,
-            mediaStream: null,
-            sessionConfig: null,
-            audioQueue: [],
-            isPlayingAudio: false,
-            nextStartTime: 0,
-            ringingSound: null
-        };
-        
-        function playRingingSound() {
-            // Create audio context for ringing if not exists
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // Create oscillator for ringing tone (double beep pattern)
-            const playBeep = (startTime, frequency) => {
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                
-                oscillator.frequency.value = frequency;
-                oscillator.type = 'sine';
-                
-                gainNode.gain.setValueAtTime(0, startTime);
-                gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4);
-                
-                oscillator.start(startTime);
-                oscillator.stop(startTime + 0.4);
-            };
-            
-            // Play ring pattern every 2 seconds
-            let time = audioCtx.currentTime;
-            for (let i = 0; i < 10; i++) { // 10 rings max (20 seconds)
-                playBeep(time, 480);
-                playBeep(time + 0.5, 480);
-                time += 2;
-            }
-            
-            voiceCallData.ringingSound = audioCtx;
-            
-            // Stop after 20 seconds
-            setTimeout(() => {
-                if (voiceCallData.ringingSound) {
-                    voiceCallData.ringingSound.close();
-                    voiceCallData.ringingSound = null;
-                }
-            }, 20000);
-        }
-        
-        function stopRingingSound() {
-            if (voiceCallData.ringingSound) {
-                voiceCallData.ringingSound.close();
-                voiceCallData.ringingSound = null;
-            }
-        }
-        
-        // General voice call - AI identifies the service type
-        window.startGeneralVoiceCall = async function() {
-            // Use service_type_id = null to indicate general request
-            // The AI will identify what service is needed
-            await startVoiceServiceRequest(null, 'General Request');
-        }
-        
-        async function startVoiceServiceRequest(serviceTypeId, serviceName) {
-            // Show voice call modal
-            document.getElementById('voiceCallModal').classList.remove('hidden');
-            voiceCallActive = true;
-            voiceCallData.serviceTypeId = serviceTypeId;
-            voiceCallData.serviceName = serviceName;
-            
-            // Update status and play ringing sound
-            updateVoiceStatus('Connecting to AI Assistant...', 'Please wait while we establish the connection');
-            playRingingSound();
-            
-            // Get session configuration from backend
-            try {
-                const guest = getGuestSession();
-                const propertyId = getPropertyId();
-                
-                console.log('🔌 Creating voice session for service:', serviceTypeId, serviceName);
-                console.log('👤 Guest info:', guest);
-                console.log('🏨 Property ID:', propertyId);
-                
-                const response = await fetch('/api/voice-assistant/session', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        service_type_id: serviceTypeId,
-                        guest_info: guest,
-                        property_id: propertyId
-                    })
-                });
-                
-                console.log('📡 Session response status:', response.status);
-                const data = await response.json();
-                console.log('📦 Session data:', data);
-                
-                if (data.success) {
-                    console.log('✅ Session created, connecting to voice assistant...');
-                    voiceCallData.sessionConfig = data;
-                    await connectToSimpleVoiceAssistant(data);
-                } else {
-                    console.error('❌ Session creation failed:', data.error);
-                    stopRingingSound();
-                    updateVoiceStatus('❌ Connection Failed', data.error || 'Please try the form instead.');
-                }
-            } catch (error) {
-                console.error('💥 Session creation error:', error);
-                stopRingingSound();
-                updateVoiceStatus('❌ Connection Error', 'Please try the form instead.');
-            }
-        }
-        
-        // NEW SIMPLE VOICE ASSISTANT IMPLEMENTATION
-        // Uses: Whisper (speech-to-text) + Chat Completions (AI logic) + TTS (text-to-speech)
-        // This is the SAME proven pattern used in the working text chat!
-        async function connectToSimpleVoiceAssistant(sessionData) {
-            if (!voiceCallActive) return;
-            
-            // Store sessionData in voiceCallData
-            voiceCallData.sessionData = sessionData;
-            voiceCallData.chatHistory = []; // Conversation history for Chat Completions
-            voiceCallData.isRecording = false;
-            voiceCallData.audioChunks = [];
-            
-            try {
-                // Request microphone permission
-                voiceCallData.mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    } 
-                });
-                
-                console.log('✅ Microphone access granted');
-                stopRingingSound();
-                
-                // Set up MediaRecorder for audio recording
-                const options = { mimeType: 'audio/webm' };
-                voiceCallData.mediaRecorder = new MediaRecorder(voiceCallData.mediaStream, options);
-                
-                voiceCallData.mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        voiceCallData.audioChunks.push(event.data);
-                    }
-                };
-                
-                voiceCallData.mediaRecorder.onstop = async () => {
-                    if (voiceCallData.audioChunks.length === 0) return;
-                    
-                    console.log('🎤 Processing speech...');
-                    updateVoiceStatus('🤔 Processing...', 'Analyzing your request');
-                    
-                    // Create audio blob
-                    const audioBlob = new Blob(voiceCallData.audioChunks, { type: 'audio/webm' });
-                    voiceCallData.audioChunks = [];
-                    
-                    try {
-                        // Step 1: Convert speech to text using Whisper API
-                        const formData = new FormData();
-                        formData.append('audio', audioBlob);
-                        formData.append('api_key', sessionData.api_key);
-                        
-                        const transcriptResponse = await fetch('/api/voice-assistant/transcribe', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        const transcriptData = await transcriptResponse.json();
-                        if (!transcriptData.success || !transcriptData.text) {
-                            throw new Error('Transcription failed');
-                        }
-                        
-                        const userText = transcriptData.text;
-                        console.log('📝 User said:', userText);
-                        addToTranscript('You', userText, false);
-                        
-                        // Step 2: Process with Chat Completions API (with function calling)
-                        voiceCallData.chatHistory.push({ role: 'user', content: userText });
-                        
-                        const requestBody = {
-                            model: sessionData.model || 'gpt-4o-mini',
-                            messages: [
-                                { role: 'system', content: sessionData.system_instructions },
-                                ...voiceCallData.chatHistory
-                            ],
-                            temperature: sessionData.temperature || 0.6,
-                            max_tokens: sessionData.max_tokens || 300
-                        };
-                        
-                        // Only add tools if they exist
-                        if (sessionData.tools && sessionData.tools.length > 0) {
-                            requestBody.tools = sessionData.tools;
-                            requestBody.tool_choice = sessionData.tool_choice || 'auto';
-                        }
-                        
-                        console.log('📤 Sending to OpenAI:', {
-                            model: requestBody.model,
-                            messageCount: requestBody.messages.length,
-                            hasTools: !!requestBody.tools,
-                            toolCount: requestBody.tools?.length
-                        });
-                        
-                        const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': 'Bearer ' + sessionData.api_key,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(requestBody)
-                        });
-                        
-                        const chatData = await chatResponse.json();
-                        console.log('🤖 AI response:', chatData);
-                        
-                        if (chatData.error) {
-                            console.error('❌ OpenAI error:', chatData.error);
-                            updateVoiceStatus('❌ Error', chatData.error.message || 'AI service error');
-                            return;
-                        }
-                        
-                        if (chatData.choices && chatData.choices[0]) {
-                            const message = chatData.choices[0].message;
-                            
-                            // Check if AI wants to call a function
-                            if (message.tool_calls && message.tool_calls.length > 0) {
-                                const toolCall = message.tool_calls[0];
-                                console.log('🔧 Function call:', toolCall.function.name, toolCall.function.arguments);
-                                
-                                if (toolCall.function.name === 'create_service_request') {
-                                    const args = JSON.parse(toolCall.function.arguments);
-                                    
-                                    // Call the service request API
-                                    const serviceResponse = await fetch('/api/service-requests', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            property_id: getPropertyId(),
-                                            service_type_id: args.service_type_id || sessionData.service_type_id,
-                                            guest_name: sessionData.guest_info.full_name,
-                                            room_number: sessionData.guest_info.room_number,
-                                            guest_phone: args.guest_phone || null,
-                                            request_details: args.request_details,
-                                            priority: args.priority,
-                                            pass_reference: sessionData.guest_info.pass_reference
-                                        })
-                                    });
-                                    
-                                    const serviceResult = await serviceResponse.json();
-                                    console.log('✅ Service request created:', serviceResult);
-                                    
-                                    if (serviceResult.success) {
-                                        const confirmText = 'Perfect! I have created service request #' + serviceResult.request_id + ' for room ' + sessionData.guest_info.room_number + '. Our team will assist you shortly.';
-                                        addToTranscript('AI Assistant', confirmText, true);
-                                        await speakText(confirmText, sessionData);
-                                        
-                                        // End call after successful request
-                                        setTimeout(() => {
-                                            updateVoiceStatus('✅ Request Submitted!', 'Our team will contact you shortly.');
-                                            setTimeout(endVoiceCall, 3000);
-                                        }, 2000);
-                                    }
-                                }
-                            } else if (message.content) {
-                                // Regular response without function call
-                                const aiText = message.content;
-                                voiceCallData.chatHistory.push({ role: 'assistant', content: aiText });
-                                addToTranscript('AI Assistant', aiText, true);
-                                await speakText(aiText, sessionData);
-                                
-                                // Ready for next input
-                                updateVoiceStatus('🎤 I am listening...', 'Press and hold to speak');
-                            }
-                        }
-                    } catch (error) {
-                        console.error('❌ Voice processing error:', error);
-                        updateVoiceStatus('❌ Error', 'Please try again or use the form');
-                    }
-                };
-                
-                // Update UI
-                updateVoiceStatus('🎤 HOLD THE BLUE BUTTON TO SPEAK', 'Press and hold the circle below, then release');
-                document.getElementById('muteBtn').classList.add('hidden'); // Hide mute button for PTT mode
-                document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
-                
-                // Add press-and-hold functionality to the voice circle (PTT - Push To Talk)
-                const voiceCircle = document.getElementById('voiceCircle');
-                
-                // Make it VERY clear it's interactive
-                voiceCircle.style.cursor = 'pointer';
-                voiceCircle.style.transition = 'transform 0.2s ease';
-                voiceCircle.style.userSelect = 'none';
-                voiceCircle.style.webkitUserSelect = 'none';
-                voiceCircle.style.position = 'relative';
-                voiceCircle.style.zIndex = '100';
-                
-                let holdTimeout;
-                
-                // Mouse events
-                voiceCircle.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (!voiceCallActive || voiceCallData.isRecording) return;
-                    
-                    console.log('🖱️ Mouse down on voice circle');
-                    
-                    // Start recording after short delay (prevents accidental clicks)
-                    holdTimeout = setTimeout(() => {
-                        voiceCallData.isRecording = true;
-                        voiceCallData.audioChunks = [];
-                        voiceCallData.mediaRecorder.start();
-                        updateVoiceStatus('🔴 RECORDING...', 'Keep holding! Release when done');
-                        document.getElementById('voiceIcon').className = 'fas fa-microphone text-red-500 text-4xl animate-pulse';
-                        voiceCircle.style.transform = 'scale(1.1)';
-                        voiceCircle.style.boxShadow = '0 0 30px rgba(239, 68, 68, 0.6)';
-                        console.log('🔴 Recording started');
-                    }, 200);
-                });
-                
-                voiceCircle.addEventListener('mouseup', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    clearTimeout(holdTimeout);
-                    if (voiceCallData.isRecording) {
-                        voiceCallData.isRecording = false;
-                        voiceCallData.mediaRecorder.stop();
-                        updateVoiceStatus('🤔 Processing...', 'Analyzing your request');
-                        document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
-                        voiceCircle.style.transform = 'scale(1)';
-                        voiceCircle.style.boxShadow = '';
-                        console.log('⏹️ Recording stopped');
-                    }
-                });
-                
-                voiceCircle.addEventListener('mouseleave', (e) => {
-                    clearTimeout(holdTimeout);
-                    if (voiceCallData.isRecording) {
-                        voiceCallData.isRecording = false;
-                        voiceCallData.mediaRecorder.stop();
-                        updateVoiceStatus('🤔 Processing...', 'Analyzing your request');
-                        document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
-                        voiceCircle.style.transform = 'scale(1)';
-                        voiceCircle.style.boxShadow = '';
-                        console.log('⏹️ Recording stopped (mouse left button)');
-                    }
-                });
-                
-                // Touch events for mobile
-                voiceCircle.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (!voiceCallActive || voiceCallData.isRecording) return;
-                    
-                    console.log('👆 Touch start on voice circle');
-                    
-                    holdTimeout = setTimeout(() => {
-                        voiceCallData.isRecording = true;
-                        voiceCallData.audioChunks = [];
-                        voiceCallData.mediaRecorder.start();
-                        updateVoiceStatus('🔴 RECORDING...', 'Keep holding! Release when done');
-                        document.getElementById('voiceIcon').className = 'fas fa-microphone text-red-500 text-4xl animate-pulse';
-                        voiceCircle.style.transform = 'scale(1.1)';
-                        voiceCircle.style.boxShadow = '0 0 30px rgba(239, 68, 68, 0.6)';
-                        console.log('🔴 Recording started (touch)');
-                    }, 200);
-                });
-                
-                voiceCircle.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    clearTimeout(holdTimeout);
-                    if (voiceCallData.isRecording) {
-                        voiceCallData.isRecording = false;
-                        voiceCallData.mediaRecorder.stop();
-                        updateVoiceStatus('🤔 Processing...', 'Analyzing your request');
-                        document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
-                        voiceCircle.style.transform = 'scale(1)';
-                        voiceCircle.style.boxShadow = '';
-                        console.log('⏹️ Recording stopped (touch)');
-                    }
-                });
-                
-                console.log('✅ Press-and-hold voice input ready! Hold the circle to speak.');
-                
-            } catch (error) {
-                console.error('Voice assistant setup error:', error);
-                stopRingingSound();
-                updateVoiceStatus('❌ Microphone Error', 'Please allow microphone access and try again.');
-            }
-        }
-        
-        // Text-to-Speech function using OpenAI TTS API
-        async function speakText(text, sessionData) {
-            try {
-                const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + sessionData.api_key,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        model: 'tts-1',
-                        voice: sessionData.voice || 'alloy',
-                        input: text
-                    })
-                });
-                
-                if (!ttsResponse.ok) {
-                    throw new Error('TTS failed');
-                }
-                
-                const audioBlob = await ttsResponse.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
-                
-                audio.onended = () => {
-                    URL.revokeObjectURL(audioUrl);
-                    console.log('🔊 Finished speaking');
-                };
-                
-                await audio.play();
-                console.log('🔊 Speaking:', text.substring(0, 50) + '...');
-                
-            } catch (error) {
-                console.error('TTS error:', error);
-                // Continue without audio if TTS fails
-            }
-        }
-        
-        // OLD REALTIME API FUNCTIONS - NO LONGER USED
-        // Kept for reference only - new implementation uses Whisper + Chat Completions + TTS
-        /*
-        function streamAudioToOpenAI(ws) {
-            const audioContext = voiceCallData.audioContext;
-            const mediaStream = voiceCallData.mediaStream;
-            
-            const source = audioContext.createMediaStreamSource(mediaStream);
-            const processor = audioContext.createScriptProcessor(4096, 1, 1);
-            
-            source.connect(processor);
-            processor.connect(audioContext.destination);
-            
-            processor.onaudioprocess = (e) => {
-                if (!voiceCallActive || voiceCallData.isMuted) return;
-                
-                const inputData = e.inputBuffer.getChannelData(0);
-                
-                // Convert Float32Array to Int16Array (PCM16)
-                const pcm16 = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
-                    pcm16[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
-                }
-                
-                // Convert to base64
-                const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(pcm16.buffer)));
-                
-                // Send audio to OpenAI
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'input_audio_buffer.append',
-                        audio: base64Audio
-                    }));
-                }
-            };
-        }
-        
-        function handleOpenAIMessage(message) {
-            console.log('📨 OpenAI message:', message.type);
-            
-            // Handle session.created - capture session ID and update with our config
-            if (message.type === 'session.created') {
-                console.log('✅ Session created, updating with our configuration...');
-                console.log('📝 Session ID:', message.session?.id);
-                
-                if (voiceCallData.ws && voiceCallData.ws.readyState === WebSocket.OPEN && voiceCallData.sessionData?.session_config) {
-                    // Send session.update with the session ID
-                    const sessionUpdatePayload = {
-                        type: 'session.update',
-                        session: {
-                            ...voiceCallData.sessionData.session_config
-                        }
-                    };
-                    
-                    console.log('📤 Sending session.update after session.created');
-                    console.log('🔧 Config keys:', Object.keys(voiceCallData.sessionData.session_config));
-                    voiceCallData.ws.send(JSON.stringify(sessionUpdatePayload));
-                }
-            }
-            
-            // Log EVERYTHING for debugging
-            if (message.type.includes('function')) {
-                console.log('🔥 FUNCTION-RELATED MESSAGE:', JSON.stringify(message, null, 2));
-            }
-            
-            switch (message.type) {
-                case 'response.created':
-                    // New response starting - reset audio timing
-                    voiceCallData.nextStartTime = voiceCallData.audioContext ? voiceCallData.audioContext.currentTime : 0;
-                    console.log('New AI response starting');
-                    break;
-                    
-                case 'conversation.item.created':
-                    if (message.item.type === 'message' && message.item.role === 'assistant') {
-                        // AI is responding
-                        console.log('AI responding...');
-                    }
-                    break;
-                    
-                case 'response.audio_transcript.delta':
-                case 'response.output_audio_transcript.delta':
-                    // Update transcript with AI speech
-                    if (message.delta) {
-                        addToTranscript('AI Assistant', message.delta, true);
-                    }
-                    break;
-                    
-                case 'conversation.item.input_audio_transcription.completed':
-                    // User finished speaking - manually trigger AI response with FORCED function calling
-                    console.log('🎤 User finished speaking, forcing AI to call function...');
-                    if (voiceCallData.ws && voiceCallData.ws.readyState === WebSocket.OPEN) {
-                        voiceCallData.ws.send(JSON.stringify({
-                            type: 'response.create',
-                            response: {
-                                modalities: ['text', 'audio'],
-                                instructions: 'You MUST call the create_service_request function now. Do not just respond verbally.',
-                                tool_choice: 'required'  // Force function call
-                            }
-                        }));
-                        console.log('✅ Sent response.create with tool_choice:required');
-                    }
-                    // Update transcript with user speech
-                    if (message.transcript) {
-                        addToTranscript('You', message.transcript);
-                    }
-                    break;
-                    
-                case 'response.audio.delta':
-                case 'response.output_audio.delta':
-                    // Play audio response from AI
-                    if (message.delta) {
-                        playAudioChunk(message.delta);
-                    }
-                    break;
-                    
-                case 'response.done':
-                    console.log('✅ AI response complete. Full response:', JSON.stringify(message, null, 2));
-                    // Check if there were any function calls
-                    if (message.response && message.response.output) {
-                        console.log('📦 Response output:', message.response.output);
-                        const hasFunctionCall = message.response.output.some(item => 
-                            item.type === 'function_call' || item.type === 'function_call_output'
-                        );
-                        if (!hasFunctionCall) {
-                            console.error('❌ AI DID NOT CALL ANY FUNCTION! Response contained:', 
-                                message.response.output.map(o => o.type).join(', '));
-                        }
-                    }
-                    break;
-                    
-                case 'response.function_call_arguments.delta':
-                    console.log('🔄 Function arguments building:', message);
-                    break;
-                    
-                case 'response.function_call_arguments.done':
-                    console.log('🎯 Function call detected!', message);
-                    // AI wants to call a function (create service request)
-                    if (message.name === 'create_service_request') {
-                        console.log('✅ Calling handleServiceRequestCreation with args:', message.arguments);
-                        handleServiceRequestCreation(JSON.parse(message.arguments));
-                    }
-                    break;
-                    
-                case 'error':
-                    console.error('OpenAI error:', message.error);
-                    // Ignore non-critical API warnings like session.type
-                    if (message.error && message.error.code !== 'missing_required_parameter') {
-                        updateVoiceStatus('❌ Error', message.error.message || 'Something went wrong');
-                    }
-                    break;
-            }
-        }
-        
-        function playAudioChunk(base64Audio) {
-            if (!voiceCallData.audioContext) return;
-            
-            try {
-                const binaryString = atob(base64Audio);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                
-                const pcm16 = new Int16Array(bytes.buffer);
-                const float32 = new Float32Array(pcm16.length);
-                for (let i = 0; i < pcm16.length; i++) {
-                    float32[i] = pcm16[i] / 32768.0;
-                }
-                
-                const audioBuffer = voiceCallData.audioContext.createBuffer(1, float32.length, 24000);
-                audioBuffer.getChannelData(0).set(float32);
-                
-                // Calculate when this chunk should start playing
-                const now = voiceCallData.audioContext.currentTime;
-                const startTime = Math.max(now, voiceCallData.nextStartTime);
-                
-                // Schedule this chunk to play
-                const source = voiceCallData.audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(voiceCallData.audioContext.destination);
-                source.start(startTime);
-                
-                // Update next start time for seamless playback
-                voiceCallData.nextStartTime = startTime + audioBuffer.duration;
-                
-            } catch (error) {
-                console.error('Audio playback error:', error);
-            }
-        }
-        
-        async function handleServiceRequestCreation(args) {
-            console.log('Creating service request:', args);
-            
-            const guest = getGuestSession();
-            const propertyId = getPropertyId();
-            
-            try {
-                const response = await fetch('/api/voice-assistant/function-call', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        function_name: 'create_service_request',
-                        arguments: args,
-                        session_data: {
-                            service_type_id: voiceCallData.serviceTypeId,
-                            guest_info: guest,
-                            property_id: propertyId
-                        }
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    updateVoiceStatus(
-                        '✅ Request Booked Successfully!',
-                        'Request ID: #' + result.request_id + ' - Our team will assist you shortly.'
-                    );
-                    
-                    // Confetti effect
-                    if (typeof confetti !== 'undefined') {
-                        confetti({particleCount: 100, spread: 70, origin: {y: 0.6}});
-                    }
-                    
-                    // Send function result back to OpenAI
-                    if (voiceCallData.ws) {
-                        voiceCallData.ws.send(JSON.stringify({
-                            type: 'conversation.item.create',
-                            item: {
-                                type: 'function_call_output',
-                                output: JSON.stringify(result)
-                            }
-                        }));
-                    }
-                    
-                    // Auto-close after 3 seconds
-                    setTimeout(() => {
-                        endVoiceCall();
-                        closeServiceMenu();
-                    }, 3000);
-                } else {
-                    updateVoiceStatus('❌ Booking Failed', 'Please try again or use the form.');
-                }
-            } catch (error) {
-                console.error('Service request creation error:', error);
-                updateVoiceStatus('❌ Booking Error', 'Please try again or use the form.');
-            }
-        }
-        */
-        // END OF OLD REALTIME API FUNCTIONS
-        
-        function addToTranscript(speaker, text, isDelta = false) {
-            const transcriptDiv = document.getElementById('voiceTranscript');
-            const transcriptText = transcriptDiv.querySelector('p');
-            
-            transcriptDiv.classList.remove('hidden');
-            
-            // Also maintain plain text version in voiceCallData.transcript
-            if (isDelta) {
-                // Append to last message if it's from the same speaker
-                const lastEntry = transcriptText.innerHTML.split('<br><br>').slice(-1)[0];
-                if (lastEntry.includes('<strong>' + speaker + ':</strong>')) {
-                    transcriptText.innerHTML = transcriptText.innerHTML.slice(0, -8) + text;
-                    // Update plain text
-                    voiceCallData.transcript += text;
-                } else {
-                    const entry = '<strong>' + speaker + ':</strong> ' + text;
-                    transcriptText.innerHTML += entry;
-                    // Update plain text
-                    if (voiceCallData.transcript) {
-                        voiceCallData.transcript += ' ';
-                    }
-                    voiceCallData.transcript += speaker + ': ' + text;
-                }
-            } else {
-                const entry = '<strong>' + speaker + ':</strong> ' + text + '<br><br>';
-                transcriptText.innerHTML += entry;
-                // Update plain text
-                if (voiceCallData.transcript) {
-                    voiceCallData.transcript += ' ';
-                }
-                voiceCallData.transcript += speaker + ': ' + text;
-            }
-            
-            // Scroll to bottom
-            transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-        }
-        
-        function updateVoiceStatus(title, subtitle) {
-            const statusDiv = document.getElementById('voiceStatus');
-            statusDiv.innerHTML = 
-                '<h3 class="text-xl font-bold text-gray-800 mb-2">' + title + '</h3>' +
-                '<p class="text-gray-600 text-sm">' + subtitle + '</p>';
-        }
-        
-        function toggleMute() {
-            voiceCallData.isMuted = !voiceCallData.isMuted;
-            const muteBtn = document.getElementById('muteBtn');
-            
-            if (voiceCallData.isMuted) {
-                muteBtn.innerHTML = '<i class="fas fa-microphone mr-2"></i>Unmute';
-                muteBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
-                muteBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
-                document.getElementById('voiceIcon').className = 'fas fa-microphone-slash text-white text-4xl';
-            } else {
-                muteBtn.innerHTML = '<i class="fas fa-microphone-slash mr-2"></i>Mute';
-                muteBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
-                muteBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
-                document.getElementById('voiceIcon').className = 'fas fa-microphone-alt text-white text-4xl animate-pulse';
-            }
-        }
-        
-        function endVoiceCall() {
-            voiceCallActive = false;
-            
-            // Save transcript to backend before closing
-            const session = getGuestSession();
-            const propertyId = getPropertyId();
-            // Use the plain text transcript from voiceCallData
-            const transcript = voiceCallData.transcript || '';
-            
-            if (transcript && transcript.trim().length > 0) {
-                console.log('💾 Saving voice call transcript before closing...');
-                fetch('/api/voice-call-logs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        property_id: propertyId,
-                        pass_reference: session?.pass_reference,
-                        guest_name: session?.full_name,
-                        room_number: session?.room_number,
-                        service_type_id: voiceCallData.serviceTypeId,
-                        transcript: transcript,
-                        duration_seconds: 0 // We can track this if needed
-                    })
-                }).then(res => res.json())
-                  .then(data => {
-                      if (data.success) {
-                          console.log('✅ Voice call transcript saved! Log ID:', data.log_id);
-                      } else {
-                          console.error('❌ Failed to save transcript:', data.error);
-                      }
-                  })
-                  .catch(err => console.error('❌ Error saving transcript:', err));
-            }
-            
-            // Close WebSocket
-            if (voiceCallData.ws) {
-                voiceCallData.ws.close();
-                voiceCallData.ws = null;
-            }
-            
-            // Stop media stream
-            if (voiceCallData.mediaStream) {
-                voiceCallData.mediaStream.getTracks().forEach(track => track.stop());
-                voiceCallData.mediaStream = null;
-            }
-            
-            // Close audio context
-            if (voiceCallData.audioContext) {
-                voiceCallData.audioContext.close();
-                voiceCallData.audioContext = null;
-            }
-            
-            document.getElementById('voiceCallModal').classList.add('hidden');
-            document.getElementById('muteBtn').classList.add('hidden');
-            document.getElementById('voiceTranscript').classList.add('hidden');
-            document.getElementById('voiceTranscript').querySelector('p').innerHTML = '';
-            voiceCallData = {
-                serviceTypeId: null, 
-                serviceName: '', 
-                transcript: '', 
-                isMuted: false,
-                ws: null,
-                audioContext: null,
-                mediaStream: null,
-                sessionConfig: null
-            };
-        }
-        
-        // ========================================
-        // END AI VOICE CALL FUNCTIONS
-        // ========================================
-
-        // Service button setup on page load
+        // The hero "At Your Service" chip opens the concierge chat
         document.addEventListener('DOMContentLoaded', function() {
-            // Attach event listener to service button
             const serviceButton = document.getElementById('serviceButton');
             if (serviceButton) {
-                serviceButton.addEventListener('click', window.openServiceMenu);
+                serviceButton.addEventListener('click', function() {
+                    const chatBtn = document.getElementById('chatbotButton');
+                    const win = document.getElementById('chatWindow');
+                    if (chatBtn && win && win.classList.contains('hidden')) chatBtn.click();
+                });
             }
         });
         
