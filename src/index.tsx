@@ -33577,7 +33577,10 @@ window.luxTogglePassForm = function() {
               if (vc === call) endVoiceCall('mic_denied', vT('Please allow the microphone to talk to the concierge'));
               return;
             }
-            if (vc !== call) return; // ended while the permission prompt was up
+            if (vc !== call) { // ended while the permission prompt was up
+              call.stream.getTracks().forEach(function (t) { t.stop(); });
+              return;
+            }
 
             var data = null;
             try {
@@ -33593,7 +33596,10 @@ window.luxTogglePassForm = function() {
               });
               data = await res.json();
             } catch (e) {}
-            if (vc !== call) return;
+            if (vc !== call) { // ended while the secret was being minted: close the server's row
+              if (data && data.voice_session_id) postVoiceEnd(data.voice_session_id, 0, 'cancelled');
+              return;
+            }
             if (!data || !data.success || !data.client_secret) {
               var err = (data && data.error) || '';
               if (err === 'voice_disabled') {
@@ -33650,6 +33656,15 @@ window.luxTogglePassForm = function() {
             } });
           }
 
+          // A beacon survives the page going away; keepalive covers every other end
+          function postVoiceEnd(voiceSessionId, seconds, reason) {
+            var payload = JSON.stringify({ voice_session_id: voiceSessionId, seconds: seconds, reason: reason });
+            if (reason === 'unload' && navigator.sendBeacon) {
+              navigator.sendBeacon('/api/voice/end', new Blob([payload], { type: 'application/json' }));
+            } else {
+              fetch('/api/voice/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(function () {});
+            }
+          }
           function postVoiceEvent(call, body) {
             body.voice_session_id = call.session.voice_session_id;
             return fetch('/api/voice/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true })
@@ -33816,14 +33831,7 @@ window.luxTogglePassForm = function() {
             voiceUi.pill.hidden = true;
             voiceUi.orb.style.setProperty('--lvl', '0');
             var seconds = call.connectedAt ? Math.round((Date.now() - call.connectedAt) / 1000) : 0;
-            if (call.session && call.session.voice_session_id) {
-              var payload = JSON.stringify({ voice_session_id: call.session.voice_session_id, seconds: seconds, reason: reason });
-              if (reason === 'unload' && navigator.sendBeacon) {
-                navigator.sendBeacon('/api/voice/end', new Blob([payload], { type: 'application/json' }));
-              } else {
-                fetch('/api/voice/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(function () {});
-              }
-            }
+            if (call.session && call.session.voice_session_id) postVoiceEnd(call.session.voice_session_id, seconds, reason);
             if (window.luxTrack) luxTrack('voice_end', reason);
             if (reason === 'unload') return;
             if (reason === 'type' || reason === 'staff') ensureChatOpen();
