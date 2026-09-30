@@ -30109,8 +30109,8 @@ window.luxTogglePassForm = function() {
                 propertyData = Object.assign({}, _pvLive.property, m.property || {});
                 if (Array.isArray(m.customSections)) customSections = m.customSections;
                 if (Array.isArray(m.infoPages)) infoPages = m.infoPages;
-                if (typeof m.beachEnabled === 'boolean') _pvBeach = m.beachEnabled;
-                if (typeof m.feedbackEnabled === 'boolean') _pvFeedback = m.feedbackEnabled;
+                if (m.beachEnabled != null) _pvBeach = !!m.beachEnabled;
+                if (m.feedbackEnabled != null) _pvFeedback = !!m.feedbackEnabled;
                 allOfferings = _pvLive.offerings.slice();
                 var nameEl = document.getElementById('propertyName');
                 if (nameEl) nameEl.textContent = propertyData.name || '';
