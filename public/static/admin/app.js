@@ -340,10 +340,10 @@ function renderHome() {
       : '<div class="hm-att-row good" style="cursor:default"><div class="hm-att-ico">✅</div><div class="hm-att-text"><div class="hm-att-title">' + t('home.allGood') + '</div><div class="hm-att-sub">' + t('home.allGoodSub') + '</div></div></div>') + '</div>'
     + '<div class="hm-h">' + t('home.tasks') + '</div><div class="hm-tasks">' + tasks.map(function (tk, i) { return '<button class="hm-task" type="button" data-task="' + i + '"><span class="hm-task-ico">' + tk.ico + '</span><span class="hm-task-t">' + edEsc(tk.t) + '</span><span class="hm-task-s">' + edEsc(tk.s) + '</span></button>'; }).join('') + '</div>'
     + '<div class="hm-h">' + t('home.tiles') + '</div><div class="hm-tiles">' + tiles.map(function (tl) {
-      var status = tl.count == null ? '' : tl.count ? t('tiles.count', { n: tl.count, what: tl.isRs ? t('tiles.rsSub') : tl.kind === 'map' ? 'pins' : vocab(tl.key)[tl.count === 1 ? 'one' : 'many'] }) : 'EMPTY';
-      if (tl.kind === 'map' && tl.count) status = tl.count + ' pins';
+      var empty = tl.count === 0 && tl.kind !== 'map';
+      var status = tl.count == null ? '' : empty ? t('tiles.empty') : t('tiles.count', { n: tl.count, what: tl.isRs ? t('tiles.rsSub') : tl.kind === 'map' ? t('tiles.pins') : vocab(tl.key)[tl.count === 1 ? 'one' : 'many'] });
       return '<button class="hm-tile' + (tl.visible ? '' : ' off') + '" type="button" data-tile="' + edAttr(tl.key) + '">' + (tl.img ? '<div class="hm-tile-bg" style="background-image:url(\'' + edAttr(tl.img) + '\')"></div>' : '') + '<div class="hm-tile-ov"></div>'
-        + (status ? '<div class="hm-tile-s' + (status === 'EMPTY' ? ' warn' : '') + '">' + edEsc(status) + '</div>' : '') + (tl.visible ? '' : '<div class="hm-tile-s right">' + t('tag.hidden') + '</div>')
+        + (status ? '<div class="hm-tile-s' + (empty ? ' warn' : '') + '">' + edEsc(status) + '</div>' : '') + (tl.visible ? '' : '<div class="hm-tile-s right">' + t('tag.hidden') + '</div>')
         + '<div class="hm-tile-t">' + edIconHtml(tl.icon) + edEsc(tileLabel(tl)) + '</div></button>';
     }).join('') + '</div>';
   var left = document.getElementById('hm-left');

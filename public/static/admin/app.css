@@ -428,6 +428,7 @@ details.ed-adv[open] summary::before{content:'▾ '}
 #sb-overlay{display:none;position:fixed;inset:0;background:rgba(20,17,15,.5);z-index:250}
 @media (max-width:900px){
   #sidebar{position:fixed;left:0;top:0;bottom:0;z-index:260;transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);width:280px;box-shadow:0 0 40px rgba(0,0,0,.4)}
+  body.lang-ar #sidebar{left:auto;right:0;transform:translateX(100%)}
   body.sb-open #sidebar{transform:translateX(0)}
   body.sb-open #sb-overlay{display:block}
   .tb-menu{display:flex}
