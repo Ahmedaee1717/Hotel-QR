@@ -12983,7 +12983,8 @@ app.post('/api/chatbot/chat', async (c) => {
     // Get or create conversation
     let convId = conversation_id
     let isAIPaused = false
-    
+    let conv: any = null
+
     if (!convId) {
       // Create new conversation with guest info if available
       const convResult = await DB.prepare(`
@@ -13001,7 +13002,6 @@ app.post('/api/chatbot/chat', async (c) => {
       try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {}
     } else {
       // Check if admin has taken over (only for existing conversations)
-      let conv: any = null
       try {
         conv = await DB.prepare(`
           SELECT is_ai_paused, site_lang, guest_lang FROM chatbot_conversations
