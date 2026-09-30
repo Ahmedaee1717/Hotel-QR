@@ -35044,7 +35044,9 @@ window.luxTogglePassForm = function() {
                 bubble.innerHTML = text.replace(/\\n/g, '<br>');
                 // Add staff badge
                 const badge = document.createElement('span');
-                badge.className = 'inline-block bg-white bg-opacity-20 text-xs px-2 py-1 rounded-full mr-2';
+                badge.className = 'inline-block text-xs px-2 py-1 rounded-full mr-2';
+                // Own colours: the page's white utilities render it solid white on the purple bubble
+                badge.style.cssText = 'background:rgba(0,0,0,.28);color:#fff;border:1px solid rgba(255,255,255,.45);font-weight:600;letter-spacing:.02em';
                 badge.innerHTML = '<i class="fas fa-headset mr-1"></i>Staff';
                 bubble.insertBefore(badge, bubble.firstChild);
               } else {
