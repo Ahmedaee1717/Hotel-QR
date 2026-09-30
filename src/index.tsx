@@ -56332,7 +56332,7 @@ header{padding:16px 22px;display:flex;align-items:center;justify-content:space-b
 header h1{font-size:1.3rem;font-weight:800;color:#111827}
 header h1 i{color:#25D366;margin-right:9px}
 header a{color:#2563eb;text-decoration:none;font-size:.85rem;font-weight:600}
-.wrap{max-width:880px;margin:0 auto;padding:20px}
+.wrap{max-width:980px;margin:0 auto;padding:20px}
 body.embed .wrap{padding:0;max-width:none}
 .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .card h2{font-size:1.05rem;font-weight:800;color:#111827;margin-bottom:6px;display:flex;align-items:center;gap:9px}
@@ -56350,13 +56350,14 @@ input:focus,select:focus{outline:none;border-color:#25D366;box-shadow:0 0 0 3px 
 .btn-wa:hover{background:#1eb856}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.88rem}
-th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #f0f1f3;vertical-align:top}
+th,td{text-align:left;padding:10px 6px;border-bottom:1px solid #f0f1f3;vertical-align:top}
 th{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:700;white-space:nowrap}
 td button{border:1px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:7px;padding:6px 11px;font-size:.75rem;cursor:pointer;font-weight:600;white-space:nowrap;font-family:inherit}
 td button.b-soft{border-color:#d1d5db;background:#f9fafb;color:#374151}
 td button.b-soft:hover{background:#f3f4f6}
-td select.sel{width:auto;min-width:150px;padding:7px 9px;font-size:.82rem}
+td select.sel{width:auto;min-width:0;padding:7px 8px;font-size:.82rem}
 td .acts{display:flex;gap:6px;flex-wrap:wrap}
+td .acts.col{flex-direction:column;align-items:flex-start}
 tr.paused td{color:#9ca3af}
 tr.paused td b{color:#9ca3af}
 .pill{display:inline-block;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;font-weight:800;padding:4px 11px;border-radius:999px;background:#f3f4f6;color:#4b5563;white-space:nowrap}
@@ -56390,7 +56391,7 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
 .act .txt{color:#374151;margin-top:4px;line-height:1.5}
 .act .res{color:#15803d;margin-top:3px;font-size:.8rem;line-height:1.5}
 [dir=auto]{unicode-bidi:plaintext}
-@media (max-width:700px){.two{grid-template-columns:1fr}.wrap{padding:14px}.card{padding:16px}}
+@media (max-width:700px){.two{grid-template-columns:1fr}.wrap{padding:14px}.card{padding:16px}td button{padding:12px 14px;font-size:.8rem}}
 </style>
 </head>
 <body>
@@ -56497,7 +56498,7 @@ var EMBED = new URLSearchParams(location.search).has('embed');
 if(EMBED) document.body.classList.add('embed');
 if(!EMBED && !localStorage.getItem('admin_token')) window.location.href='/admin/login';
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
-var RELAY = {alerts:'Alerts only (can reply)', instant:'Instant: every guest message', off:'Off'};
+var RELAY = {alerts:'Alerts only', instant:'Instant', off:'Off'};   // table labels; the form spells them out
 var READS = {en:'English', ar:'Arabic — العربية'};
 var KIND = {alert:'Alert', forward:'Guest message', confirm:'Confirmation', help:'Help', test:'Test'};
 var OB_ST = {pending:['queued','pill'], sent:['sent','pill ok'], failed:['failed','pill bad']};
@@ -56568,7 +56569,7 @@ function contactRow(c, d){
     '<td><select class="sel" onchange="patch('+id+',{relay_mode:this.value})">'+opts(RELAY, c.relay_mode||'alerts')+'</select></td>'+
     '<td><select class="sel" onchange="patch('+id+',{language:this.value})">'+opts(READS, c.language||'en')+'</select></td>'+
     '<td>'+status+last+'</td>'+
-    '<td><div class="acts"><button class="b-soft" onclick="patch('+id+',{is_active:'+(on?'false':'true')+'})">'+(on?'Pause':'Resume')+'</button>'+
+    '<td><div class="acts col"><button class="b-soft" onclick="patch('+id+',{is_active:'+(on?'false':'true')+'})">'+(on?'Pause':'Resume')+'</button>'+
     '<button onclick="del('+id+')">Remove</button></div></td></tr>';
 }
 function who(x){ return x.contact_name || x.contact || x.name || (x.contact_phone ? '+'+x.contact_phone : ''); }
