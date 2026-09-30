@@ -144,7 +144,7 @@ var SCREENS = {
   beach: { i18n: 'sc.beach', icon: 'fas fa-umbrella-beach', hash: 'beach', cap: 'cap.beach', embed: '/admin/beach-setup?embed=1', note: 'emb.beach', help: 'beach' },
   feedback: { i18n: 'sc.feedback', icon: 'fas fa-comment-dots', hash: 'feedback', cap: 'cap.feedback', help: 'feedback' },
   map: { i18n: 'sc.map', icon: 'fas fa-map-location-dot', hash: 'map', cap: 'cap.map', embed: '/admin/map-editor?embed=1', note: 'emb.map', help: 'map' },
-  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', tabs: ['teach', 'conversations'], help: 'chatbot' },
+  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', tabs: ['conversations', 'teach'], help: 'chatbot' },
   whatsapp: { i18n: 'sc.whatsapp', icon: 'fab fa-whatsapp', hash: 'whatsapp', cap: 'cap.whatsapp', embed: '/admin/escalation?embed=1', note: 'emb.whatsapp', help: 'chatbot' },
   staff: { i18n: 'sc.staff', icon: 'fas fa-users', hash: 'staff', cap: 'cap.staff', embed: '/admin/ops-staff?embed=1', note: 'emb.staff', perm: 'users_view', help: 'behind' },
   elkasr: { i18n: 'sc.elkasr', icon: 'fas fa-chair', hash: 'elkasr', cap: 'cap.elkasr', embed: '/admin/restaurant-setup/' + MAIN_RESTAURANT_ID + '?embed=1', withProperty: true, note: 'emb.elkasr', help: 'behind' },
