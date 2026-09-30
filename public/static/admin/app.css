@@ -66,6 +66,10 @@ input,textarea,select{font-family:inherit;font-size:inherit}
 
 /* == MAIN + TOPBAR == */
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);min-width:0}
+#wa-down{display:flex;align-items:center;gap:12px;background:#a63d2f;color:#fff;padding:10px 22px;font-size:13.5px;line-height:1.45;flex-shrink:0}
+#wa-down>i{font-size:22px;flex-shrink:0}
+#wa-down .btn{margin-inline-start:auto;flex-shrink:0;background:#fff;color:#a63d2f;border:0;font-weight:600}
+@media (max-width:700px){#wa-down{padding:10px 14px;font-size:12.5px;flex-wrap:wrap}#wa-down .btn{margin-inline-start:34px}}
 .topbar{height:60px;flex-shrink:0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:var(--surface);gap:12px}
 .topbar-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}

@@ -54616,6 +54616,9 @@ app.get('/staff/app', (c) => {
         <span id="wdTxt">Checking alert watcher…</span>
         <button id="testRingBtn" onclick="testRing()">Test ring</button>
     </div>
+    <div id="waDown" hidden style="margin:10px 16px 0;background:#a63d2f;color:#fff;border-radius:12px;padding:10px 14px;font-size:.8rem;line-height:1.45;display:flex;gap:10px;align-items:flex-start">
+        <i class="fab fa-whatsapp" style="font-size:1.3rem;margin-top:2px"></i><div id="waDownTxt"></div>
+    </div>
 
     <div class="wrap">
         <div class="tabs">
@@ -57474,6 +57477,21 @@ app.get('/staff/app', (c) => {
     opsBoot();
     setInterval(opsTick, 15000);
     document.addEventListener('visibilitychange', opsTick);
+
+    // WhatsApp line logged out: managers get no alerts and their WhatsApp replies do not reach guests
+    function waLineCheck() {
+        fetch('/api/staff/wa-line', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+            var box = document.getElementById('waDown'); if (!box) return;
+            if (!d || !d.down) { box.hidden = true; box.style.display = 'none'; return; }
+            var ar = STAFF_LANG === 'ar';
+            box.querySelector('#waDownTxt').innerHTML = ar
+                ? '<b>خط واتساب غير متصل.</b> المديرون لا تصلهم تنبيهات الضيوف على واتساب — ردّوا على الضيوف من هنا، وأبلغوا المدير لمسح رمز QR.'
+                : '<b>WhatsApp line is logged out.</b> Managers get no guest alerts on WhatsApp — answer guests here, and tell the manager to scan the QR code again.';
+            box.hidden = false; box.style.display = 'flex';
+        }).catch(function () {});
+    }
+    waLineCheck();
+    setInterval(waLineCheck, 120000);
     </script>
 </body>
 </html>
@@ -78495,6 +78513,7 @@ app.post('/api/staff/ring-check', async (c) => {
     c.executionCtx.waitUntil(runEscalations(c.env, DB).catch(() => {}).then(() => drainWaOutbox(c.env, DB)).catch(() => {}))
     c.executionCtx.waitUntil(drainWaInbound(c.env, DB).catch(() => {}))
     c.executionCtx.waitUntil(rstSweepNoShows(c.env, DB).catch(() => {}))
+    c.executionCtx.waitUntil(waWatchdog(c.env, DB).catch((e) => console.error('wa watch', e)))
     return c.json({ success: true, pending })
   } catch (e) {
     console.error('ring-check', e)
@@ -79288,6 +79307,103 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
   }
 
   return { channel: 'none', ok: false, detail: 'No WhatsApp channel configured' }
+}
+
+// WhatsApp line watchdog. The line (shared with Signabot) is sometimes logged out by
+// WhatsApp and needs a fresh QR scan; until then nothing is delivered. The ring-check
+// cron looks every few minutes (and WaSender's session.status events trigger a look at
+// once); two "logged out" answers in a row send one e-mail, a reminder every 3 hours,
+// and a "back online" e-mail when it recovers. State lives in system_settings.
+const WA_WATCH_DOWN = ['disconnected', 'no_session', 'bad_key']
+const WA_WATCH_TO_DEFAULT = 'ahmed.enin@gmail.com'
+async function waWatchGet(DB: any): Promise<Record<string, string>> {
+  const rows: any[] = (await DB.prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'wa_watch_%'").all()).results || []
+  const o: Record<string, string> = {}
+  for (const r of rows) o[r.setting_key] = r.setting_value == null ? '' : String(r.setting_value)
+  return o
+}
+function waWatchSet(DB: any, kv: Record<string, string | null>): any[] {
+  return Object.keys(kv).map((k) => kv[k] == null
+    ? DB.prepare('DELETE FROM system_settings WHERE setting_key = ?').bind(k)
+    : DB.prepare(`INSERT INTO system_settings (setting_key, setting_value, description, updated_at) VALUES (?, ?, 'WhatsApp line watchdog', datetime('now'))
+        ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at`).bind(k, kv[k]))
+}
+function waWatchCairo(ms: number): string {
+  try { return new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(ms)) + ' Cairo' } catch (e) { return new Date(ms).toISOString() }
+}
+function waWatchSpan(ms: number): string {
+  const m = Math.max(1, Math.round(ms / 60000))
+  return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '')
+}
+async function waWatchMail(env: any, to: string, subject: string, lines: string[]): Promise<boolean> {
+  if (!env.RESEND_API_KEY || !to) return false
+  const esc = (x: string) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#1f1a16;max-width:560px">'
+    + lines.map((l) => l === '' ? '<br>' : '<p style="margin:0 0 10px">' + esc(l).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>') + '</p>').join('')
+    + '<p style="margin:18px 0 0;color:#77706a;font-size:12px">Old Palace Resort · WhatsApp line watch</p></div>'
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'Old Palace Resort <reports@oldpalaceresort.online>', to: [to], subject, html, text: lines.join('\n').replace(/\*\*/g, '') }),
+      signal: AbortSignal.timeout(8000)
+    })
+    if (!r.ok) console.error('wa watch mail', r.status, (await r.text()).slice(0, 200))
+    return r.ok
+  } catch (e) { console.error('wa watch mail', String(e).slice(0, 160)); return false }
+}
+async function waWatchdog(env: any, DB: any, force?: boolean): Promise<{ state: string; changed?: string }> {
+  if (!env.WASENDER_TOKEN) return { state: 'off' }
+  const w = await waWatchGet(DB)
+  const now = Date.now()
+  const lastCheck = w.wa_watch_checked_at ? Date.parse(w.wa_watch_checked_at) : 0
+  if (!force && lastCheck && now - lastCheck < 4 * 60000) return { state: w.wa_watch_state || 'ok' }
+  // A fresh look (not the 10-minute cache the admin screens use); it refreshes that cache too
+  try { await DB.prepare('DELETE FROM wasender_health WHERE id = 1').run() } catch (e) {}
+  const h = await whatsappHealth(env, DB)
+  const down = WA_WATCH_DOWN.includes(h.state)
+  const to = w.wa_watch_email || WA_WATCH_TO_DEFAULT
+  const set: Record<string, string | null> = { wa_watch_checked_at: new Date(now).toISOString() }
+  let changed = ''
+  if (down) {
+    const strikes = (parseInt(w.wa_watch_strikes || '0', 10) || 0) + 1
+    set.wa_watch_strikes = String(strikes)
+    if (!w.wa_watch_down_since) set.wa_watch_down_since = new Date(now).toISOString()
+    set.wa_watch_note = h.note || ''
+    const since = w.wa_watch_down_since ? Date.parse(w.wa_watch_down_since) : now
+    const mailedAt = w.wa_watch_mailed_at ? Date.parse(w.wa_watch_mailed_at) : 0
+    // Two answers in a row (a reconnect in progress is not an outage), then every 3 hours
+    const first = w.wa_watch_state !== 'down' && strikes >= 2
+    const remind = w.wa_watch_state === 'down' && mailedAt && now - mailedAt >= 3 * 3600000
+    if (first || remind) {
+      const own = await waOwnNumber(env, DB).catch(() => '')
+      const line = own ? '+' + own : 'the hotel\'s WhatsApp line'
+      const ok = await waWatchMail(env, to, (remind ? 'Still logged out — ' : '') + 'WhatsApp line is logged out (Old Palace alerts + Signabot)', [
+        '**The WhatsApp line ' + line + ' was logged out** — noticed ' + waWatchCairo(since) + (remind ? ', still down after ' + waWatchSpan(now - since) : '') + '.',
+        'Until it is connected again, managers get no guest alerts, their replies do not reach guests, and Signabot cannot answer.',
+        '',
+        '**To fix it (2 minutes):** open wasenderapi.com, go to your WhatsApp session, press Connect / Scan QR, and scan the code with the phone that has this number (WhatsApp → Linked devices → Link a device).',
+        '',
+        '**So it stops happening:** keep that phone plugged in and on Wi-Fi; set WhatsApp\'s battery use to Unrestricted; turn off scheduled auto-restart and bedtime / battery-saving modes; in WhatsApp → Linked devices remove everything except WaSender.',
+        '',
+        'WhatsApp said: ' + (h.note || h.state)
+      ])
+      if (ok) { set.wa_watch_mailed_at = new Date(now).toISOString(); set.wa_watch_state = 'down'; changed = 'down' }
+    }
+  } else if (h.state === 'ready') {
+    if (w.wa_watch_state === 'down') {
+      const since = w.wa_watch_down_since ? Date.parse(w.wa_watch_down_since) : now
+      await waWatchMail(env, to, 'WhatsApp line is back online (Old Palace alerts + Signabot)', [
+        '**The WhatsApp line is connected again** — ' + waWatchCairo(now) + ', after about ' + waWatchSpan(now - since) + ' offline.',
+        'Guest alerts, staff replies and Signabot work again. Alerts that failed while it was down are not re-sent.'
+      ])
+      changed = 'up'
+    }
+    set.wa_watch_state = 'ok'; set.wa_watch_strikes = null; set.wa_watch_down_since = null; set.wa_watch_mailed_at = null; set.wa_watch_note = null
+  }
+  // 'error' (WaSender unreachable) changes nothing: no alarm on a network blip
+  await DB.batch(waWatchSet(DB, set))
+  return { state: down ? 'down' : h.state === 'ready' ? 'ok' : (w.wa_watch_state || 'ok'), changed: changed || undefined }
 }
 
 // Escalation ladder: up to four levels, each with its own start time, its own
@@ -80538,6 +80654,9 @@ app.post('/api/staff/wasender-webhook', async (c) => {
     const payload = await c.req.json().catch(() => ({}))
     const lidWrites = waLidStatements(DB, payload)
     if (lidWrites.length) { try { await DB.batch(lidWrites) } catch (e) {} }
+    if (/^session\.status$/i.test(String((payload && payload.event) || ''))) {
+      try { c.executionCtx.waitUntil(waWatchdog(c.env, DB, true).catch(() => {})) } catch (e) {}
+    }
     const msgs = waParseInbound(payload)
     if (!msgs.length) return c.json({ success: true, ignored: 'no inbound message', claimed: 0, claimed_all: false })
 
@@ -80698,6 +80817,32 @@ app.post('/api/staff/escalation/contacts', async (c) => {
     `).bind(b.name || '', phone, b.callmebot_key || null, level, relayMode, language).run()
     return c.json({ success: true })
   } catch (e) { return c.json({ success: false }, 500) }
+})
+
+// Is the WhatsApp line connected? (the watchdog's last verdict; cheap, for banners)
+app.get('/api/staff/wa-line', async (c) => {
+  try {
+    const w = await waWatchGet(c.env.DB)
+    const down = w.wa_watch_state === 'down' || (parseInt(w.wa_watch_strikes || '0', 10) || 0) >= 2
+    return c.json({ success: true, down, since: down ? (w.wa_watch_down_since || null) : null, checked_at: w.wa_watch_checked_at || null })
+  } catch (e) { return c.json({ success: true, down: false }) }
+})
+
+// One test e-mail from the line watch (admin only, at most one per 10 minutes)
+app.post('/api/staff/wa-line/test-email', async (c) => {
+  if (!c.req.header('X-User-ID')) return c.json({ success: false, error: 'Sign in to the admin first.' }, 401)
+  const DB = c.env.DB
+  const w = await waWatchGet(DB)
+  const last = w.wa_watch_test_at ? Date.parse(w.wa_watch_test_at) : 0
+  if (last && Date.now() - last < 10 * 60000) return c.json({ success: false, error: 'A test was sent a few minutes ago — check the inbox (and spam).' })
+  const to = w.wa_watch_email || WA_WATCH_TO_DEFAULT
+  const h = await whatsappHealth(c.env, DB)
+  const ok = await waWatchMail(c.env, to, 'Test: WhatsApp line watch is on (Old Palace alerts + Signabot)', [
+    '**This is a test.** You will get an e-mail like this within a few minutes whenever WhatsApp logs the line out, a reminder every 3 hours while it stays down, and one when it is back.',
+    'Right now the line is: **' + (h.state === 'ready' ? 'connected' : h.state) + '**.'
+  ])
+  await DB.batch(waWatchSet(DB, { wa_watch_test_at: new Date().toISOString() }))
+  return c.json(ok ? { success: true, to } : { success: false, error: 'The e-mail service refused the message.' })
 })
 
 // The WhatsApp groups the hotel's line is a member of, to pick one as an alert group.

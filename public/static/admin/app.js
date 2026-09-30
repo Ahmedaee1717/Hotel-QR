@@ -572,6 +572,7 @@ function setLang(lang) {
   var ci = document.getElementById('cmdk-in'); if (ci) ci.placeholder = t('cmdk.ph');
   var lb = document.getElementById('tb-lang'); if (lb) { lb.textContent = t('lang.btn'); lb.title = t('lang.switch'); }
   if (C) { buildSidebar(); if (V3.screen === 'page') openPage(V3.key, { keepPhone: true }); else if (V3.screen) go(V3.screen, { tab: V3.tab, page: V3.key }); }
+  waLineBar();
 }
 
 /* ---- boot ---- */
@@ -600,7 +601,20 @@ async function boot() {
   document.getElementById('sc-stage').innerHTML = '';
   buildSidebar();
   routeFromHash();
+  waLineWatch();
 }
+/* ---- WhatsApp line banner: WhatsApp sometimes logs the shared line out; nothing is delivered until it is scanned again ---- */
+var WA_LINE = { down: false, since: null };
+function waLineBar() {
+  var bar = document.getElementById('wa-down');
+  if (!WA_LINE.down) { if (bar) bar.remove(); return; }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'wa-down'; bar.setAttribute('role', 'alert'); var main = document.getElementById('main'); main.insertBefore(bar, document.getElementById('content')); }
+  var at = ''; try { if (WA_LINE.since) at = new Date(WA_LINE.since).toLocaleTimeString(LANG === 'ar' ? 'ar-EG' : 'en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Cairo' }); } catch (e) {}
+  bar.innerHTML = '<i class="fab fa-whatsapp"></i><div><b>' + edEsc(t('wa.downT')) + (at ? ' · ' + edEsc(t('wa.since', { t: at })) : '') + '</b> ' + edEsc(t('wa.downD')) + '</div><button type="button" class="btn btn-sm" id="wa-down-go">' + edEsc(t('wa.open')) + '</button>';
+  document.getElementById('wa-down-go').addEventListener('click', function () { go('chatbot', { tab: 'whatsapp' }); });
+}
+async function waLineCheck() { var r = await api('GET', '/api/staff/wa-line'); if (r.ok) { WA_LINE.down = !!r.data.down; WA_LINE.since = r.data.since || null; waLineBar(); } }
+function waLineWatch() { waLineCheck(); setInterval(waLineCheck, 120000); }
 (function wireShell() {
   document.getElementById('tb-menu').addEventListener('click', function () { toggleSidebar(); });
   document.getElementById('sb-overlay').addEventListener('click', function () { toggleSidebar(false); });

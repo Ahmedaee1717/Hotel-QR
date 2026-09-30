@@ -2,6 +2,7 @@
 var I18N = { en: {}, ar: {} };
 I18N.en = {
   'brand.tag': 'Guest app', 'nav.openGuest': 'Open the guest app', 'nav.signedIn': 'Signed in', 'nav.logout': 'Sign out',
+  'wa.downT': 'WhatsApp line is logged out', 'wa.since': 'since {t}', 'wa.downD': 'Managers get no guest alerts and their replies do not reach guests. Scan the QR code again at wasenderapi.com with the phone that has the number.', 'wa.open': 'WhatsApp alerts',
   'top.find': 'Find anything…', 'top.help': 'Help', 'cmdk.ph': 'Type the name of a tile, a place, a dish or an info page…',
   'grp.home': 'Home screen', 'grp.pages': 'Guest pages', 'grp.behind': 'Behind the scenes', 'grp.advanced': 'Advanced', 'nav.newTile': 'New tile', 'tag.hidden': 'hidden',
   'sc.home': 'Home', 'sc.hotel': 'Hotel & home screen', 'sc.roomservice': 'Room service', 'sc.info': 'Info pages', 'sc.beach': 'Beach', 'sc.feedback': 'Feedback', 'sc.map': 'Resort map',
@@ -106,6 +107,7 @@ I18N.en = {
 };
 I18N.ar = {
   'brand.tag': 'تطبيق الضيوف', 'nav.openGuest': 'افتح تطبيق الضيوف', 'nav.signedIn': 'مسجّل الدخول', 'nav.logout': 'تسجيل الخروج',
+  'wa.downT': 'خط واتساب غير متصل', 'wa.since': 'منذ {t}', 'wa.downD': 'المديرون لا تصلهم تنبيهات الضيوف وردودهم لا تصل للضيوف. امسح رمز QR مرة أخرى على wasenderapi.com بالهاتف الذي عليه الرقم.', 'wa.open': 'تنبيهات واتساب',
   'top.find': 'ابحث عن أي شيء…', 'top.help': 'مساعدة', 'cmdk.ph': 'اكتب اسم مربع أو مكان أو طبق أو صفحة معلومات…',
   'grp.home': 'الشاشة الرئيسية', 'grp.pages': 'صفحات الضيوف', 'grp.behind': 'خلف الكواليس', 'grp.advanced': 'أدوات متقدمة', 'nav.newTile': 'مربع جديد', 'tag.hidden': 'مخفي',
   'sc.home': 'الرئيسية', 'sc.hotel': 'الفندق والشاشة الرئيسية', 'sc.roomservice': 'خدمة الغرف', 'sc.info': 'صفحات المعلومات', 'sc.beach': 'الشاطئ', 'sc.feedback': 'رأي الضيوف', 'sc.map': 'خريطة المنتجع',
