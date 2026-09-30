@@ -144,7 +144,7 @@ var SCREENS = {
   beach: { i18n: 'sc.beach', icon: 'fas fa-umbrella-beach', hash: 'beach', cap: 'cap.beach', embed: '/admin/beach-setup?embed=1', note: 'emb.beach', help: 'beach' },
   feedback: { i18n: 'sc.feedback', icon: 'fas fa-comment-dots', hash: 'feedback', cap: 'cap.feedback', help: 'feedback' },
   map: { i18n: 'sc.map', icon: 'fas fa-map-location-dot', hash: 'map', cap: 'cap.map', embed: '/admin/map-editor?embed=1', note: 'emb.map', help: 'map' },
-  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', tabs: ['conversations', 'teach'], help: 'chatbot' },
+  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', tabs: ['conversations', 'teach', 'whatsapp'], help: 'chatbot' },
   whatsapp: { i18n: 'sc.whatsapp', icon: 'fab fa-whatsapp', hash: 'whatsapp', cap: 'cap.whatsapp', embed: '/admin/escalation?embed=1', note: 'emb.whatsapp', help: 'chatbot' },
   staff: { i18n: 'sc.staff', icon: 'fas fa-users', hash: 'staff', cap: 'cap.staff', embed: '/admin/ops-staff?embed=1', note: 'emb.staff', perm: 'users_view', help: 'behind' },
   elkasr: { i18n: 'sc.elkasr', icon: 'fas fa-chair', hash: 'elkasr', cap: 'cap.elkasr', embed: '/admin/restaurant-setup/' + MAIN_RESTAURANT_ID + '?embed=1', withProperty: true, note: 'emb.elkasr', help: 'behind' },
@@ -168,7 +168,7 @@ function buildSidebar() {
   }).join('');
   nav.innerHTML = '<div class="nav-section"><div class="nav-section-label">' + t('grp.home') + '</div>' + navItem('home') + navItem('hotel') + '</div>'
     + '<div class="nav-section"><div class="nav-section-label">' + t('grp.pages') + '</div>' + tiles + '<button class="nav-add" type="button" data-go="newtile"><span class="nav-emoji">＋</span><span>' + t('nav.newTile') + '</span></button></div>'
-    + '<div class="nav-section"><div class="nav-section-label">' + t('grp.behind') + '</div>' + navItem('chatbot') + navItem('whatsapp') + navItem('staff') + navItem('elkasr') + navItem('analytics') + navItem('qr') + navItem('help') + '</div>'
+    + '<div class="nav-section"><div class="nav-section-label">' + t('grp.behind') + '</div>' + navItem('chatbot') + navItem('staff') + navItem('elkasr') + navItem('analytics') + navItem('qr') + navItem('help') + '</div>'
     + '<div class="nav-section"><div class="nav-section-label">' + t('grp.advanced') + '</div>' + navItem('frontdesk') + navItem('seasonal') + '</div>';
   nav.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { navGo(b.dataset.go); }); });
   markSidebar();
@@ -249,6 +249,7 @@ window.addEventListener('hashchange', function () { if (!_hashSelf) routeFromHas
 function helpChapterFor() { var s = SCREENS[V3.screen]; if (V3.screen === 'page') { var tl = tileByKey(V3.key); return tl && tl.type === 'restaurant' ? 'dining' : 'page'; } return (s && s.help) || 'home'; }
 function go(screen, opts) {
   opts = opts || {};
+  if (screen === 'whatsapp') { screen = 'chatbot'; opts.tab = 'whatsapp'; } // WhatsApp alerts is a tab of the AI Chatbot
   var s = SCREENS[screen]; if (!s || screen === 'page') { screen = 'home'; s = SCREENS.home; }
   if (s.perm && !can(s.perm)) { screen = 'home'; s = SCREENS.home; }
   toggleSidebar(false); closeModal();

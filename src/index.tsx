@@ -49274,7 +49274,9 @@ app.get('/admin/app', async (c) => {
     if (!res.ok) {
       return c.text('The guest-app editor is not part of this build yet. Use /admin/dashboard.', 404)
     }
-    return new Response(res.body, {
+    // The build id on every admin file makes an update reach the browser on the next load
+    const html = (await res.text()).replace(/(\/static\/admin\/[a-z0-9-]+\.(?:js|css))"/g, '$1?v=' + OPS_BUILD + '"')
+    return new Response(html, {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
@@ -59204,6 +59206,11 @@ app.get('/admin/dashboard', (c) => {
       const pageParams = new URLSearchParams(window.location.search);
       const askedTab = ((location.hash || '').slice(1) || pageParams.get('tab') || '').replace(/[^a-z]/g, '');
       let REDIRECTING = false;
+      if (EMBED && MOVED_TABS[askedTab] && window.top !== window) {
+        // An admin tab opened before an update asks for a pane that now lives in the admin itself
+        REDIRECTING = true;
+        try { window.top.location.replace('/admin/app#' + MOVED_TABS[askedTab]); } catch (e) { REDIRECTING = false; }
+      }
       if (!EMBED && MOVED_TABS[askedTab]) {
         REDIRECTING = true;
         location.replace('/admin/app#' + MOVED_TABS[askedTab]);

@@ -439,6 +439,12 @@ function renderChatbot(tab, opts) {
     cw.querySelector('.cb-conv-note').textContent = t('cb.convNote');
     return;
   }
+  if (tab === 'whatsapp') {
+    var ww = stageHost('cb-wa-wrap');
+    if (!ww.firstChild) ww.innerHTML = '<div class="sc-note plain"><span>📲</span><div class="cb-wa-note"></div></div><div class="cb-conv"><iframe src="/admin/escalation?embed=1" title="' + edAttr(t('tab.whatsapp')) + '"></iframe></div>';
+    ww.querySelector('.cb-wa-note').textContent = t('emb.whatsapp');
+    return;
+  }
   if (opts.q != null) CB.q = opts.q;
   var host = stageHost('cb-wrap');
   host.innerHTML = '<div class="cb-col"><div id="cb-status"></div>'
