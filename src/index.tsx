@@ -79345,7 +79345,7 @@ async function waWatchMail(env: any, to: string, subject: string, lines: string[
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Old Palace Resort <reports@oldpalaceresort.online>', to: [to], subject, html, text: lines.join('\n').replace(/\*\*/g, '') }),
+      body: JSON.stringify({ from: 'Old Palace alerts <reports@guestconnect.uk>', to: [to], subject, html, text: lines.join('\n').replace(/\*\*/g, '') }),
       signal: AbortSignal.timeout(8000)
     })
     if (!r.ok) console.error('wa watch mail', r.status, (await r.text()).slice(0, 200))
@@ -80828,7 +80828,21 @@ app.get('/api/staff/wa-line', async (c) => {
   } catch (e) { return c.json({ success: true, down: false }) }
 })
 
-// One test e-mail from the line watch (admin only, at most one per 10 minutes)
+// What happened to the line watch's recent e-mails (Resend's delivery log; admin only, no content)
+app.get('/api/staff/wa-line/mail-log', async (c) => {
+  if (!c.req.header('X-User-ID')) return c.json({ success: false, error: 'Sign in to the admin first.' }, 401)
+  if (!c.env.RESEND_API_KEY) return c.json({ success: false, error: 'No e-mail service key.' })
+  try {
+    const r = await fetch('https://api.resend.com/emails?limit=5', { headers: { 'Authorization': 'Bearer ' + c.env.RESEND_API_KEY }, signal: AbortSignal.timeout(8000) })
+    const d: any = await r.json().catch(() => null)
+    if (!r.ok) return c.json({ success: false, status: r.status, error: (d && (d.message || d.name)) || 'Resend answered ' + r.status })
+    const rows = ((d && d.data) || []).map((e: any) => ({ to: e.to, from: e.from, subject: e.subject, last_event: e.last_event, created_at: e.created_at }))
+    return c.json({ success: true, emails: rows })
+  } catch (e) { return c.json({ success: false, error: 'Could not reach the e-mail service.' }) }
+})
+
+// One test e-mail from the line watch (admin only, at most one per 10 minutes). Sent from the
+// GuestLens reports address: same Resend account, and Gmail already trusts it.
 app.post('/api/staff/wa-line/test-email', async (c) => {
   if (!c.req.header('X-User-ID')) return c.json({ success: false, error: 'Sign in to the admin first.' }, 401)
   const DB = c.env.DB
