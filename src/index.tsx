@@ -465,10 +465,13 @@ function mediaLooksLikeImage(b: Uint8Array, ext: string): boolean {
   return false
 }
 
+// No file extension in the key: the Pages routing table (dist/_routes.json) hands any
+// URL ending in .png/.jpg/… to the static asset store, so /api/img/…png would never
+// reach this worker. The type is kept as a trailing "-png" and in the object's metadata.
 function mediaNewKey(propertyId: string | number, ext: string): string {
   const now = new Date()
   const rand = Math.random().toString(36).slice(2, 8)
-  return `p${propertyId}/${now.getUTCFullYear()}/${now.getTime()}-${rand}.${ext}`
+  return `p${propertyId}/${now.getUTCFullYear()}/${now.getTime()}-${rand}-${ext}`
 }
 
 async function mediaStore(env: any, propertyId: string | number, bytes: ArrayBuffer | Uint8Array, ext: string): Promise<{ key: string, url: string }> {
@@ -10952,7 +10955,7 @@ app.get('/api/img/*', async (c) => {
   if (!obj) return c.text('Not found', 404)
 
   const headers = new Headers()
-  headers.set('Content-Type', (obj.httpMetadata && obj.httpMetadata.contentType) || MEDIA_TYPES[key.split('.').pop() || ''] || 'application/octet-stream')
+  headers.set('Content-Type', (obj.httpMetadata && obj.httpMetadata.contentType) || MEDIA_TYPES[key.split(/[.-]/).pop() || ''] || 'application/octet-stream')
   headers.set('Cache-Control', 'public, max-age=31536000, immutable')
   headers.set('X-Content-Type-Options', 'nosniff')
   if (obj.httpEtag) headers.set('ETag', obj.httpEtag)
