@@ -7546,7 +7546,7 @@ app.get('/api/info-pages/:property_id', async (c) => {
     const pages = await DB.prepare(`
       SELECT page_id, page_key, title_en, title_ar, title_de, title_ru,
              title_pl, title_it, title_fr, title_cs, title_uk, title_zh,
-             icon_class, color_theme, display_order
+             icon_class, color_theme, display_order, tile_image_url
       FROM info_pages
       WHERE property_id = ? AND is_published = 1 AND show_in_menu = 1
       ORDER BY display_order ASC, page_id ASC
@@ -12581,7 +12581,10 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           ho.opening_hours,
           ho.tile_subtitle,
           ho.cuisine_type,
-          ho.dress_code
+          ho.dress_code,
+          ho.event_date,
+          ho.event_start_time,
+          ho.event_end_time
         FROM hotel_offerings ho
         WHERE ho.property_id = ?
           AND ho.status = 'active'
@@ -12628,7 +12631,10 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           NULL as opening_hours,
           NULL as tile_subtitle,
           NULL as cuisine_type,
-          NULL as dress_code
+          NULL as dress_code,
+          NULL as event_date,
+          NULL as event_start_time,
+          NULL as event_end_time
         FROM activities a
         JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
         WHERE vp.property_id = ?
@@ -12662,12 +12668,17 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
       try {
         const rows: any[] = offerings.results
         const texts: string[] = []
-        rows.forEach(o => { texts.push(o.title_en || '', o.short_description_en || '', o.location || '') })
+        const N = 7
+        rows.forEach(o => { texts.push(o.title_en || '', o.short_description_en || '', o.location || '', o.tile_subtitle || '', o.opening_hours || '', o.cuisine_type || '', o.dress_code || '') })
         const tr = await dsTranslateBatch(c.env, langN, texts)
         rows.forEach((o, i) => {
-          o.title_en = tr[i * 3] || o.title_en
-          o.short_description_en = tr[i * 3 + 1] || o.short_description_en
-          o.location = tr[i * 3 + 2] || o.location
+          o.title_en = tr[i * N] || o.title_en
+          o.short_description_en = tr[i * N + 1] || o.short_description_en
+          o.location = tr[i * N + 2] || o.location
+          o.tile_subtitle = tr[i * N + 3] || o.tile_subtitle
+          o.opening_hours = tr[i * N + 4] || o.opening_hours
+          o.cuisine_type = tr[i * N + 5] || o.cuisine_type
+          o.dress_code = tr[i * N + 6] || o.dress_code
         })
       } catch (e) {}
     }
@@ -26110,6 +26121,9 @@ window.luxTogglePassForm = function() {
           .lux-menu-item .nm { font-size: 0.94rem; font-weight: 600; color: var(--lux-text); }
           .lux-menu-item .ds { font-size: 0.74rem; color: rgba(246, 240, 227, 0.55); margin-top: 0.15rem; line-height: 1.45; }
           .lux-menu-item .pr { font-family: var(--lux-serif); color: var(--lux-gold-2); font-weight: 700; white-space: nowrap; }
+          .lux-menu-item .lux-menu-text { flex: 1; min-width: 0; }
+          .lux-menu-thumb { width: 54px; height: 54px; border-radius: 0.7rem; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(212, 175, 55, 0.3); }
+          .lux-menu-soon { display: flex; align-items: center; opacity: 0.8; }
           .lux-lightbox { position: fixed; inset: 0; z-index: 1300; background: rgba(8, 4, 6, 0.93); display: flex; align-items: center; justify-content: center; padding: 1rem; }
           .lux-lightbox.hidden { display: none; }
           .lux-lightbox img { max-width: 100%; max-height: 92vh; border-radius: 0.6rem; }
@@ -26801,6 +26815,13 @@ window.luxTogglePassForm = function() {
           .lux-tile:hover .lux-tile-bg { opacity: 0.26; }
           .lux-tile > * { position: relative; }
 
+          /* Admin preview (?preview=1): the phone frame in the editor shows the guest screen only */
+          html.is-preview .pass-link-bar, html.is-preview #chatbotWidget, html.is-preview #chatbotButton, html.is-preview #serviceButton,
+          html.is-preview #feedbackButton, html.is-preview #languageSelector, html.is-preview #moodCheckModal { display: none !important; }
+          html.is-preview, html.is-preview *, html.is-preview *::before, html.is-preview *::after { transition: none !important; scroll-behavior: auto !important; }
+          @keyframes pvFlash { 0% { box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.95); } 100% { box-shadow: 0 0 0 3px rgba(212, 175, 55, 0); } }
+          .pv-flash { animation: pvFlash 1.6s ease-out 1; }
+
           #content > .max-w-6xl { padding-top: 2.8rem; padding-bottom: 7.5rem; }
 
           @media (prefers-reduced-motion: reduce) {
@@ -27306,7 +27327,7 @@ window.luxTogglePassForm = function() {
           var luxWatchTimer = setInterval(function() {
             luxWatch();
             luxNavOffset();
-            if (window.luxBuildHomeSafe) window.luxBuildHomeSafe();
+            if (window.luxBuildHomeSafe && !window.LUX_PREVIEW) window.luxBuildHomeSafe();
             if (++luxWatchCount > 20) clearInterval(luxWatchTimer);
           }, 800);
           window.addEventListener('resize', luxNavOffset);
@@ -27331,10 +27352,21 @@ window.luxTogglePassForm = function() {
         let customSections = [];
         let currentFilter = 'all';
         window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
-        
+
+        // ?preview=1: the admin editor shows this page inside a phone frame and posts drafts to it.
+        // Nothing here may track, navigate, touch history or open the chat; language comes from ?lang.
+        const PREVIEW = new URLSearchParams(location.search).get('preview') === '1';
+        window.LUX_PREVIEW = PREVIEW;
+        if (PREVIEW) {
+            document.documentElement.classList.add('is-preview');
+            var pvLang = (new URLSearchParams(location.search).get('lang') || '').toLowerCase();
+            window.currentLanguage = /^[a-z]{2}$/.test(pvLang) ? pvLang : 'en';
+        }
+
         // Get linked pass reference from guestPassSession
         let linkedPassReference = null;
         function updateLinkedPassReference() {
+            if (PREVIEW) return null;
             try {
                 const session = localStorage.getItem('guestPassSession');
                 console.log('📦 Raw session from localStorage:', session);
@@ -27392,6 +27424,7 @@ window.luxTogglePassForm = function() {
             }
             function flush() {
                 if (S.timer) { clearTimeout(S.timer); S.timer = 0; }
+                if (PREVIEW) { S.q.length = 0; return; }
                 while (S.q.length) {
                     var pd = window.propertyData;
                     var body = JSON.stringify({
@@ -27435,6 +27468,7 @@ window.luxTogglePassForm = function() {
             }
 
             window.luxTrack = function(ev, target) {
+                if (PREVIEW) return;
                 try {
                     var now = Date.now();
                     resume(now);
@@ -27446,6 +27480,7 @@ window.luxTogglePassForm = function() {
             window.luxTrackFlush = function() { try { flush(); } catch (e) {} };
             // Called once the property has loaded; counts only when this load started a new session
             window.luxTrackVisit = function() {
+                if (PREVIEW) return;
                 try {
                     if (S.started) return;
                     S.started = true;
@@ -27477,7 +27512,7 @@ window.luxTogglePassForm = function() {
                         if (bare(new URL(ref).hostname) !== bare(location.hostname)) src = 'link';
                     } catch (e) {}
                 }
-                if (qs.get('src') === 'qr') {
+                if (qs.get('src') === 'qr' && !PREVIEW) {
                     qs.delete('src');
                     var rest = qs.toString();
                     try { history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash); } catch (e) {}
@@ -27509,6 +27544,7 @@ window.luxTogglePassForm = function() {
 
         // Venue, section and sheet opens (existing call sites): 'offering:H3', 'restaurant', 'live-map', …
         function trackPageView(pageType, pageId) {
+            if (PREVIEW) return;
             if (pageType && window.luxTrack) luxTrack('open', pageId ? pageType + ':' + pageId : pageType);
         }
 
@@ -28303,7 +28339,10 @@ window.luxTogglePassForm = function() {
         // Helper function to get translated field with AI fallback
         async function getTranslatedField(item, fieldName) {
             if (!item) return '';
-            
+
+            // Drafts in the admin preview are English and must never wait on the network
+            if (PREVIEW) return item[fieldName + '_en'] || item[fieldName] || '';
+
             // If English, use _en field
             if (window.currentLanguage === 'en') {
                 return item[fieldName + '_en'] || item[fieldName] || '';
@@ -28445,21 +28484,22 @@ window.luxTogglePassForm = function() {
         function changeLanguage() {
             const selector = document.getElementById('languageSelector');
             const newLang = selector.value;
-            
+            if (PREVIEW) { selector.value = window.currentLanguage; return; }
+
             console.log('🌐 Changing language to:', newLang);
-            
+
             // CRITICAL: Save to localStorage FIRST
             localStorage.setItem('preferredLanguage', newLang);
-            
+
             // Verify it's saved
             const saved = localStorage.getItem('preferredLanguage');
             console.log('✅ Saved to localStorage:', saved);
-            
+
             if (saved !== newLang) {
                 console.error('❌ localStorage save FAILED!');
                 return;
             }
-            
+
             if (window.luxTrack) { luxTrack('lang', newLang); luxTrackFlush(); }
 
             // RELOAD THE ENTIRE PAGE - cleanest approach
@@ -29893,8 +29933,8 @@ window.luxTogglePassForm = function() {
                 applySectionTranslations(propertyData);
                 
                 // Load info pages after property data is loaded
-                loadInfoPages();
-                
+                const infoPagesLoad = loadInfoPages();
+
                 // Load feedback form for homepage (if exists)
                 loadHomepageFeedbackForm();
                 
@@ -29941,16 +29981,25 @@ window.luxTogglePassForm = function() {
                 // Check beach booking AFTER content div is visible
                 if (propertyData && propertyData.property_id) {
                     console.log('Checking beach booking after content is visible');
-                    checkBeachBookingEnabled();
+                    if (PREVIEW) { try { await checkBeachBookingEnabled(); } catch (e) {} }
+                    else checkBeachBookingEnabled();
                 }
-                
+
                 try { luxRstOpenFromUrl(); } catch (e) { console.error('open param', e); }
+
+                if (PREVIEW) {
+                    // Everything the home screen reads is in place: render it once more, then tell the admin
+                    try { await infoPagesLoad; } catch (e) {}
+                    try { luxBuildHome(); } catch (e) {}
+                    initPreview();
+                    return;
+                }
 
                 // Initialize chatbot after all data is loaded
                 if (typeof initChatbot === 'function') {
                     initChatbot();
                 }
-                
+
             } catch (error) {
                 console.error('Initialization error:', error);
                 console.error('Error details:', error.message, error.stack);
@@ -30215,14 +30264,14 @@ window.luxTogglePassForm = function() {
                     : \`javascript:viewOffering('\${r.offering_id}')\`;
                 
                 return \`
-                <div class="offering-card lux-row" onclick="viewOffering('\${r.offering_id}')">
+                <div class="offering-card lux-row" data-oid="\${r.offering_id}" onclick="viewOffering('\${r.offering_id}')">
                     <div class="lux-row-media">
                         <img src="\${r.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
                         <div class="lux-row-badge">\${generateOccupancyBadge(r.occupancy_status)}</div>
                     </div>
                     <div class="lux-row-main">
                         <h3>\${title}</h3>
-                        <p class="lux-row-sub">\${description}</p>
+                        <p class="lux-row-sub">\${r.tile_subtitle || description}</p>
                         <div class="lux-row-meta">
                             \${r.location ? '<span><i class="fas fa-map-marker-alt"></i>' + translateLocation(r.location) + '</span>' : ''}
                             \${(r.offering_type === 'restaurant' ? r.enable_booking === 1 : r.requires_booking === 1) ? '<span class="lux-meta-chip"><i class="fas fa-calendar-check"></i>' + reservationsText + '</span>' : ''}
@@ -30262,13 +30311,13 @@ window.luxTogglePassForm = function() {
                 const title = await getTranslatedField(e, 'title');
                 const description = await getTranslatedField(e, 'short_description');
                 return \`
-                <div class="offering-card lux-row" onclick="viewOffering('\${e.offering_id}')">
+                <div class="offering-card lux-row" data-oid="\${e.offering_id}" onclick="viewOffering('\${e.offering_id}')">
                     <div class="lux-row-media">
                         <img src="\${e.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
                     </div>
                     <div class="lux-row-main">
                         <h3>\${title}</h3>
-                        <p class="lux-row-sub">\${description}</p>
+                        <p class="lux-row-sub">\${e.tile_subtitle || description}</p>
                         <div class="lux-row-meta">
                             \${e.event_date ? '<span class="lux-meta-chip"><i class="fas fa-calendar"></i>' + new Date(e.event_date).toLocaleDateString() + '</span>' : ''}
                             \${e.event_start_time ? '<span><i class="fas fa-clock"></i>' + e.event_start_time + '</span>' : ''}
@@ -30303,13 +30352,13 @@ window.luxTogglePassForm = function() {
                 const title = await getTranslatedField(s, 'title');
                 const description = await getTranslatedField(s, 'short_description');
                 return \`
-                <div class="offering-card lux-row" onclick="viewOffering('\${s.offering_id}')">
+                <div class="offering-card lux-row" data-oid="\${s.offering_id}" onclick="viewOffering('\${s.offering_id}')">
                     <div class="lux-row-media">
                         <img src="\${s.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
                     </div>
                     <div class="lux-row-main">
                         <h3>\${title}</h3>
-                        <p class="lux-row-sub">\${description}</p>
+                        <p class="lux-row-sub">\${s.tile_subtitle || description}</p>
                         <div class="lux-row-meta">
                             \${s.duration_minutes ? '<span><i class="fas fa-clock"></i>' + s.duration_minutes + ' ' + minutesText + '</span>' : ''}
                         </div>
@@ -30342,13 +30391,13 @@ window.luxTogglePassForm = function() {
                 const title = await getTranslatedField(s, 'title');
                 const description = await getTranslatedField(s, 'short_description');
                 return \`
-                <div class="offering-card lux-row" onclick="viewOffering('\${s.offering_id}')">
+                <div class="offering-card lux-row" data-oid="\${s.offering_id}" onclick="viewOffering('\${s.offering_id}')">
                     <div class="lux-row-media">
                         <img src="\${s.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
                     </div>
                     <div class="lux-row-main">
                         <h3>\${title}</h3>
-                        <p class="lux-row-sub">\${description}</p>
+                        <p class="lux-row-sub">\${s.tile_subtitle || description}</p>
                         <div class="lux-row-meta">
                             \${s.location ? '<span><i class="fas fa-map-marker-alt"></i>' + translateLocation(s.location) + '</span>' : ''}
                         </div>
@@ -30440,13 +30489,13 @@ window.luxTogglePassForm = function() {
                 const title = await getTranslatedField(o, 'title');
                 const description = await getTranslatedField(o, 'short_description');
                 return \`
-                <div class="offering-card lux-row" onclick="viewOffering('\${o.offering_id}')">
+                <div class="offering-card lux-row" data-oid="\${o.offering_id}" onclick="viewOffering('\${o.offering_id}')">
                     <div class="lux-row-media">
                         <img src="\${o.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
                     </div>
                     <div class="lux-row-main">
                         <h3>\${title}</h3>
-                        <p class="lux-row-sub">\${description}</p>
+                        <p class="lux-row-sub">\${o.tile_subtitle || description}</p>
                         <div class="lux-row-meta">
                             \${o.location ? '<span><i class="fas fa-map-marker-alt"></i>' + translateLocation(o.location) + '</span>' : ''}
                             \${(o.offering_type === 'restaurant' ? o.enable_booking === 1 : o.requires_booking === 1) ? '<span class="lux-meta-chip"><i class="fas fa-calendar-check"></i>' + reservationsText + '</span>' : ''}
@@ -30925,9 +30974,9 @@ window.luxTogglePassForm = function() {
         }
 
         // ── MAISON home launcher: big thumb-friendly category tiles ──
-        function luxTile(icon, label, sub, action, wide, bgImg) {
-            return '<button class="lux-tile' + (wide ? ' lux-tile-wide' : '') + '" onclick="' + action + '">' +
-                (bgImg ? '<span class="lux-tile-bg" style="background-image: url(&quot;' + bgImg + '&quot;)"></span>' : '') +
+        function luxTile(icon, label, sub, action, wide, bgImg, key) {
+            return '<button class="lux-tile' + (wide ? ' lux-tile-wide' : '') + '"' + (key ? ' data-key="' + luxEsc(key) + '"' : '') + ' onclick="' + action + '">' +
+                (bgImg ? '<span class="lux-tile-bg" style="background-image: url(&quot;' + luxEsc(bgImg) + '&quot;)"></span>' : '') +
                 '<span class="lux-tile-icon"><i class="' + icon + '"></i></span>' +
                 '<span class="lux-tile-text"><span class="lux-tile-label">' + label + '</span>' +
                 (sub ? '<span class="lux-tile-sub">' + sub + '</span>' : '') +
@@ -30944,75 +30993,100 @@ window.luxTogglePassForm = function() {
             return o ? o.images[0] : '';
         }
 
+        // properties.tile_order: the admin's order of tile keys (type:restaurant, cs:<section>, beach, info:<page>, feedback, map)
+        function luxTileOrder() {
+            var raw = propertyData && propertyData.tile_order;
+            if (!raw) return [];
+            if (Array.isArray(raw)) return raw.map(String);
+            try { var a = JSON.parse(raw); return Array.isArray(a) ? a.map(String) : []; } catch (e) { return []; }
+        }
+        // Admin preview overrides for the two tiles whose visibility comes from other fetches (null = as live)
+        var _pvBeach = null, _pvFeedback = null;
+
         function luxBuildHome() {
             const grid = document.getElementById('luxHome');
             if (!grid || !propertyData) return;
             const lang = window.currentLanguage || 'en';
-            let html = '';
+            const tiles = [];
+            const extraLabels = [];
+            const add = (key, icon, label, sub, action, wide, bgImg) => tiles.push({ key: key, html: luxTile(icon, label, sub, action, wide, bgImg, key) });
 
             if (propertyData.show_restaurants === 1) {
                 const name = propertyData['section_restaurants_' + lang] || 'Dining';
-                html += luxTile('fas fa-utensils', name, luxT('Restaurants & Bars'), "luxOpenCategory('restaurant')", true, luxCatImg('restaurant'));
+                add('type:restaurant', 'fas fa-utensils', name, luxT('Restaurants & Bars'), "luxOpenCategory('restaurant')", true, luxCatImg('restaurant'));
             }
             if (propertyData.show_events === 1) {
-                html += luxTile('fas fa-calendar-days', propertyData['section_events_' + lang] || 'Events', '', "luxOpenCategory('event')", false, luxCatImg('event'));
+                add('type:event', 'fas fa-calendar-days', propertyData['section_events_' + lang] || 'Events', '', "luxOpenCategory('event')", false, luxCatImg('event'));
             }
             if (propertyData.show_spa === 1) {
-                html += luxTile('fas fa-spa', propertyData['section_spa_' + lang] || 'Spa & Wellness', '', "luxOpenCategory('spa')", false, luxCatImg('spa'));
+                add('type:spa', 'fas fa-spa', propertyData['section_spa_' + lang] || 'Spa & Wellness', '', "luxOpenCategory('spa')", false, luxCatImg('spa'));
             }
             if (propertyData.show_service === 1) {
-                html += luxTile('fas fa-concierge-bell', propertyData['section_service_' + lang] || 'Services', '', "luxOpenCategory('service')", false, luxCatImg('service'));
+                add('type:service', 'fas fa-concierge-bell', propertyData['section_service_' + lang] || 'Services', '', "luxOpenCategory('service')", false, luxCatImg('service'));
             }
             if (propertyData.show_activities === 1) {
                 const actImg = (typeof allActivities !== 'undefined' && allActivities[0] && allActivities[0].images && allActivities[0].images[0]) || '';
-                html += luxTile('fas fa-hiking', propertyData['section_activities_' + lang] || 'Experiences', '', "luxOpenCategory('activities')", false, actImg);
+                add('type:activity', 'fas fa-hiking', propertyData['section_activities_' + lang] || 'Experiences', '', "luxOpenCategory('activities')", false, actImg);
             }
             (customSections || []).forEach(cs => {
-                if (cs.is_visible === 1) {
-                    const name = (cs.translated_name || cs.section_name_en || '').replace(/</g, '&lt;');
-                    if (cs.section_key === 'room-service') {
-                        html += luxTile(cs.icon_class || 'fas fa-utensils', name, luxT('Served to your room'), 'luxOpenRoomService()', false, luxCatImg('room_service'));
-                    } else {
-                        html += luxTile(cs.icon_class || 'fas fa-star', name, '', "luxOpenCategory('" + cs.section_key + "')", false, luxCatImg(null, cs.section_key));
-                    }
+                if (cs.is_visible !== 1) return;
+                const name = (cs.translated_name || cs.section_name_en || '').replace(/</g, '&lt;');
+                const subRaw = String(cs.subtitle_en || '').trim();
+                if (subRaw) extraLabels.push(subRaw);
+                const key = 'cs:' + cs.section_key;
+                if (cs.section_key === 'room-service') {
+                    add(key, cs.icon_class || 'fas fa-utensils', name, luxEsc(luxT(subRaw || 'Served to your room')), 'luxOpenRoomService()', false, cs.tile_image_url || luxCatImg('room_service'));
+                } else {
+                    add(key, cs.icon_class || 'fas fa-star', name, subRaw ? luxEsc(luxT(subRaw)) : '', "luxOpenCategory('" + cs.section_key + "')", false, cs.tile_image_url || luxCatImg(null, cs.section_key));
                 }
             });
             const beachEl = document.getElementById('beach-booking-section');
-            if (beachEl && (beachEl.dataset.luxEnabled === '1' || !beachEl.classList.contains('hidden'))) {
-                beachEl.dataset.luxEnabled = '1';
-                html += luxTile('fas fa-umbrella-beach', luxT('Beach'), luxT('Reserve your spot'), 'luxOpenBeach()');
-            }
+            let beachOn = !!(beachEl && (beachEl.dataset.luxEnabled === '1' || !beachEl.classList.contains('hidden')));
+            if (beachOn) beachEl.dataset.luxEnabled = '1';
+            if (PREVIEW && _pvBeach != null) beachOn = _pvBeach;
+            if (beachOn) add('beach', 'fas fa-umbrella-beach', luxT('Beach'), luxT('Reserve your spot'), 'luxOpenBeach()');
             (infoPages || []).forEach(p => {
                 const t = (p['title_' + lang] || p.title_en || '').replace(/</g, '&lt;');
-                html += luxTile(p.icon_class || 'fas fa-info-circle', t, '', "openInfoPage('" + p.page_key + "')");
+                add('info:' + p.page_key, p.icon_class || 'fas fa-info-circle', t, '', "openInfoPage('" + p.page_key + "')", false, p.tile_image_url || '');
             });
             const fb = document.getElementById('feedbackButton');
-            if (fb && !fb.classList.contains('hidden')) {
-                html += luxTile('fas fa-comment-dots', luxT('Feedback'), luxT('Share your thoughts'), 'openFeedbackForm()');
-            }
+            let fbOn = !!(fb && !fb.classList.contains('hidden'));
+            if (PREVIEW && _pvFeedback != null) fbOn = _pvFeedback;
+            if (fbOn) add('feedback', 'fas fa-comment-dots', luxT('Feedback'), luxT('Share your thoughts'), 'openFeedbackForm()');
             if (propertyData.show_hotel_map === 1) {
-                html += luxTile('fas fa-map-location-dot', luxT('Resort Map'), luxT('Live · Find your way'), 'luxOpenLiveMap()');
+                add('map', 'fas fa-map-location-dot', luxT('Resort Map'), luxT('Live · Find your way'), 'luxOpenLiveMap()');
             }
-            grid.innerHTML = html;
+
+            // Tiles the admin has not placed keep their default order and go last
+            const order = luxTileOrder();
+            if (order.length) {
+                tiles.forEach((tl, i) => { const at = order.indexOf(tl.key); tl.rank = at >= 0 ? at : order.length + i; });
+                tiles.sort((a, b) => a.rank - b.rank);
+            }
+            grid.innerHTML = tiles.map(tl => tl.html).join('');
+            if (extraLabels.length) luxTPrefetch(extraLabels);
         }
 
-        // Machine-translated labels for the hardcoded home tiles. Prefetched
-        // once per language (server caches in D1); home re-renders when ready.
+        // Machine-translated labels for the hardcoded home tiles (and the admin's tile subtitles).
+        // Fetched once per language (server caches in D1); home re-renders when ready.
         window.LUX_I18N = {};
+        var _luxTAsked = {};
         function luxT(s) { return window.LUX_I18N[s] || s; }
-        (async function () {
-            try {
-                var gl = window.currentLanguage || 'en';
-                if (gl === 'en') return;
-                var strs = ['Beach', 'Reserve your spot', 'Feedback', 'Share your thoughts', 'Resort Map', 'Live · Find your way', 'Restaurants & Bars', 'Served to your room'];
-                var d = await fetch('/api/staff/translate', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ target: gl, items: strs.map(function (s, i) { return { id: i, text: s }; }) })
-                }).then(function (r) { return r.json(); });
-                (d.results || []).forEach(function (r) { if (r && r.text) window.LUX_I18N[strs[r.id]] = r.text; });
+        function luxTPrefetch(strs) {
+            var gl = window.currentLanguage || 'en';
+            if (gl === 'en') return;
+            var need = [];
+            (strs || []).forEach(function (s) { if (s && !window.LUX_I18N[s] && !_luxTAsked[s]) { _luxTAsked[s] = 1; need.push(s); } });
+            if (!need.length) return;
+            fetch('/api/staff/translate', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: gl, items: need.map(function (s, i) { return { id: i, text: s }; }) })
+            }).then(function (r) { return r.json(); }).then(function (d) {
+                (d.results || []).forEach(function (r) { if (r && r.text && need[r.id] != null) window.LUX_I18N[need[r.id]] = r.text; });
                 if (window.luxBuildHomeSafe) window.luxBuildHomeSafe();
-            } catch (e) {}
-        })();
+            }).catch(function () {});
+        }
+        luxTPrefetch(['Beach', 'Reserve your spot', 'Feedback', 'Share your thoughts', 'Resort Map', 'Live · Find your way', 'Restaurants & Bars', 'Served to your room', 'Our Menus', 'Page', 'Menu coming soon']);
 
         window.luxBuildHomeSafe = function() {
             const content = document.getElementById('content');
@@ -31021,7 +31095,7 @@ window.luxTogglePassForm = function() {
             }
         };
 
-        window.luxOpenCategory = function(key) {
+        window.luxOpenCategory = function(key, noScroll) {
             const content = document.getElementById('content');
             if (content) content.classList.remove('lux-home-mode');
             const back = document.getElementById('luxBackBtn');
@@ -31036,6 +31110,7 @@ window.luxTogglePassForm = function() {
                 if (beachEl) beachEl.classList.add('hidden');
                 filterOfferings(key);
             }
+            if (noScroll) return;
             // Land the guest right on the category content, not back at the hero
             setTimeout(function() {
                 const container = document.querySelector('#content > .max-w-6xl');
@@ -31057,6 +31132,174 @@ window.luxTogglePassForm = function() {
             try { luxBuildHome(); } catch (e) {}
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
+
+        // ── Admin live preview (?preview=1). The editor posts {type:'op-preview', view, …}; every message
+        // fully describes one draft, which is laid over the live data and drawn by the same functions
+        // guests use. Nothing here is saved. ──
+        var _pvLive = null, _pvLastKey = null;
+        function initPreview() {
+            _pvLive = {
+                property: Object.assign({}, propertyData),
+                customSections: (customSections || []).slice(),
+                infoPages: (infoPages || []).slice(),
+                offerings: (allOfferings || []).slice()
+            };
+            window.addEventListener('message', function (ev) {
+                if (ev.origin !== location.origin) return;
+                var m = ev.data || {};
+                if (!m || m.type !== 'op-preview') return;
+                Promise.resolve().then(function () { return renderPreview(m); }).catch(function (e) { console.error('preview', e); });
+            });
+            try { window.parent.postMessage({ type: 'op-preview-ready' }, location.origin); } catch (e) {}
+        }
+        function pvFlash(el) {
+            if (!el) return;
+            el.classList.remove('pv-flash'); void el.offsetWidth; el.classList.add('pv-flash');
+        }
+        function pvScrollTo(el, pad) {
+            var top = el ? el.getBoundingClientRect().top + window.pageYOffset - (pad || 12) : 0;
+            window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+            document.documentElement.scrollLeft = 0; document.body.scrollLeft = 0;
+        }
+        // Guest rows carry a source prefix ('H3'); the editor sends bare ids (3)
+        function pvOfferingId(id) {
+            var s = id == null ? '' : String(id);
+            return /^[0-9]+$/.test(s) ? 'H' + s : s;
+        }
+        function pvApplyOfferings(rows) {
+            var list = _pvLive.offerings.slice();
+            (rows || []).forEach(function (r) {
+                if (!r) return;
+                var d = Object.assign({}, r);
+                d.offering_id = (d.offering_id == null || d.offering_id === '') ? 'draft' : pvOfferingId(d.offering_id);
+                if (d.original_id == null && /^H[0-9]+$/.test(d.offering_id)) d.original_id = Number(d.offering_id.slice(1));
+                if (!d.source_table) d.source_table = 'hotel';
+                // Only fields the editor sent replace the live ones
+                if ('images' in d) {
+                    if (typeof d.images === 'string') { try { d.images = JSON.parse(d.images); } catch (e) { d.images = []; } }
+                    if (!Array.isArray(d.images)) d.images = [];
+                }
+                var i = -1;
+                for (var k = 0; k < list.length; k++) if (String(list[k].offering_id) === d.offering_id) { i = k; break; }
+                if (i >= 0) list[i] = Object.assign({}, list[i], d); else list.push(d);
+            });
+            // Hidden venues vanish, exactly as they do for guests
+            allOfferings = list.filter(function (o) { return !o.status || o.status === 'active'; });
+        }
+        function pvCategoryKey(k) {
+            k = String(k || '');
+            if (k.indexOf('type:') === 0) k = k.slice(5);
+            if (k === 'activity') return 'activities';
+            if (k.indexOf('cs:') === 0) return k.slice(3);
+            return k;
+        }
+        function pvKeyForOffering(o) {
+            if (!o) return 'restaurant';
+            if (o.offering_type === 'custom') return o.custom_section_key || 'restaurant';
+            if (o.offering_type === 'activity') return 'activities';
+            return o.offering_type || 'restaurant';
+        }
+        function pvSectionEl(catKey) {
+            var ids = { restaurant: 'restaurants-section', event: 'events-section', spa: 'spa-section', service: 'service-section', activities: 'activities-section' };
+            return document.getElementById(ids[catKey] || ('custom-section-' + catKey));
+        }
+        function pvRenderCards(catKey) {
+            if (catKey === 'restaurant') return renderRestaurants();
+            if (catKey === 'event') return renderEvents();
+            if (catKey === 'spa') return renderSpa();
+            if (catKey === 'service') return renderServices();
+            if (catKey === 'activities') return renderActivities();
+            return renderCustomSection(catKey);
+        }
+        function pvResetToLive() {
+            propertyData = Object.assign({}, _pvLive.property);
+            customSections = _pvLive.customSections.slice();
+            infoPages = _pvLive.infoPages.slice();
+            _pvBeach = null; _pvFeedback = null;
+        }
+        async function pvShowCategory(key, offerings) {
+            var catKey = pvCategoryKey(key);
+            pvResetToLive();
+            pvApplyOfferings(offerings);
+            luxOpenCategory(catKey, true);
+            // The editor may preview a page whose tile is switched off
+            var sec = pvSectionEl(catKey);
+            if (sec) sec.style.display = 'block';
+            try { await pvRenderCards(catKey); } catch (e) { console.error('preview cards', e); }
+            return catKey;
+        }
+        async function renderPreview(m) {
+            if (!_pvLive) return;
+            var view = m.view || 'home';
+            if (view === 'home') {
+                luxCloseSheet();
+                pvResetToLive();
+                propertyData = Object.assign({}, _pvLive.property, m.property || {});
+                if (Array.isArray(m.customSections)) customSections = m.customSections;
+                if (Array.isArray(m.infoPages)) infoPages = m.infoPages;
+                if (m.beachEnabled != null) _pvBeach = !!m.beachEnabled;
+                if (m.feedbackEnabled != null) _pvFeedback = !!m.feedbackEnabled;
+                allOfferings = _pvLive.offerings.slice();
+                var nameEl = document.getElementById('propertyName');
+                if (nameEl) nameEl.textContent = propertyData.name || '';
+                var tagEl = document.getElementById('propertyTagline');
+                if (tagEl) tagEl.textContent = propertyData.tagline || (translations[window.currentLanguage] || translations.en).discoverAll;
+                try { applyDesignSettings(propertyData); } catch (e) {}
+                var content = document.getElementById('content');
+                if (content) content.classList.add('lux-home-mode');
+                var back = document.getElementById('luxBackBtn');
+                if (back) back.classList.add('hidden');
+                luxBuildHome();
+                var hkey = 'home:' + (m.highlight || '');
+                if (hkey !== _pvLastKey) {
+                    var tile = m.highlight ? document.querySelector('.lux-tile[data-key="' + String(m.highlight).replace(/"/g, '') + '"]') : null;
+                    if (tile) { pvScrollTo(tile, window.innerHeight / 3); pvFlash(tile); } else pvScrollTo(null, 0);
+                }
+                _pvLastKey = hkey;
+                return;
+            }
+            if (view === 'category') {
+                luxCloseSheet();
+                var catKey = await pvShowCategory(m.key, m.offerings);
+                var hid = (m.highlightOfferingId == null || m.highlightOfferingId === '') ? '' : pvOfferingId(m.highlightOfferingId);
+                var ckey = 'cat:' + catKey + ':' + hid;
+                if (ckey !== _pvLastKey) {
+                    var card = hid ? document.querySelector('.offering-card[data-oid="' + hid.replace(/"/g, '') + '"]') : null;
+                    if (card) { pvScrollTo(card, 12); pvFlash(card); }
+                    else pvScrollTo(document.querySelector('#content > .max-w-6xl'), 24);
+                }
+                _pvLastKey = ckey;
+                return;
+            }
+            if (view === 'offering') {
+                var draft = m.offering || {};
+                var oid = (draft.offering_id == null || draft.offering_id === '') ? 'draft' : pvOfferingId(draft.offering_id);
+                var okey = 'offering:' + oid;
+                var body = document.getElementById('luxSheetBody');
+                var keep = (_pvLastKey === okey && body) ? body.scrollTop : 0;
+                await pvShowCategory(m.key || pvKeyForOffering(draft), [draft]);
+                if (_pvLastKey !== okey) pvScrollTo(null, 0);
+                await luxOpenOffering(oid);
+                if (keep && body) body.scrollTop = keep;
+                _pvLastKey = okey;
+                return;
+            }
+            if (view === 'info') {
+                var page = m.page || {};
+                var ikey = 'info:' + (page.page_key || page.page_id || page.title_en || '');
+                var ibody = document.getElementById('luxSheetBody');
+                var ikeep = (_pvLastKey === ikey && ibody) ? ibody.scrollTop : 0;
+                luxOpenInfoSheet(page);
+                if (ikeep && ibody) ibody.scrollTop = ikeep;
+                _pvLastKey = ikey;
+                return;
+            }
+            if (view === 'room-service') {
+                // Live data only — the editor refreshes the phone after a save
+                if (_pvLastKey !== 'room-service') luxOpenRoomService();
+                _pvLastKey = 'room-service';
+            }
+        }
 
         // ── Seamless sheets: offering details, menus, booking, room service — all in-app ──
         function luxSheetOpen(html) {
@@ -31095,14 +31338,16 @@ window.luxTogglePassForm = function() {
         window.luxOpenOffering = async function(offeringId) {
             const o = allOfferings.find(x => String(x.offering_id) === String(offeringId));
             if (!o) {
+                if (PREVIEW) return;
                 // Fallback: unknown offering, use the legacy page
                 window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
                 return;
             }
             // Restaurants with the table-booking module get the slot flow instead of the legacy form;
-            // the config fetch runs alongside the translations below
+            // the config fetch runs alongside the translations below (not in the admin preview, which
+            // draws the sheet from the draft alone)
             const rstSeq = ++luxRst.seq;
-            const rstId = o.offering_type === 'restaurant' ? luxRstOfferingNum(o) : null;
+            const rstId = (o.offering_type === 'restaurant' && !PREVIEW) ? luxRstOfferingNum(o) : null;
             const rstCfg = rstId ? luxRstFetchConfig(rstId) : null;
             const title = await getTranslatedField(o, 'title');
             let about = '';
@@ -31115,10 +31360,13 @@ window.luxTogglePassForm = function() {
 
             let chips = '';
             if (o.location) chips += '<span class="lux-meta-chip"><i class="fas fa-map-marker-alt"></i>' + translateLocation(o.location) + '</span>';
+            if (o.opening_hours) chips += '<span class="lux-meta-chip"><i class="fas fa-clock"></i>' + luxEsc(o.opening_hours) + '</span>';
             if (o.event_date) chips += '<span class="lux-meta-chip"><i class="fas fa-calendar"></i>' + new Date(o.event_date).toLocaleDateString() + '</span>';
             if (o.event_start_time) chips += '<span class="lux-meta-chip"><i class="fas fa-clock"></i>' + o.event_start_time + '</span>';
             if (o.duration_minutes) chips += '<span class="lux-meta-chip"><i class="fas fa-hourglass-half"></i>' + o.duration_minutes + ' min</span>';
             if (price > 0) chips += '<span class="lux-meta-chip"><i class="fas fa-tag"></i>' + currency + ' ' + price + '</span>';
+            if (o.cuisine_type) chips += '<span class="lux-meta-chip"><i class="fas fa-utensils"></i>' + luxEsc(o.cuisine_type) + '</span>';
+            if (o.dress_code) chips += '<span class="lux-meta-chip"><i class="fas fa-user-tie"></i>' + luxEsc(o.dress_code) + '</span>';
 
             const html = '' +
             '<div class="lux-sheet-hero">' +
@@ -31136,23 +31384,49 @@ window.luxTogglePassForm = function() {
             if (rstCfg) luxRstMount(o, title, rstCfg, rstSeq);
 
             if (o.offering_type === 'restaurant') {
-                try {
-                    const r = await fetch('/api/offerings/' + o.offering_id + '/menus');
-                    const d = await r.json();
-                    if (d.success && d.menus && d.menus.length) {
-                        let mh = '<h3>Our Menus</h3><div class="lux-menu-grid">';
-                        d.menus.forEach(m => {
-                            mh += '<div class="lux-menu-card" onclick="luxShowImage(&quot;' + m.original_image_url + '&quot;)">' +
-                                  '<img src="' + m.original_image_url + '" alt="" loading="lazy"><p>' + (m.menu_name || 'Menu') + '</p></div>';
-                        });
-                        mh += '</div>';
-                        const slot = document.getElementById('luxSheetMenus');
-                        if (slot) slot.innerHTML = mh;
-                    }
-                } catch (e) { console.error('menus load', e); }
+                const slot = document.getElementById('luxSheetMenus');
+                if (Array.isArray(o.menus)) {
+                    luxRenderMenuPages(slot, o.menus);
+                } else {
+                    try {
+                        // Menu rows are keyed by the bare restaurant id, not the guest list's prefixed one
+                        const menuId = luxRstOfferingNum(o) != null ? luxRstOfferingNum(o) : o.offering_id;
+                        const d = await luxFetchMenus(menuId);
+                        // Only fill the sheet this call opened (the guest may have moved on)
+                        if (slot && document.getElementById('luxSheetMenus') === slot) luxRenderMenuPages(slot, d && d.menus);
+                    } catch (e) { console.error('menus load', e); }
+                }
             }
             if (canBook) luxWireBookingForm(o, price, currency);
         };
+
+        var _luxMenuCache = {};
+        function luxFetchMenus(id) {
+            if (PREVIEW && _luxMenuCache[id]) return Promise.resolve(_luxMenuCache[id]);
+            return fetch('/api/offerings/' + encodeURIComponent(id) + '/menus')
+                .then(function (r) { return r.json(); })
+                .then(function (d) { if (PREVIEW) _luxMenuCache[id] = d; return d; });
+        }
+        // A menu is a set of page photos ({url, page_no}); tapping a page opens it full screen
+        function luxRenderMenuPages(slot, rows) {
+            if (!slot) return;
+            var pages = (rows || []).map(function (m) { return { url: (m && (m.url || m.page_url)) || '', n: Number(m && m.page_no) || 0 }; })
+                .filter(function (p) { return p.url; })
+                .sort(function (a, b) { return a.n - b.n; });
+            var h = '<h3>' + luxEsc(luxT('Our Menus')) + '</h3>';
+            if (!pages.length) {
+                h += '<p class="lux-sheet-desc lux-menu-soon"><i class="fas fa-book-open" style="margin-right: 0.4rem; color: var(--lux-gold-2);"></i>' + luxEsc(luxT('Menu coming soon')) + '</p>';
+            } else {
+                h += '<div class="lux-menu-grid">';
+                pages.forEach(function (p, i) {
+                    var u = luxEsc(p.url);
+                    h += '<div class="lux-menu-card" data-url="' + u + '" onclick="luxShowImage(this.getAttribute(&quot;data-url&quot;))">' +
+                         '<img src="' + u + '" alt="" loading="lazy"><p>' + luxEsc(luxT('Page')) + ' ' + (i + 1) + '</p></div>';
+                });
+                h += '</div>';
+            }
+            slot.innerHTML = h;
+        }
 
         // ── Restaurant table booking (offerings with a restaurant_settings row) ──
         // seq drops late responses once the guest has opened another sheet.
@@ -31920,6 +32194,7 @@ window.luxTogglePassForm = function() {
             }
             p.delete('open');
             var qs = p.toString();
+            if (PREVIEW) return;
             try { history.replaceState(history.state, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash); } catch (e) {}
         }
 
@@ -31954,6 +32229,7 @@ window.luxTogglePassForm = function() {
             updTotal();
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
+                if (PREVIEW) return;
                 const btn = document.getElementById('luxBkSubmit');
                 if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
                 const whenEl = document.getElementById('luxBkWhen');
@@ -32003,8 +32279,12 @@ window.luxTogglePassForm = function() {
                     const o = d.offering;
                     let img = '/static/placeholder.jpg';
                     try { const arr = JSON.parse(o.images || '[]'); if (arr[0]) img = arr[0]; } catch (e) {}
-                    const groups = {};
-                    (d.items || []).forEach(it => { (groups[it.category] = groups[it.category] || []).push(it); });
+                    const groups = {}, labels = {};
+                    (d.items || []).forEach(it => {
+                        const k = it.category || '';
+                        (groups[k] = groups[k] || []).push(it);
+                        if (!labels[k]) labels[k] = it.category_label || luxFriendlyCategory(k);
+                    });
 
                     let html = '' +
                     '<div class="lux-sheet-hero"><img src="' + img + '" alt="" onerror="this.style.display=&quot;none&quot;">' +
@@ -32017,9 +32297,11 @@ window.luxTogglePassForm = function() {
                         html += '<h3>Menu Coming Soon</h3><p class="lux-sheet-desc">Our room service menu is being updated. Please call the front desk for assistance.</p>';
                     }
                     cats.forEach(cat => {
-                        html += '<h3 style="text-transform: capitalize;">' + cat + '</h3>';
+                        html += '<h3>' + luxEsc(labels[cat] || cat) + '</h3>';
                         groups[cat].forEach(it => {
-                            html += '<div class="lux-menu-item"><div>' +
+                            html += '<div class="lux-menu-item">' +
+                                (it.image_url ? '<img class="lux-menu-thumb" src="' + luxEsc(it.image_url) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
+                                '<div class="lux-menu-text">' +
                                 '<div class="nm">' + it.item_name + (it.is_premium ? ' <i class="fas fa-star" style="color: var(--lux-gold-2); font-size: 0.7rem;"></i>' : '') + '</div>' +
                                 (it.description ? '<div class="ds">' + it.description + '</div>' : '') +
                                 (it.allergens ? '<div class="ds" style="opacity: 0.75;"><i class="fas fa-exclamation-triangle" style="margin-right: 0.3rem;"></i>Allergens: ' + it.allergens + '</div>' : '') +
@@ -32038,6 +32320,12 @@ window.luxTogglePassForm = function() {
                     luxSheetOpen('<div class="lux-sheet-content" style="padding-top: 3.4rem;"><h3>In-Room Dining</h3><p class="lux-sheet-desc">The menu is unavailable right now. Please dial Room Service from your room phone.</p></div>');
                 });
         };
+        // Older menu items carry raw category keys ('hot_and_soft_drinks', 'breakfast_3'); the API sends a
+        // friendly label with newer rows and this makes the same label from the key
+        function luxFriendlyCategory(key) {
+            return String(key || '').replace(/_[0-9]+$/, '').split('_').filter(Boolean)
+                .map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+        }
 
         // ── Beach booking: seamless in-app aerial experience ──
         const luxBeach = { settings: {}, spots: [], zones: [], limits: {}, image: '', slots: [], bookings: [], date: null, slot: null, spot: null, loungers: 2, posting: false };
@@ -33237,15 +33525,16 @@ window.luxTogglePassForm = function() {
         }
 
         function viewActivity(activityId) {
+            if (PREVIEW) return;
             trackPageView('activity', String(activityId));
-            window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
+            window.location.href ='/activity?id=' + activityId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
         }
 
         // Initialize on DOM ready
         document.addEventListener('DOMContentLoaded', function() {
             // CRITICAL: Re-read language from localStorage on page load
             const savedLang = localStorage.getItem('preferredLanguage');
-            if (savedLang) {
+            if (savedLang && !PREVIEW) {
                 window.currentLanguage = savedLang;
                 console.log('📖 Loaded language from localStorage:', savedLang);
             }
@@ -33278,7 +33567,7 @@ window.luxTogglePassForm = function() {
                 initSeasonalEffects();
                 
                 // Initialize chatbot (must run after propertyData is loaded)
-                if (typeof window.initChatbot === 'function') {
+                if (typeof window.initChatbot === 'function' && !PREVIEW) {
                     window.initChatbot();
                 }
                 });
@@ -33387,6 +33676,7 @@ window.luxTogglePassForm = function() {
             const data = await response.json();
             if (data.success) {
               infoPages = data.pages;
+              if (window.luxBuildHomeSafe) luxBuildHomeSafe();
             }
           } catch (error) {
             console.error('Load info pages error:', error);
@@ -33530,6 +33820,7 @@ window.luxTogglePassForm = function() {
         }
 
         window.openFeedbackForm = function() {
+          if (PREVIEW) return;
           // Prefer the GuestLens survey (public, branded, mobile-friendly),
           // opened in the guest's chosen language.
           if (propertyData && propertyData.feedback_survey_url) {
@@ -34588,6 +34879,7 @@ window.luxTogglePassForm = function() {
 
           // Load chatbot settings and show if enabled
           window.initChatbot = async function() {
+              if (window.LUX_PREVIEW) return;
               try {
                 const response = await fetch('/api/chatbot/settings/' + window.propertyData.property_id);
                 const data = await response.json();
@@ -35484,6 +35776,7 @@ window.luxTogglePassForm = function() {
             }
             
             function shouldShowMoodCheck() {
+                if (window.LUX_PREVIEW) return false;
                 const guest = window.getGuestSession?.();
                 if (!guest || !guest.pass_reference) return false;
                 
