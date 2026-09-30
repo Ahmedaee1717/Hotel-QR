@@ -13004,7 +13004,7 @@ app.post('/api/chatbot/chat', async (c) => {
       let conv: any = null
       try {
         conv = await DB.prepare(`
-          SELECT is_ai_paused, site_lang FROM chatbot_conversations
+          SELECT is_ai_paused, site_lang, guest_lang FROM chatbot_conversations
           WHERE conversation_id = ? AND session_id = ? AND property_id = ?
         `).bind(convId, session_id, property_id).first()
 
@@ -13044,10 +13044,18 @@ app.post('/api/chatbot/chat', async (c) => {
 
       // Instant staff alert: the guest replied while a human is handling the chat
       try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {}
+      try { c.executionCtx.waitUntil(relayGuestMessage(c.env, DB, convId, message).catch(() => {})) } catch (e) {}
+
+      // The holding line reaches the guest in their own language (cached per language)
+      let holding = 'A staff member is currently assisting you. They will respond shortly.'
+      const guestLangPaused = normLang((conv && (conv.guest_lang || conv.site_lang)) || siteLang || 'en')
+      if (guestLangPaused !== 'en') {
+        try { holding = (await dsTranslateBatch(c.env, guestLangPaused, [holding]))[0] || holding } catch (e) {}
+      }
 
       return c.json({
         success: true,
-        response: 'A staff member is currently assisting you. They will respond shortly.',
+        response: holding,
         conversation_id: convId,
         is_staff_responding: true
       })
@@ -13128,7 +13136,8 @@ app.post('/api/chatbot/chat', async (c) => {
             INSERT INTO chatbot_messages (conversation_id, role, content)
             VALUES (?, 'user', ?)
           `).bind(convId, message).run()
-          
+          try { c.executionCtx.waitUntil(relayGuestMessage(c.env, DB, convId, message).catch(() => {})) } catch (e) {}
+
           await DB.prepare(`
             INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
             VALUES (?, 'assistant', ?, '[]')
@@ -13154,7 +13163,8 @@ app.post('/api/chatbot/chat', async (c) => {
             INSERT INTO chatbot_messages (conversation_id, role, content)
             VALUES (?, 'user', ?)
           `).bind(convId, message).run()
-          
+          try { c.executionCtx.waitUntil(relayGuestMessage(c.env, DB, convId, message).catch(() => {})) } catch (e) {}
+
           await DB.prepare(`
             INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
             VALUES (?, 'assistant', ?, '[]')
@@ -13179,7 +13189,8 @@ app.post('/api/chatbot/chat', async (c) => {
           INSERT INTO chatbot_messages (conversation_id, role, content)
           VALUES (?, 'user', ?)
         `).bind(convId, message).run()
-        
+        try { c.executionCtx.waitUntil(relayGuestMessage(c.env, DB, convId, message).catch(() => {})) } catch (e) {}
+
         await DB.prepare(`
           INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
           VALUES (?, 'assistant', ?, '[]')
@@ -13199,7 +13210,8 @@ app.post('/api/chatbot/chat', async (c) => {
       INSERT INTO chatbot_messages (conversation_id, role, content)
       VALUES (?, 'user', ?)
     `).bind(convId, message).run()
-    
+    try { c.executionCtx.waitUntil(relayGuestMessage(c.env, DB, convId, message).catch(() => {})) } catch (e) {}
+
     // Check if this is a simple greeting FIRST (before RAG search) - MULTILINGUAL
     const greetings = [
       // English
@@ -13958,6 +13970,7 @@ app.post('/api/voice/event', async (c) => {
     const convId = s.conversation_id
     const writes: any[] = []
     let ring = false
+    let guestText = ''
     if (type === 'register') {
       const name = String(b.name || '').trim().slice(0, 80)
       const room = String(b.room || '').trim().slice(0, 20)
@@ -13974,6 +13987,7 @@ app.post('/api/voice/event', async (c) => {
         `).bind(convId, role, content))
         if (type === 'guest') writes.push(DB.prepare('UPDATE voice_sessions SET guest_turns = guest_turns + 1 WHERE voice_session_id = ?').bind(id))
         if (type === 'assistant') writes.push(DB.prepare('UPDATE voice_sessions SET ai_turns = ai_turns + 1 WHERE voice_session_id = ?').bind(id))
+        if (role === 'user') guestText = content
         // Same alerts as the text route: a conversation that has just started
         // (first spoken turn), a guest talking while staff handle the chat, and
         // an explicit request for the team. The ring-check cron covers the rest.
@@ -13982,6 +13996,7 @@ app.post('/api/voice/event', async (c) => {
     }
     if (writes.length) await DB.batch(writes)
     if (ring) { try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {} }
+    if (guestText) { try { c.executionCtx.waitUntil(relayGuestMessage(c.env, DB, convId, guestText).catch(() => {})) } catch (e) {} }
     return c.json({ success: true, paused })
   } catch (e) {
     console.error('voice event', e)
@@ -14142,48 +14157,73 @@ async function chatbotMessages(c: any, propertyId: string) {
   }
 }
 
+// A staff reply into a guest chat, whatever the channel (Ops app, admin
+// dashboard, WhatsApp relay): pauses the AI, records who took over and stores
+// the message as an 'admin' row the guest widget polls for. A reply is also an
+// acknowledgement, so the phone ring and the escalation ladder stop.
+async function storeStaffReply(DB: any, conversationId: any, text: string, by: string, channel: string | null) {
+  await DB.batch([
+    DB.prepare(`
+      UPDATE chatbot_conversations
+      SET is_ai_paused = 1,
+          admin_takeover_at = CURRENT_TIMESTAMP,
+          admin_takeover_by = ?,
+          staff_ack_at = CURRENT_TIMESTAMP,
+          first_ack_at = COALESCE(first_ack_at, CURRENT_TIMESTAMP)
+      WHERE conversation_id = ?
+    `).bind(by || 'admin', conversationId),
+    DB.prepare(`
+      INSERT INTO chatbot_messages (conversation_id, role, content, channel, created_at)
+      VALUES (?, 'admin', ?, ?, CURRENT_TIMESTAMP)
+    `).bind(conversationId, text, channel || null)
+  ])
+}
+
+// Hand the chat back to the AI. The resume notice reaches the guest in their
+// own language; the WhatsApp handler pointer is cleared so forwards stop.
+async function endTakeover(env: any, DB: any, conversationId: any) {
+  const conv: any = await DB.prepare('SELECT guest_lang, site_lang FROM chatbot_conversations WHERE conversation_id = ?')
+    .bind(conversationId).first()
+  const lang = normLang((conv && (conv.guest_lang || conv.site_lang)) || 'en')
+  let notice = 'AI chatbot has resumed responding to your messages.'
+  try { notice = (await dsTranslateBatch(env, lang, [notice]))[0] || notice } catch (e) {}
+  await DB.batch([
+    DB.prepare(`
+      UPDATE chatbot_conversations
+      SET is_ai_paused = 0,
+          admin_takeover_ended_at = CURRENT_TIMESTAMP,
+          wa_handler_phone = NULL
+      WHERE conversation_id = ?
+    `).bind(conversationId),
+    DB.prepare(`
+      INSERT INTO chatbot_messages (conversation_id, role, content, created_at)
+      VALUES (?, 'system', ?, CURRENT_TIMESTAMP)
+    `).bind(conversationId, notice)
+  ])
+}
+
 // Send a message as staff in a chatbot conversation (pauses the AI)
 async function chatbotSendMessage(c: any, propertyId: string, staffName: string) {
   const { DB } = c.env
   const { session_id, message, admin_id } = await c.req.json()
-  
+
   if (!session_id || !message) {
     return c.json({ error: 'Session ID and message required' }, 400)
   }
-  
+
   try {
     // Get conversation_id from session_id
     const conversation = await DB.prepare(`
       SELECT conversation_id FROM chatbot_conversations
       WHERE session_id = ? AND property_id = ?
     `).bind(session_id, propertyId).first()
-    
+
     if (!conversation) {
       return c.json({ error: 'Conversation not found' }, 404)
     }
-    
-    // Mark session as taken over by admin
-    const updateResult = await DB.prepare(`
-      UPDATE chatbot_conversations
-      SET is_ai_paused = 1,
-          admin_takeover_at = CURRENT_TIMESTAMP,
-          admin_takeover_by = ?
-      WHERE session_id = ? AND property_id = ?
-    `).bind(staffName || admin_id || 'admin', session_id, propertyId).run()
-    
-    console.log('Admin takeover update result:', updateResult)
-    
-    if (!updateResult.success) {
-      console.error('Failed to set is_ai_paused to 1')
-      // Continue anyway - still send the admin message
-    }
-    
-    // Insert admin message using conversation_id
-    await DB.prepare(`
-      INSERT INTO chatbot_messages (conversation_id, role, content, created_at)
-      VALUES (?, 'admin', ?, CURRENT_TIMESTAMP)
-    `).bind(conversation.conversation_id, message).run()
-    
+
+    await storeStaffReply(DB, conversation.conversation_id, message, staffName || admin_id || 'admin', null)
+
     return c.json({
       success: true,
       message: 'Message sent successfully'
@@ -14198,43 +14238,24 @@ async function chatbotSendMessage(c: any, propertyId: string, staffName: string)
 async function chatbotEndTakeover(c: any, propertyId: string) {
   const { DB } = c.env
   const { session_id } = await c.req.json()
-  
+
   if (!session_id) {
     return c.json({ error: 'Session ID required' }, 400)
   }
-  
+
   try {
     // Get conversation_id from session_id
     const conversation = await DB.prepare(`
       SELECT conversation_id FROM chatbot_conversations
       WHERE session_id = ? AND property_id = ?
     `).bind(session_id, propertyId).first()
-    
+
     if (!conversation) {
       return c.json({ error: 'Conversation not found' }, 404)
     }
-    
-    // Resume AI - update the conversation
-    const updateResult = await DB.prepare(`
-      UPDATE chatbot_conversations
-      SET is_ai_paused = 0,
-          admin_takeover_ended_at = CURRENT_TIMESTAMP
-      WHERE session_id = ? AND property_id = ?
-    `).bind(session_id, propertyId).run()
-    
-    console.log('Resume AI update result:', updateResult)
-    
-    if (!updateResult.success) {
-      console.error('Failed to update is_ai_paused to 0')
-      return c.json({ error: 'Failed to resume AI in database' }, 500)
-    }
-    
-    // Add system message using conversation_id
-    await DB.prepare(`
-      INSERT INTO chatbot_messages (conversation_id, role, content, created_at)
-      VALUES (?, 'system', 'AI chatbot has resumed responding to your messages.', CURRENT_TIMESTAMP)
-    `).bind(conversation.conversation_id).run()
-    
+
+    await endTakeover(c.env, DB, conversation.conversation_id)
+
     return c.json({
       success: true,
       message: 'AI resumed successfully'
@@ -95490,8 +95511,11 @@ app.post('/api/staff/ring-check', async (c) => {
     if (pending > 0) {
       c.executionCtx.waitUntil(ringStaff(c.env, DB, 2, 5000))
     }
-    // Nobody picked up in time? Escalate to management on WhatsApp.
-    c.executionCtx.waitUntil(runEscalations(c.env, DB).catch(() => {}))
+    // Nobody picked up in time? Escalate to management on WhatsApp. The ladder
+    // only queues; the outbox drain right after it does the sending, and the
+    // inbound drain retries WhatsApp replies/voice notes the webhook left behind.
+    c.executionCtx.waitUntil(runEscalations(c.env, DB).catch(() => {}).then(() => drainWaOutbox(c.env, DB)).catch(() => {}))
+    c.executionCtx.waitUntil(drainWaInbound(c.env, DB).catch(() => {}))
     c.executionCtx.waitUntil(rstSweepNoShows(c.env, DB).catch(() => {}))
     return c.json({ success: true, pending })
   } catch (e) {
@@ -95611,92 +95635,104 @@ function staffLangCode(v: any): string {
   return /^[a-z]{2,3}(-[a-z]{2,4})?$/.test(s) ? s : 'unknown'
 }
 
+// Detect + translate a batch for staff: items [{id, text}] → [{id, lang, text}]
+// where lang is the detected SOURCE language ('unknown' when the model did not
+// say). Unlike dsTranslateBatch this translates INTO English too. When a
+// session_id is given, the first detected foreign language is stamped on the
+// conversation as guest_lang. Shared by /api/staff/translate and the WhatsApp
+// relay; the relay passes a timeout so a slow model cannot eat its budget.
+async function staffTranslate(env: any, DB: any, targetRaw: string, itemsIn: any[], sessionId?: string, timeoutMs?: number): Promise<any[]> {
+  const target = normLang(targetRaw || 'en')
+  const items: any[] = (itemsIn || []).filter((i: any) => i && i.text && String(i.text).trim())
+  if (!items.length) return []
+
+  const results: any[] = []
+  const todo: any[] = []
+  const keyed: any[] = []
+  for (const it of items) keyed.push({ ...it, _key: await cacheKey(String(it.text), target) })
+  const hits = await translationCacheLookup(DB, keyed.map(k => k._key))
+  for (const it of keyed) {
+    const hit = hits.get(it._key)
+    if (hit) results.push({ id: it.id, lang: staffLangCode(hit.src_lang), text: hit.translated })
+    else todo.push(it)
+  }
+
+  if (todo.length) {
+    const apiKey = env.DEEPSEEK_API_KEY
+    const targetName = LANG_NAMES[target] || 'English'
+    if (!apiKey) {
+      todo.forEach(t => results.push({ id: t.id, lang: 'unknown', text: t.text }))
+    } else {
+      // Each item carries an echo of its own opening characters; a result is
+      // only accepted (and cached) when the echo matches its claimed index —
+      // this makes batch-index mixups impossible to poison the cache with.
+      const payload = todo.map((t, i) => ({ i: i, src: String(t.text).slice(0, 12), text: String(t.text).slice(0, 1500) }))
+      const prompt = 'You are a hotel front-desk translator. For EACH item, detect the source language and translate "text" into ' + targetName + '.\n' +
+        'Reply with ONLY a JSON array, no markdown. For each item copy "i" and "src" UNCHANGED from the input and add your output:\n' +
+        '[{"i":0,"src":"<copied verbatim>","lang":"<ISO 639-1 code of the SOURCE language>","text":"<translation into ' + targetName + '>"}]\n' +
+        'If an item is already in ' + targetName + ', copy its text unchanged and still report its language code. Preserve meaning, tone and any room numbers or times exactly.\n\n' +
+        JSON.stringify(payload)
+      try {
+        const init: any = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0,
+            max_tokens: 2400
+          })
+        }
+        if (timeoutMs) init.signal = AbortSignal.timeout(timeoutMs)
+        const r = await fetch('https://api.deepseek.com/v1/chat/completions', init)
+        const d: any = await r.json()
+        let raw = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '[]'
+        raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim()
+        const arr = JSON.parse(raw)
+        const writes: any[] = []
+        for (const out of arr) {
+          const src = todo[out.i]
+          if (!src) continue
+          // Reject misaligned results instead of caching a wrong translation
+          if (String(out.src || '') !== String(src.text).slice(0, 12)) continue
+          const lang = staffLangCode(out.lang)
+          results.push({ id: src.id, lang, text: out.text || src.text })
+          writes.push(DB.prepare(`
+              INSERT INTO staff_translations (cache_key, src_lang, target_lang, translated)
+              VALUES (?, ?, ?, ?)
+              ON CONFLICT(cache_key) DO UPDATE SET translated = excluded.translated, src_lang = excluded.src_lang
+            `).bind(src._key, lang, target, out.text || src.text))
+        }
+        if (writes.length) { try { await DB.batch(writes) } catch (e) {} }
+        // anything the model skipped falls back to the original
+        todo.forEach(t => {
+          if (!results.find(r2 => r2.id === t.id)) results.push({ id: t.id, lang: 'unknown', text: t.text })
+        })
+      } catch (e) {
+        console.error('staff translate error', e)
+        todo.forEach(t => results.push({ id: t.id, lang: 'unknown', text: t.text }))
+      }
+    }
+  }
+
+  // Remember the guest's language so staff replies can be sent back in it
+  if (sessionId) {
+    const guestLang = results.map(r => r.lang).find(l => l && l !== 'unknown' && l !== target)
+    if (guestLang) {
+      try {
+        await DB.prepare('UPDATE chatbot_conversations SET guest_lang = ? WHERE session_id = ?')
+          .bind(guestLang, sessionId).run()
+      } catch (e) {}
+    }
+  }
+  return results
+}
+
 app.post('/api/staff/translate', async (c) => {
   const { DB } = c.env
   try {
     const body = await c.req.json()
-    const target = normLang(body.target || 'en')
-    const items: any[] = (body.items || []).filter((i: any) => i && i.text && String(i.text).trim())
-    if (!items.length) return c.json({ success: true, results: [] })
-
-    const results: any[] = []
-    const todo: any[] = []
-    const keyed: any[] = []
-    for (const it of items) keyed.push({ ...it, _key: await cacheKey(String(it.text), target) })
-    const hits = await translationCacheLookup(DB, keyed.map(k => k._key))
-    for (const it of keyed) {
-      const hit = hits.get(it._key)
-      if (hit) results.push({ id: it.id, lang: staffLangCode(hit.src_lang), text: hit.translated })
-      else todo.push(it)
-    }
-
-    if (todo.length) {
-      const apiKey = c.env.DEEPSEEK_API_KEY
-      const targetName = LANG_NAMES[target] || 'English'
-      if (!apiKey) {
-        todo.forEach(t => results.push({ id: t.id, lang: 'unknown', text: t.text }))
-      } else {
-        // Each item carries an echo of its own opening characters; a result is
-        // only accepted (and cached) when the echo matches its claimed index —
-        // this makes batch-index mixups impossible to poison the cache with.
-        const payload = todo.map((t, i) => ({ i: i, src: String(t.text).slice(0, 12), text: String(t.text).slice(0, 1500) }))
-        const prompt = 'You are a hotel front-desk translator. For EACH item, detect the source language and translate "text" into ' + targetName + '.\n' +
-          'Reply with ONLY a JSON array, no markdown. For each item copy "i" and "src" UNCHANGED from the input and add your output:\n' +
-          '[{"i":0,"src":"<copied verbatim>","lang":"<ISO 639-1 code of the SOURCE language>","text":"<translation into ' + targetName + '>"}]\n' +
-          'If an item is already in ' + targetName + ', copy its text unchanged and still report its language code. Preserve meaning, tone and any room numbers or times exactly.\n\n' +
-          JSON.stringify(payload)
-        try {
-          const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-            body: JSON.stringify({
-              model: 'deepseek-chat',
-              messages: [{ role: 'user', content: prompt }],
-              temperature: 0,
-              max_tokens: 2400
-            })
-          })
-          const d: any = await r.json()
-          let raw = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '[]'
-          raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim()
-          const arr = JSON.parse(raw)
-          const writes: any[] = []
-          for (const out of arr) {
-            const src = todo[out.i]
-            if (!src) continue
-            // Reject misaligned results instead of caching a wrong translation
-            if (String(out.src || '') !== String(src.text).slice(0, 12)) continue
-            const lang = staffLangCode(out.lang)
-            results.push({ id: src.id, lang, text: out.text || src.text })
-            writes.push(DB.prepare(`
-                INSERT INTO staff_translations (cache_key, src_lang, target_lang, translated)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(cache_key) DO UPDATE SET translated = excluded.translated, src_lang = excluded.src_lang
-              `).bind(src._key, lang, target, out.text || src.text))
-          }
-          if (writes.length) { try { await DB.batch(writes) } catch (e) {} }
-          // anything the model skipped falls back to the original
-          todo.forEach(t => {
-            if (!results.find(r2 => r2.id === t.id)) results.push({ id: t.id, lang: 'unknown', text: t.text })
-          })
-        } catch (e) {
-          console.error('staff translate error', e)
-          todo.forEach(t => results.push({ id: t.id, lang: 'unknown', text: t.text }))
-        }
-      }
-    }
-
-    // Remember the guest's language so staff replies can be sent back in it
-    if (body.session_id) {
-      const guestLang = results.map(r => r.lang).find(l => l && l !== 'unknown' && l !== target)
-      if (guestLang) {
-        try {
-          await DB.prepare('UPDATE chatbot_conversations SET guest_lang = ? WHERE session_id = ?')
-            .bind(guestLang, body.session_id).run()
-        } catch (e) {}
-      }
-    }
-
+    const results = await staffTranslate(c.env, DB, body.target || 'en', body.items || [], body.session_id)
     return c.json({ success: true, results })
   } catch (error) {
     console.error('translate endpoint error', error)
@@ -96215,28 +96251,28 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
   // The free plan allows 1 request/minute, so a 429 is retried briefly rather
   // than being written off as a failed alert.
   if (env.WASENDER_TOKEN) {
-    // No long retry sleeps here: the escalation cron returns every minute, so a
-    // rate-limited send is logged as such and simply takes the next minute's
-    // quota. Long waits inside waitUntil get the worker killed mid-flight.
+    // No sleeps here: a 429 is reported with WaSender's retry_after and the
+    // outbox drain (per-minute cron) sends it later. Long waits inside
+    // waitUntil get the worker killed mid-flight.
     const to = '+' + String(contact.phone).replace(/[^0-9]/g, '')
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const r = await fetch('https://www.wasenderapi.com/api/send-message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.WASENDER_TOKEN },
-          body: JSON.stringify({ to, text })
+          body: JSON.stringify({ to, text }),
+          signal: AbortSignal.timeout(5000)
         })
         const body = await r.text()
-        if (r.status === 429 && attempt === 0) {
-          await new Promise(res => setTimeout(res, 3000))
-          continue
-        }
+        let data: any = null
+        try { data = JSON.parse(body) } catch (e) { /* keep HTTP verdict */ }
         if (r.status === 429) {
-          return { channel: 'wasender', ok: false, detail: 'rate limited (free plan allows 1 message/minute) — retries on the next cycle' }
+          const ra = Math.max(5, Math.min(3600, parseInt(String(data?.retry_after ?? r.headers.get('retry-after') ?? ''), 10) || 60))
+          return { channel: 'wasender', ok: false, rate_limited: true, retry_after: ra, detail: 'rate limited — retry after ' + ra + ' s' }
         }
-        let ok = r.ok
-        try { ok = ok && JSON.parse(body).success !== false } catch (e) { /* keep HTTP verdict */ }
-        return { channel: 'wasender', ok, detail: body.slice(0, 260) }
+        const ok = r.ok && !(data && data.success === false)
+        const msgId = data && data.data && data.data.msgId != null ? parseInt(String(data.data.msgId), 10) || null : null
+        return { channel: 'wasender', ok, msg_id: msgId, detail: body.slice(0, 260) }
       } catch (e: any) {
         if (attempt === 1) return { channel: 'wasender', ok: false, detail: String(e).slice(0, 200) }
       }
@@ -96310,7 +96346,7 @@ async function runEscalations(env: any, DB: any) {
   const firstStart = Math.min(...levels.map((l: any) => l.start_after_minutes || 5))
 
   const stale = await DB.prepare(`
-    SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number,
+    SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number, c.guest_lang, c.site_lang,
       (SELECT MAX(m.created_at) FROM chatbot_messages m
         WHERE m.conversation_id = c.conversation_id AND m.role = 'user') as last_user_at,
       (SELECT m.content FROM chatbot_messages m
@@ -96335,9 +96371,23 @@ async function runEscalations(env: any, DB: any) {
     ).bind(conv.last_user_at).first()
     const waited = (waitedRow && waitedRow.mins) || 0
 
-    const who = conv.guest_name || 'A guest'
-    const room = conv.room_number ? 'Room ' + conv.room_number : 'room not linked'
     const msg = String(conv.last_text || '').slice(0, 120)
+    // The guest's line is quoted in each contact's own language: one detect +
+    // translate per language, which also stamps guest_lang on the chat.
+    const quotes = new Map<string, { text: string; lang: string }>()
+    const quoteFor = async (lang: string) => {
+      const hit = quotes.get(lang)
+      if (hit) return hit
+      let q = { text: msg, lang: 'unknown' }
+      if (msg) {
+        try {
+          const r = await staffTranslate(env, DB, lang, [{ id: 'q', text: msg }], conv.session_id, 12000)
+          if (r[0]) q = { text: String(r[0].text || msg).slice(0, 200), lang: r[0].lang || 'unknown' }
+        } catch (e) { /* untranslated quote is still useful */ }
+      }
+      quotes.set(lang, q)
+      return q
+    }
 
     for (const lvl of levels) {
       const L = lvl.level
@@ -96360,16 +96410,28 @@ async function runEscalations(env: any, DB: any) {
         if (recent) continue
       }
 
-      const text = (LEVEL_TONE[L] || LEVEL_TONE[1]) + ' ' + waited + ' min with no reply\n' +
-                   who + ' (' + room + ')\n"' + msg + '"\nOpen the Ops app to answer.'
-
+      // Alerts are queued, not sent: the outbox drain paces them to WaSender's
+      // limits. The log row is written now (status 'queued') because this
+      // level's throttle counts log rows; the drain flips it to sent/failed.
       for (const contact of recipients) {
         try {
-          const res = await sendWhatsApp(env, contact, text, [who + ' (' + room + ')', String(waited), msg])
-          await DB.prepare(`
+          const ui = waUiLang(contact)
+          const t = WA_CHROME[ui]
+          const q = await quoteFor(normLang(contact.language || 'en'))
+          const guestLang = (q.lang !== 'unknown' ? q.lang : '') || conv.guest_lang || conv.site_lang || ''
+          const text = (ui === 'ar' ? LEVEL_TONE_AR[L] || LEVEL_TONE_AR[1] : LEVEL_TONE[L] || LEVEL_TONE[1]) + ' · #' + conv.conversation_id + '\n' +
+            (conv.guest_name || t.guest) + ' · ' + t.room + ' ' + (conv.room_number || t.no_room) + ' · ' + waLangName(guestLang, ui) + '\n' +
+            t.waiting.replace('{m}', String(waited)) + '\n' +
+            '"' + q.text + '"\n' +
+            t.hint.replace(/\{id\}/g, String(conv.conversation_id))
+          const log = await DB.prepare(`
             INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail, level)
-            VALUES (1, ?, ?, ?, ?, ?, ?)
-          `).bind(conv.session_id, contact.phone, res.channel, res.ok ? 'sent' : 'failed', res.detail, L).run()
+            VALUES (1, ?, ?, 'outbox', 'queued', 'queued for WhatsApp', ?)
+          `).bind(conv.session_id, contact.phone, L).run()
+          await enqueueWa(DB, {
+            contact_phone: contact.phone, conversation_id: conv.conversation_id, kind: 'alert', text, priority: 1,
+            detail: 'log:' + (log.meta && log.meta.last_row_id)
+          })
         } catch (e: any) {
           await DB.prepare(`
             INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail, level)
@@ -96379,6 +96441,979 @@ async function runEscalations(env: any, DB: any) {
       }
     }
   }
+}
+
+// ── Two-way WhatsApp relay ──
+//
+// Staff answer guests from WhatsApp: every alert/forward carries a "#17" chat
+// tag, replies (typed or voice notes) come back through the WaSender webhook,
+// are understood by DeepSeek and stored as staff replies in the guest's
+// language. All traffic to a contact goes through wa_outbox so WaSender's
+// pacing (trial: 1 message/minute) never drops an alert.
+const LEVEL_TONE_AR: Record<number, string> = {
+  1: '🔔 أولد بالاس — ضيف في انتظار الرد',
+  2: '⚠️ المستوى 2 — لا يزال الضيف بلا رد',
+  3: '🚨 المستوى 3 — عاجل: الضيف بلا رد',
+  4: '🆘 تصعيد نهائي — الضيف بلا رد'
+}
+
+const LANG_NAMES_AR: Record<string, string> = {
+  en: 'الإنجليزية', ar: 'العربية', ru: 'الروسية', de: 'الألمانية', fr: 'الفرنسية', it: 'الإيطالية',
+  es: 'الإسبانية', pl: 'البولندية', cs: 'التشيكية', uk: 'الأوكرانية', tr: 'التركية', nl: 'الهولندية',
+  ro: 'الرومانية', hu: 'المجرية', sv: 'السويدية', zh: 'الصينية', ja: 'اليابانية', ko: 'الكورية',
+  pt: 'البرتغالية', he: 'العبرية', fa: 'الفارسية', hi: 'الهندية', sk: 'السلوفاكية', bg: 'البلغارية', sr: 'الصربية',
+  el: 'اليونانية', no: 'النرويجية', da: 'الدنماركية', fi: 'الفنلندية'
+}
+
+// Chrome the contact reads (hints, commands, confirmations) in English or Arabic.
+// Guest-facing text is never taken from here.
+const WA_CHROME: Record<string, Record<string, string>> = {
+  en: {
+    room: 'Room', no_room: 'not given yet', guest: 'Guest', unknown_lang: 'language unknown',
+    waiting: 'waiting {m} min',
+    hint: '↩︎ Reply to this message to answer the guest (I translate). Send "#{id} done" to hand back to the AI, "list" for waiting guests, "help" for commands.',
+    forward_hint: '↩︎ Reply to this message to answer the guest (I translate). Send "#{id} done" to hand back to the AI, "help" for commands.',
+    no_chat: 'No open chat. Send "list" to see waiting guests.',
+    no_such_chat: 'There is no chat #{id}. Send "list" to see waiting guests.',
+    list_empty: 'No guests are waiting right now.',
+    list_head: 'Waiting guests — answer one with "#tag your reply":',
+    handled_by_you: ' · you are handling', handled: ' · being handled', waiting_tag: ' · waiting',
+    active_set: 'Now talking to #{id}. Reply here to answer this guest.',
+    last_turns: 'Last messages from the guest:',
+    done: '✅ #{id} handed back to the AI concierge.',
+    muted: '🔕 Instant forwards paused until {until} (alerts still come). Send "on" to resume.',
+    unmuted: '🔔 Instant forwards resumed.',
+    unclear_voice: '🎤 I could not make out the voice note. I heard: "{heard}" — please type the instruction.',
+    unclear_text: '🤔 I could not work out what to tell the guest from: "{heard}" — please rephrase or type the instruction.',
+    which_room: 'Which room? ({options}) — start your reply with the chat tag, e.g. "#{id} …".',
+    too_long: '🎤 That voice note is longer than 3 minutes — please send a shorter one or type the instruction.',
+    failed: '⚠️ I could not process your last message — please type the instruction.',
+    ack: '👍 Noted for #{id}.',
+    sent_prefix: '✅ Sent: ',
+    help: '🤖 Old Palace concierge — WhatsApp commands\n' +
+      '• Reply to an alert → I send your answer to that guest, translated into their language.\n' +
+      '• Voice note → I turn your spoken instruction into a polite message for the guest.\n' +
+      '• #17 → talk to chat #17 (shows the guest\'s last messages). "#17 your text" answers it directly.\n' +
+      '• #17 done (or just "done") → hand the chat back to the AI.\n' +
+      '• list → waiting guests.\n' +
+      '• mute 2h / on → pause / resume instant forwards.\n' +
+      '• help → this card.'
+  },
+  ar: {
+    room: 'غرفة', no_room: 'غير محددة بعد', guest: 'ضيف', unknown_lang: 'لغة غير معروفة',
+    waiting: 'في الانتظار منذ {m} دقيقة',
+    hint: '↩︎ رد على هذه الرسالة للرد على الضيف (أنا أترجم). أرسل "#{id} تم" لإعادة المحادثة للمساعد الآلي، "القائمة" لعرض الضيوف المنتظرين، "مساعدة" للأوامر.',
+    forward_hint: '↩︎ رد على هذه الرسالة للرد على الضيف (أنا أترجم). أرسل "#{id} تم" لإعادة المحادثة للمساعد الآلي، "مساعدة" للأوامر.',
+    no_chat: 'لا توجد محادثة مفتوحة. أرسل "القائمة" لعرض الضيوف المنتظرين.',
+    no_such_chat: 'لا توجد محادثة برقم #{id}. أرسل "القائمة" لعرض الضيوف المنتظرين.',
+    list_empty: 'لا يوجد ضيوف في الانتظار الآن.',
+    list_head: 'الضيوف المنتظرون — للرد على أحدهم أرسل "#الرقم ردك":',
+    handled_by_you: ' · أنت تتولاها', handled: ' · قيد المتابعة', waiting_tag: ' · في الانتظار',
+    active_set: 'الآن تتحدث مع #{id}. رد هنا للرد على هذا الضيف.',
+    last_turns: 'آخر رسائل الضيف:',
+    done: '✅ تمت إعادة #{id} إلى المساعد الآلي.',
+    muted: '🔕 تم إيقاف التحويل الفوري حتى {until} (التنبيهات مستمرة). أرسل "تشغيل" للاستئناف.',
+    unmuted: '🔔 تم استئناف التحويل الفوري.',
+    unclear_voice: '🎤 لم أفهم الرسالة الصوتية بوضوح. سمعت: "{heard}" — من فضلك اكتب التعليمات نصًا.',
+    unclear_text: '🤔 لم أفهم ما يجب إبلاغه للضيف من: "{heard}" — من فضلك أعد الصياغة أو اكتب التعليمات.',
+    which_room: 'أي غرفة؟ ({options}) — ابدأ ردك برقم المحادثة، مثل "#{id} …".',
+    too_long: '🎤 الرسالة الصوتية أطول من 3 دقائق — أرسل رسالة أقصر أو اكتب التعليمات نصًا.',
+    failed: '⚠️ لم أتمكن من معالجة رسالتك الأخيرة — من فضلك اكتب التعليمات نصًا.',
+    ack: '👍 تم تسجيل ذلك لـ #{id}.',
+    sent_prefix: '✅ تم الإرسال: ',
+    help: '🤖 مساعد أولد بالاس — أوامر واتساب\n' +
+      '• الرد على تنبيه ← أرسل ردك إلى ذلك الضيف مترجمًا إلى لغته.\n' +
+      '• رسالة صوتية ← أحوّل تعليماتك المنطوقة إلى رسالة مهذبة للضيف.\n' +
+      '• #17 ← التحدث مع المحادثة #17 (تعرض آخر رسائل الضيف). "#17 نص ردك" يرد عليها مباشرة.\n' +
+      '• #17 تم (أو "تم" فقط) ← إعادة المحادثة إلى المساعد الآلي.\n' +
+      '• القائمة ← الضيوف المنتظرون.\n' +
+      '• كتم 2 ساعة / تشغيل ← إيقاف / استئناف التحويل الفوري.\n' +
+      '• مساعدة ← هذه البطاقة.'
+  }
+}
+
+const WA_SEND_GAP_MS = 5200
+
+function waUiLang(contact: any): string {
+  return normLang((contact && contact.language) || 'en') === 'ar' ? 'ar' : 'en'
+}
+
+function waLangName(code: string, ui: string): string {
+  const c = normLang(code || '')
+  if (!code || !LANG_NAMES[c]) return WA_CHROME[ui].unknown_lang
+  return ui === 'ar' ? (LANG_NAMES_AR[c] || LANG_NAMES[c]) : LANG_NAMES[c]
+}
+
+// "#17 · Room 204 · Anna (German)" — the first line of every chat-related message.
+function waChatLine(conv: any, ui: string, guestLang?: string): string {
+  const t = WA_CHROME[ui]
+  return '#' + conv.conversation_id + ' · ' + t.room + ' ' + (conv.room_number || t.no_room) + ' · ' +
+    (conv.guest_name || t.guest) + ' (' + waLangName(guestLang || conv.guest_lang || conv.site_lang || '', ui) + ')'
+}
+
+function waSqlTime(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+function waMaskPhone(p: any): string {
+  const d = String(p || '')
+  return d.length > 7 ? d.slice(0, 4) + '****' + d.slice(-3) : '****'
+}
+
+// Sleep in short slices: a single long timer inside waitUntil is what gets
+// the worker killed mid-flight.
+async function waPause(ms: number) {
+  let left = ms
+  while (left > 0) {
+    const step = Math.min(2600, left)
+    await new Promise(res => setTimeout(res, step))
+    left -= step
+  }
+}
+
+// wa_outbox.detail keeps a reference prefix across sends: 'log:<escalation_log id>'
+// for alerts/tests, 'src:<hash>' for forwards (the 60 s duplicate guard).
+function waDetailRef(detail: any): string {
+  const m = String(detail || '').match(/^(log:\d+|src:[0-9a-f]+)/)
+  return m ? m[1] : ''
+}
+
+async function waTextHash(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(buf)).slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Queue a message for a contact. Alerts and forwards also make that chat the
+// contact's "active chat" (a tag-less reply goes there).
+async function enqueueWa(DB: any, m: { contact_phone: string; conversation_id?: any; kind: string; text: string; priority?: number; detail?: string | null }): Promise<number> {
+  const stmts = [
+    DB.prepare(`
+      INSERT INTO wa_outbox (property_id, contact_phone, conversation_id, kind, text, priority, detail)
+      VALUES (1, ?, ?, ?, ?, ?, ?)
+    `).bind(m.contact_phone, m.conversation_id == null ? null : m.conversation_id, m.kind, m.text, m.priority == null ? 5 : m.priority, m.detail == null ? null : m.detail)
+  ]
+  if ((m.kind === 'alert' || m.kind === 'forward') && m.conversation_id != null) {
+    stmts.push(DB.prepare(`
+      INSERT INTO wa_relay_state (contact_phone, active_conversation_id, updated_at) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(contact_phone) DO UPDATE SET active_conversation_id = excluded.active_conversation_id, updated_at = excluded.updated_at
+    `).bind(m.contact_phone, m.conversation_id))
+  }
+  const res = await DB.batch(stmts)
+  return Number((res[0] && res[0].meta && res[0].meta.last_row_id) || 0)
+}
+
+// 'trial' when WaSender's last 429 asked for ≥ 30 s (the free plan's 1/minute),
+// 'paid' when it asked for less, 'unknown' before any 429.
+async function waPlanHint(DB: any): Promise<{ hint: string; retry_after: number }> {
+  try {
+    const row: any = await DB.prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'wa_last_429'").first()
+    if (!row) return { hint: 'unknown', retry_after: 0 }
+    const ra = parseInt(String(row.setting_value || ''), 10) || 0
+    return { hint: ra >= 30 ? 'trial' : 'paid', retry_after: ra }
+  } catch (e) { return { hint: 'unknown', retry_after: 0 } }
+}
+
+// Send what is due, in priority order, within the budget. Consecutive rows for
+// the same contact + chat + kind go out as one message. On the trial plan one
+// message per call (the cron calls every minute); otherwise up to six, 5.2 s
+// apart. A 429 parks the rows until WaSender's retry_after; three real
+// failures mark a row failed and log it.
+async function drainWaOutbox(env: any, DB: any, deadline?: number): Promise<{ sent: number; rate_limited: boolean }> {
+  const end = deadline || (Date.now() + 24000)
+  const out = { sent: 0, rate_limited: false }
+  const rows: any[] = (await DB.prepare(`
+    SELECT id, contact_phone, conversation_id, kind, text, attempts, detail FROM wa_outbox
+    WHERE status = 'pending' AND (retry_after IS NULL OR retry_after <= datetime('now'))
+    ORDER BY priority, created_at, id LIMIT 40
+  `).all()).results || []
+  if (!rows.length) return out
+  const plan = await waPlanHint(DB)
+  const maxSends = plan.hint === 'trial' ? 1 : 6
+
+  const groups: any[] = []
+  for (const r of rows) {
+    const g = groups[groups.length - 1]
+    const text = String(r.text || '')
+    if (g && g.phone === r.contact_phone && String(g.conversation_id) === String(r.conversation_id) && g.kind === r.kind && g.len + 2 + text.length <= 1500) {
+      g.rows.push(r); g.len += 2 + text.length
+    } else {
+      groups.push({ phone: r.contact_phone, conversation_id: r.conversation_id, kind: r.kind, rows: [r], len: text.length })
+    }
+  }
+
+  const contacts = new Map<string, any>()
+  const lastSent: any = await DB.prepare("SELECT MAX(sent_at) AS at FROM wa_outbox WHERE status = 'sent'").first()
+  let lastSentMs = lastSent && lastSent.at ? Date.parse(String(lastSent.at).replace(' ', 'T') + 'Z') : 0
+
+  for (const g of groups) {
+    if (out.sent >= maxSends) break
+    if (out.sent > 0) {
+      if (Date.now() + WA_SEND_GAP_MS + 6000 > end) break
+      await waPause(WA_SEND_GAP_MS)
+    } else if (Date.now() + 6000 > end) break
+
+    // Claim each row (another drain may be running): a 90 s lease in retry_after
+    const lease = waSqlTime(Date.now() + 90000)
+    const claims = await DB.batch(g.rows.map((r: any) => DB.prepare(`
+      UPDATE wa_outbox SET retry_after = ?, attempts = attempts + 1
+      WHERE id = ? AND status = 'pending' AND (retry_after IS NULL OR retry_after <= datetime('now'))
+    `).bind(lease, r.id)))
+    const mine: any[] = g.rows.filter((r: any, i: number) => claims[i] && claims[i].meta && claims[i].meta.changes)
+    if (!mine.length) continue
+
+    let contact = contacts.get(g.phone)
+    if (contact === undefined) {
+      contact = (await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND phone = ? ORDER BY is_active DESC, contact_id LIMIT 1').bind(g.phone).first()) || { phone: g.phone }
+      contacts.set(g.phone, contact)
+    }
+    const text = mine.map((r: any) => String(r.text || '')).join('\n\n')
+    let res: any
+    try { res = await sendWhatsApp(env, contact, text, []) } catch (e: any) { res = { channel: 'error', ok: false, detail: String(e).slice(0, 200) } }
+    const logIds: number[] = []
+    for (const r of mine) { const m = waDetailRef(r.detail).match(/^log:(\d+)$/); if (m) logIds.push(parseInt(m[1], 10)) }
+    const withRef = (r: any, d: string) => { const ref = waDetailRef(r.detail); return ((ref ? ref + ' ' : '') + String(d || '')).slice(0, 300) }
+
+    if (res.ok) {
+      out.sent++
+      const stmts = mine.map((r: any) => DB.prepare(`
+        UPDATE wa_outbox SET status = 'sent', sent_at = datetime('now'), retry_after = NULL, msg_id = ?, detail = ? WHERE id = ?
+      `).bind(res.msg_id == null ? null : res.msg_id, withRef(r, res.detail), r.id))
+      for (const id of logIds) stmts.push(DB.prepare("UPDATE escalation_log SET status = 'sent', channel = ?, detail = ?, sent_at = datetime('now') WHERE log_id = ?").bind(res.channel, String(res.detail || '').slice(0, 260), id))
+      // Two successes inside 45 s means the 1/minute plan is gone: forget the trial flag
+      if (plan.hint === 'trial' && lastSentMs && Date.now() - lastSentMs < 45000) stmts.push(DB.prepare("DELETE FROM system_settings WHERE setting_key = 'wa_last_429'"))
+      await DB.batch(stmts)
+      lastSentMs = Date.now()
+    } else if (res.rate_limited) {
+      out.rate_limited = true
+      const ra = res.retry_after || 60
+      const stmts = mine.map((r: any) => DB.prepare(`
+        UPDATE wa_outbox SET retry_after = datetime('now', '+' || ? || ' seconds'), attempts = attempts - 1, detail = ? WHERE id = ?
+      `).bind(ra, withRef(r, res.detail), r.id))
+      stmts.push(DB.prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('wa_last_429', ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value").bind(String(ra)))
+      await DB.batch(stmts)
+      break
+    } else {
+      const stmts: any[] = []
+      for (const r of mine) {
+        const attempts = Number(r.attempts || 0) + 1
+        if (attempts >= 3) {
+          stmts.push(DB.prepare("UPDATE wa_outbox SET status = 'failed', retry_after = NULL, detail = ? WHERE id = ?").bind(withRef(r, res.detail), r.id))
+          const m = waDetailRef(r.detail).match(/^log:(\d+)$/)
+          if (m) stmts.push(DB.prepare("UPDATE escalation_log SET status = 'failed', channel = ?, detail = ?, sent_at = datetime('now') WHERE log_id = ?").bind(res.channel, String(res.detail || '').slice(0, 260), parseInt(m[1], 10)))
+          else stmts.push(DB.prepare(`
+            INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+            VALUES (1, COALESCE((SELECT session_id FROM chatbot_conversations WHERE conversation_id = ?), 'whatsapp-relay'), ?, ?, 'failed', ?)
+          `).bind(r.conversation_id == null ? null : r.conversation_id, g.phone, res.channel, (r.kind + ' failed: ' + String(res.detail || '')).slice(0, 260)))
+        } else {
+          stmts.push(DB.prepare("UPDATE wa_outbox SET retry_after = datetime('now', '+60 seconds'), detail = ? WHERE id = ?").bind(withRef(r, res.detail), r.id))
+        }
+      }
+      await DB.batch(stmts)
+    }
+  }
+  return out
+}
+
+// WaSender webhook payloads (Baileys-shaped). data.messages is an object for
+// messages.received and an array for messages.upsert; the phone lives in
+// key.cleanedSenderPn/senderPn when the chat is addressed by lid.
+function waParseInbound(body: any): { phone: string; lid?: string; id: string; fromMe: boolean; text: string; quoted: string; audio: any }[] {
+  const ev = String((body && body.event) || '')
+  if (ev && !/messages\.(upsert|received)|message\.received|messages/i.test(ev)) return []
+  const d = (body && body.data) || body
+  const m = d && (d.messages || d.message || d)
+  const list: any[] = Array.isArray(m) ? m : (m && typeof m === 'object' ? [m] : [])
+  const out: any[] = []
+  for (const msg of list) {
+    const key = (msg && msg.key) || {}
+    const remote = String(key.remoteJid || (msg && (msg.remoteJid || msg.from)) || '')
+    if (!remote || remote.endsWith('@g.us') || remote.includes('broadcast')) continue
+    const pnJid = String(key.cleanedSenderPn || key.senderPn || key.remoteJidAlt || key.participantPn || '')
+    let phone = ''
+    let lid: string | undefined
+    if (pnJid) phone = pnJid.split('@')[0].split(':')[0]
+    else if (remote.endsWith('@lid')) lid = remote.split('@')[0]
+    else phone = remote.split('@')[0].split(':')[0]
+    if (phone && !/^\d{8,16}$/.test(phone)) continue
+    if (!phone && !lid) continue
+    const mm = (msg && (msg.message || (msg.messages && msg.messages.message))) || {}
+    const ext = mm.extendedTextMessage || {}
+    const audio = mm.audioMessage || mm.pttMessage || null
+    const text = String((msg && msg.messageBody) || mm.conversation || ext.text || '').trim()
+    const ctx = ext.contextInfo || (audio && audio.contextInfo) || {}
+    const qm = ctx.quotedMessage || {}
+    const quoted = String(qm.conversation || (qm.extendedTextMessage && qm.extendedTextMessage.text) || '').trim()
+    if (!text && !audio) continue
+    out.push({ phone, lid, id: key.id ? String(key.id) : '', fromMe: !!key.fromMe, text, quoted, audio })
+  }
+  return out
+}
+
+// lid → phone pairs seen in an event, as statements for one batch.
+function waLidStatements(DB: any, body: any): any[] {
+  const d = (body && body.data) || body
+  const m = d && (d.messages || d.message || d)
+  const list: any[] = Array.isArray(m) ? m : (m && typeof m === 'object' ? [m] : [])
+  const stmts: any[] = []
+  for (const x of list) {
+    const k = (x && x.key) || {}
+    const lid = String(k.senderLid || (String(k.remoteJid || '').endsWith('@lid') ? k.remoteJid : '') || '').split('@')[0]
+    const pn = String(k.cleanedSenderPn || k.senderPn || '').split('@')[0].split(':')[0]
+    if (/^\d{6,}$/.test(lid) && /^\d{8,16}$/.test(pn)) {
+      stmts.push(DB.prepare("INSERT OR REPLACE INTO wa_lids (lid, phone, updated_at) VALUES (?, ?, datetime('now'))").bind(lid, pn))
+    }
+  }
+  return stmts
+}
+
+// Staff commands in a typed message (EN + AR, punctuation ignored).
+function waParseCommand(raw: string): { cmd: string; tag?: number; minutes?: number } | null {
+  const s = String(raw || '').trim()
+  if (s === '?' || s === '؟') return { cmd: 'help' }
+  const tagM = s.match(/^#(\d{1,6})\b\s*/)
+  const tag = tagM ? parseInt(tagM[1], 10) : undefined
+  const rest = (tagM ? s.slice(tagM[0].length) : s)
+    .replace(/[ً-ْـ]/g, '').replace(/[.,!?؟\-—_"'«»()]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+  if (!rest) return tag ? { cmd: 'switch', tag } : null
+  if (['help', 'مساعدة', 'المساعدة', 'اوامر', 'أوامر', 'الاوامر', 'الأوامر'].includes(rest)) return { cmd: 'help' }
+  if (['list', 'chats', 'القائمة', 'قائمة', 'المحادثات', 'الشاتات'].includes(rest)) return { cmd: 'list' }
+  if (['done', 'back', 'ai', 'bot', 'تم', 'خلص', 'خلاص', 'تمام', 'رجع البوت', 'رجّع البوت'].includes(rest)) return { cmd: 'done', tag }
+  if (['on', 'unmute', 'resume', 'تشغيل', 'شغل', 'شغّل', 'استئناف'].includes(rest)) return { cmd: 'on' }
+  const mute = rest.match(/^(?:mute|كتم|اكتم|صمت|ايقاف|إيقاف)(?:\s+(\d{1,3})\s*(h|hr|hrs|hour|hours|m|min|mins|minutes|س|ساعة|ساعات|د|دقيقة|دقائق)?)?$/)
+  if (mute) {
+    const n = mute[1] ? parseInt(mute[1], 10) : 0
+    const unit = mute[2] || ''
+    const minutes = !n ? 120 : /^(m|min|mins|minutes|د|دقيقة|دقائق)$/.test(unit) ? n : n * 60
+    return { cmd: 'mute', minutes: Math.min(Math.max(minutes, 5), 24 * 60) }
+  }
+  return null
+}
+
+const WA_CONV_COLS = 'conversation_id, session_id, guest_name, room_number, guest_lang, site_lang, is_ai_paused, staff_ack_at, wa_handler_phone, admin_takeover_by'
+
+async function waConversation(DB: any, conversationId: any): Promise<any> {
+  return DB.prepare('SELECT ' + WA_CONV_COLS + ' FROM chatbot_conversations WHERE conversation_id = ? AND property_id = 1').bind(conversationId).first()
+}
+
+// Waiting (unacknowledged, ring-state rule) and handled chats of the last 6 h, newest guest line first.
+async function waOpenChats(DB: any, limit: number): Promise<any[]> {
+  return (await DB.prepare(`
+    SELECT * FROM (
+      SELECT ${WA_CONV_COLS.split(', ').map(x => 'c.' + x).join(', ')},
+        (SELECT MAX(m.created_at) FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id AND m.role = 'user') AS last_user_at,
+        CAST((julianday('now') - julianday((SELECT MAX(m.created_at) FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id AND m.role = 'user'))) * 1440 AS INTEGER) AS mins,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id AND m.role = 'user'
+            AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at)
+        ) THEN 1 ELSE 0 END AS waiting
+      FROM chatbot_conversations c
+      WHERE c.property_id = 1 AND EXISTS (
+        SELECT 1 FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id AND m.role = 'user' AND m.created_at > datetime('now', '-6 hours')
+      )
+    ) WHERE waiting = 1 OR is_ai_paused = 1
+    ORDER BY waiting DESC, last_user_at DESC LIMIT ?
+  `).bind(limit).all()).results || []
+}
+
+// The newest chat a guest is waiting in (same rule as /api/staff/ring-state).
+async function waNewestWaiting(DB: any): Promise<any> {
+  return DB.prepare(`
+    SELECT ${WA_CONV_COLS.split(', ').map(x => 'c.' + x).join(', ')} FROM chatbot_conversations c
+    WHERE c.property_id = 1 AND EXISTS (
+      SELECT 1 FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id AND m.role = 'user'
+        AND m.created_at > datetime('now', '-20 minutes')
+        AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at)
+    )
+    ORDER BY c.conversation_id DESC LIMIT 1
+  `).first()
+}
+
+function waNowCairo(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).format(new Date())
+}
+
+// ── Voice notes: WhatsApp CDN download + WebCrypto decrypt (WaSender's
+// documented algorithm), with WaSender's decrypt-media endpoint as fallback ──
+async function waDecryptMedia(enc: ArrayBuffer, mediaKeyB64: string, info: string = 'WhatsApp Audio Keys'): Promise<ArrayBuffer> {
+  const keyBytes = Uint8Array.from(atob(String(mediaKeyB64).replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0))
+  const base = await crypto.subtle.importKey('raw', keyBytes, 'HKDF', false, ['deriveBits'])
+  const x = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new TextEncoder().encode(info) }, base, 112 * 8))
+  const iv = x.slice(0, 16), cipherKey = x.slice(16, 48), macKey = x.slice(48, 80)
+  const f = new Uint8Array(enc)
+  if (f.length < 11) throw new Error('media too small')
+  const ct = f.slice(0, f.length - 10), mac = f.slice(f.length - 10)
+  const hk = await crypto.subtle.importKey('raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const signed = new Uint8Array(iv.length + ct.length)
+  signed.set(iv, 0); signed.set(ct, iv.length)
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', hk, signed))
+  for (let i = 0; i < 10; i++) if (mac[i] !== sig[i]) throw new Error('media mac mismatch')
+  const aes = await crypto.subtle.importKey('raw', cipherKey, { name: 'AES-CBC' }, false, ['decrypt'])
+  return crypto.subtle.decrypt({ name: 'AES-CBC', iv }, aes, ct)
+}
+
+async function waFetchVoiceBytes(env: any, media: any, keyId: string, end: number): Promise<ArrayBuffer> {
+  const left = () => Math.max(1000, end - Date.now())
+  const url = media.url || (media.directPath ? 'https://mmg.whatsapp.net' + media.directPath : '')
+  let primaryErr = ''
+  if (url && media.mediaKey) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(Math.min(6000, left())) })
+      if (!r.ok) throw new Error('cdn ' + r.status)
+      return await waDecryptMedia(await r.arrayBuffer(), media.mediaKey)
+    } catch (e: any) { primaryErr = String(e && e.message || e).slice(0, 80) }
+  } else primaryErr = 'no media url/key'
+  if (!env.WASENDER_TOKEN) throw new Error('media download failed: ' + primaryErr)
+  const r = await fetch('https://www.wasenderapi.com/api/decrypt-media', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.WASENDER_TOKEN },
+    body: JSON.stringify({ data: { messages: { key: { id: keyId }, message: { audioMessage: {
+      url: media.url, mimetype: media.mimetype || 'audio/ogg; codecs=opus', mediaKey: media.mediaKey, fileSha256: media.fileSha256, fileLength: media.fileLength
+    } } } } }),
+    signal: AbortSignal.timeout(Math.min(8000, left()))
+  })
+  const d: any = await r.json().catch(() => ({}))
+  if (!r.ok || !d || !d.publicUrl) throw new Error('decrypt-media ' + r.status + ' (' + primaryErr + ')')
+  let f = await fetch(d.publicUrl, { signal: AbortSignal.timeout(Math.min(6000, left())) })
+  if (f.status === 401 || f.status === 403) {
+    f = await fetch(d.publicUrl, { headers: { 'Authorization': 'Bearer ' + env.WASENDER_TOKEN }, signal: AbortSignal.timeout(Math.min(6000, left())) })
+  }
+  if (!f.ok) throw new Error('decrypted-media ' + f.status)
+  return f.arrayBuffer()
+}
+
+const WA_VOICE_PROMPT = 'Voice note from a front-desk staff member of Old Palace Resort, Hurghada, giving instructions in Egyptian Arabic (sometimes English) about what to tell a hotel guest; may include room numbers, times, prices, restaurant names.'
+const WA_VOICE_KEYWORDS = ['Old Palace', 'El Kasr', 'La Cucina', 'room service', 'late checkout', 'check-out', 'بوفيه', 'الشاطئ', 'غرفة']
+const WA_TRANSCRIBE_MODELS = ['gpt-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1']
+
+async function waTranscribeOnce(env: any, bytes: ArrayBuffer, model: string, end: number): Promise<{ text: string; lang: string; garbled: boolean }> {
+  const build = (hints: boolean) => {
+    const fd = new FormData()
+    fd.append('file', new Blob([bytes], { type: 'audio/ogg' }), 'note.ogg')
+    fd.append('model', model)
+    fd.append('response_format', model === 'whisper-1' ? 'verbose_json' : 'json')
+    fd.append('prompt', WA_VOICE_PROMPT)
+    if (hints) {
+      fd.append('languages[]', 'ar'); fd.append('languages[]', 'en')
+      for (const k of WA_VOICE_KEYWORDS) fd.append('keywords[]', k)
+    }
+    return fd
+  }
+  const variants = model === 'gpt-transcribe' ? [true, false] : [false]
+  let lastErr = 'transcription failed'
+  for (const hints of variants) {
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + env.OPENAI_API_KEY },
+      body: build(hints),
+      signal: AbortSignal.timeout(Math.min(10000, Math.max(1000, end - Date.now())))
+    })
+    if (!r.ok) {
+      lastErr = 'openai ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 120)
+      if (r.status === 400 && hints) continue
+      throw new Error(lastErr)
+    }
+    const d: any = await r.json()
+    const text = String(d.text || '').trim()
+    const noLang = model === 'gpt-transcribe' && Array.isArray(d.languages) && d.languages.length === 0
+    let lang = ''
+    if (Array.isArray(d.languages) && d.languages.length) lang = staffLangCode(d.languages[0] && (d.languages[0].code || d.languages[0]))
+    else if (d.language) { const c = normLang(d.language); lang = LANG_NAMES[c] ? c : 'unknown' }
+    if (!lang || lang === 'unknown') lang = /[؀-ۿ]/.test(text) ? 'ar' : (text ? 'en' : 'unknown')
+    const words = text.split(/\s+/).filter(Boolean).length
+    return { text, lang, garbled: words < 3 || noLang }
+  }
+  throw new Error(lastErr)
+}
+
+// One transcription tier per attempt plus one fallback, so three attempts
+// walk gpt-transcribe → gpt-4o-mini-transcribe → whisper-1.
+async function waTranscribeVoice(env: any, media: any, keyId: string, attempts: number, end: number): Promise<{ text: string; lang: string; garbled: boolean }> {
+  if (!env.OPENAI_API_KEY) throw new Error('no OPENAI_API_KEY')
+  const bytes = await waFetchVoiceBytes(env, media, keyId, end)
+  const start = Math.min(Math.max(Number(attempts || 1) - 1, 0), WA_TRANSCRIBE_MODELS.length - 1)
+  let lastErr: any = null
+  for (let i = start; i < Math.min(start + 2, WA_TRANSCRIBE_MODELS.length); i++) {
+    if (end - Date.now() < 4000) throw new Error('budget')
+    try { return await waTranscribeOnce(env, bytes, WA_TRANSCRIBE_MODELS[i], end) } catch (e) { lastErr = e }
+  }
+  throw lastErr || new Error('transcription failed')
+}
+
+// ── Understanding: DeepSeek turns the staff's words into the guest's message ──
+function waSystemPrompt(hotelName: string, chatbotName: string, staffName: string, guestLangName: string, staffLangName: string): string {
+  return `You are ${chatbotName}, the AI concierge of ${hotelName}. A staff member, ${staffName}, sent a spoken instruction (transcribed below; language usually Egyptian Arabic; the transcript may contain recognition errors) about what to tell a guest who is chatting with you. Reply with JSON only.
+
+guest_message rules:
+1. Write in ${guestLangName}; the guest never sees the staff's words.
+2. Speak as the concierge, first person plural ('we'), warm, polite, luxury-hotel register; use the guest's name if known.
+3. Carry EXACTLY what the staff instructed — every fact, number, time, price, condition, apology or question — and nothing more. Never add promises, options, prices, times, names or availability the staff did not state. Never mention staff, voice notes, translation or 'I was told'.
+4. Turn reported speech into direct speech: 'tell him the pool closes at 6' → 'The pool closes at 6:00 pm.'
+5. At most 3 sentences unless the instruction is genuinely long. No lists, no markdown except app links.
+6. If the instruction answers the guest's last question, answer it directly; if it asks the guest something, ask it.
+7. If the staff wording is blunt or internal ('no, we're full, ugh'), keep the meaning and make it gracious ('Unfortunately we are fully booked tonight').
+8. When a fact is ambiguous in the transcript, keep the guest message general and explain in notes.
+9. Include an app link only when the staff says to send/show a menu, page or booking AND a matching target exists in APP NAVIGATION; copy the app:// target verbatim as [label in the guest's language](app://target).
+
+intent: 'reply' = something to tell the guest. 'command' = an instruction to the system, not a message: command ∈ handback (resume the AI: 'done', 'خلاص', 'تمام', 'رجّع البوت', 'let the bot handle it'), call_guest (staff will phone), escalate (wants a manager), later (staff will answer later), ignore. A note can be both ('tell him it's fixed and hand back') → intent 'reply' plus command 'handback'. 'unclear' = you cannot tell what to say (garbled, empty, off-topic, wrong chat).
+
+target_session_id: when CANDIDATE CHATS lists more than one, pick the one the staff refers to (room number, guest name, subject, or the quoted alert text); otherwise the first. target_confidence 0-1.
+
+staff_summary: ONE line in the staff's language (${staffLangName}) confirming what happened, e.g. 'Sent to Room 4127 (Anna) in Russian: "<guest_message rendered in the staff's language>"'; for a command say what was done; for unclear ask the staff to type the instruction and quote what was heard.
+
+confidence: 0-1 that guest_message faithfully carries the instruction (below 0.6 nothing is sent).
+
+Return exactly this JSON shape: {"intent":"reply","command":null,"target_session_id":"guest-…","target_confidence":0.9,"guest_lang":"ru","guest_message":"…","staff_lang":"ar","staff_summary":"…","confidence":0.92,"notes":""}`
+}
+
+function waUserPrompt(hotelName: string, chatbotName: string, staffName: string, staffLang: string, transcript: string, quoted: string, candidates: any[], navText: string): string {
+  const roleLabel: Record<string, string> = { user: 'guest', assistant: 'concierge', admin: 'staff', system: 'system' }
+  const chats = candidates.map((cd, i) => {
+    const lang = normLang(cd.guest_lang || cd.site_lang || 'en')
+    const lines = (cd.messages || []).map((m: any) => '   ' + (roleLabel[m.role] || m.role) + ': ' + String(m.content || '').replace(/\s+/g, ' ').slice(0, 300))
+    return (i + 1) + '. session_id=' + cd.session_id + ' | Room ' + (cd.room_number || '?') + ' | ' + (cd.guest_name || 'unknown') +
+      ' | guest language: ' + lang + ' (' + (LANG_NAMES[lang] || lang) + ') | waiting ' + (cd.mins == null ? '?' : cd.mins) + ' min\n' +
+      '   last messages:\n' + (lines.length ? lines.join('\n') : '   (none)')
+  }).join('\n')
+  return 'HOTEL: ' + hotelName + '; persona ' + chatbotName + '; resort local time ' + waNowCairo() + '.\n' +
+    'STAFF: ' + staffName + ', transcript language guess: ' + (staffLang || 'unknown') + '.\n' +
+    'STAFF TRANSCRIPT (verbatim, may contain errors):\n"""' + transcript + '"""\n' +
+    'QUOTED ALERT (if the staff replied to a specific alert): ' + (quoted || 'none') + '\n\n' +
+    'CANDIDATE CHATS (most recent alert first):\n' + chats + '\n\n' +
+    'APP NAVIGATION (allowed app:// links): ' + (navText || 'none')
+}
+
+async function waUnderstand(env: any, system: string, user: string, end: number): Promise<any> {
+  if (!env.DEEPSEEK_API_KEY) throw new Error('no DEEPSEEK_API_KEY')
+  for (const jsonMode of [true, false]) {
+    if (end - Date.now() < 4000) throw new Error('budget')
+    const body: any = {
+      model: 'deepseek-chat', temperature: 0.2, max_tokens: 700,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+    }
+    if (jsonMode) body.response_format = { type: 'json_object' }
+    const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.DEEPSEEK_API_KEY },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(Math.min(12000, Math.max(1000, end - Date.now())))
+    })
+    if (!r.ok) throw new Error('deepseek ' + r.status)
+    const d: any = await r.json().catch(() => null)
+    let raw = String((d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim()
+    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+    if (!raw) continue
+    try {
+      const obj = JSON.parse(raw)
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj
+    } catch (e) { /* retry without JSON mode */ }
+  }
+  throw new Error('deepseek returned no JSON')
+}
+
+// Guest language of a chat; when nothing is stamped yet, detect it from the
+// guest's last line (which stamps guest_lang as a side effect).
+async function waGuestLang(env: any, DB: any, conv: any, contactLang: string, end: number): Promise<string> {
+  let lang = normLang(conv.guest_lang || conv.site_lang || '')
+  if (!conv.guest_lang && !conv.site_lang) {
+    lang = ''
+    const last: any = await DB.prepare("SELECT content FROM chatbot_messages WHERE conversation_id = ? AND role = 'user' ORDER BY created_at DESC, rowid DESC LIMIT 1").bind(conv.conversation_id).first()
+    if (last && last.content && end - Date.now() > 6000) {
+      try {
+        const r = await staffTranslate(env, DB, contactLang, [{ id: 'g', text: String(last.content) }], conv.session_id, 8000)
+        if (r[0] && r[0].lang && r[0].lang !== 'unknown') lang = normLang(r[0].lang)
+      } catch (e) {}
+    }
+  }
+  return lang && LANG_NAMES[lang] ? lang : 'en'
+}
+
+async function waSay(DB: any, contact: any, conv: any, text: string, kind: string = 'confirm', priority: number = 9): Promise<void> {
+  const ui = waUiLang(contact)
+  await enqueueWa(DB, {
+    contact_phone: contact.phone, conversation_id: conv ? conv.conversation_id : null, kind,
+    text: (conv ? waChatLine(conv, ui) + '\n' : '') + text, priority
+  })
+}
+
+// One inbound staff message (typed or voice note), end to end. Runs in the
+// webhook's waitUntil and again from the ring-check drain when it did not
+// finish. `patch` collects what to write back on the wa_inbound row.
+async function waHandleInbound(env: any, DB: any, job: any, contact: any, end: number, patch: any): Promise<void> {
+  const ui = waUiLang(contact)
+  const t = WA_CHROME[ui]
+  const keyId = String(job.id || '').replace(/^mid:/, '')
+  let text = String(job.text || '').trim()
+  let staffLang = job.staff_lang || ''
+
+  if (job.kind === 'voice') {
+    let transcript = String(job.transcript || '')
+    if (!transcript) {
+      const media = job.media_json ? JSON.parse(job.media_json) : null
+      if (!media) throw new Error('no media')
+      if (Number(media.seconds || 0) > 180) {
+        await waSay(DB, contact, null, t.too_long)
+        patch.intent = 'unclear'; patch.error = 'voice note over 180 s'
+        return
+      }
+      const tr = await waTranscribeVoice(env, media, keyId, Number(job.attempts || 1), end)
+      transcript = tr.text; staffLang = tr.lang
+      patch.transcript = transcript; patch.staff_lang = staffLang
+      if (tr.garbled) {
+        await waSay(DB, contact, null, t.unclear_voice.replace('{heard}', transcript.slice(0, 120)))
+        patch.intent = 'unclear'
+        return
+      }
+    }
+    text = transcript
+  } else if (!staffLang) {
+    staffLang = /[؀-ۿ]/.test(text) ? 'ar' : 'unknown'
+    patch.staff_lang = staffLang
+  }
+
+  // Target chat: #tag in the text, else in the quoted alert, else the
+  // contact's active chat, else the newest chat a guest is waiting in.
+  const tagOf = (s: any) => { const m = String(s || '').match(/#(\d{1,6})\b/); return m ? parseInt(m[1], 10) : 0 }
+  const cmd = job.kind === 'text' ? waParseCommand(text) : null
+  const tag = (cmd && cmd.tag) || tagOf(text) || tagOf(job.quoted_text)
+  let conv: any = null
+  if (tag) {
+    conv = await waConversation(DB, tag)
+    if (!conv) {
+      await waSay(DB, contact, null, t.no_such_chat.replace('{id}', String(tag)))
+      patch.intent = 'unclear'; patch.error = 'no chat #' + tag
+      return
+    }
+  } else if (!cmd || cmd.cmd === 'done') {
+    const state: any = await DB.prepare('SELECT active_conversation_id FROM wa_relay_state WHERE contact_phone = ?').bind(contact.phone).first()
+    if (state && state.active_conversation_id) conv = await waConversation(DB, state.active_conversation_id)
+    if (!conv) conv = await waNewestWaiting(DB)
+  }
+  if (conv) patch.conversation_id = conv.conversation_id
+
+  if (cmd) {
+    patch.intent = 'command'
+    if (cmd.cmd === 'help') {
+      await waSay(DB, contact, null, t.help, 'help')
+      patch.staff_summary = 'help'
+    } else if (cmd.cmd === 'list') {
+      const chats = await waOpenChats(DB, 5)
+      const lines = chats.map((cd: any) => waChatLine(cd, ui) + ' · ' + t.waiting.replace('{m}', String(cd.mins == null ? '?' : cd.mins)) +
+        (cd.wa_handler_phone === contact.phone ? t.handled_by_you : cd.is_ai_paused === 1 ? t.handled : cd.waiting ? t.waiting_tag : ''))
+      await waSay(DB, contact, null, lines.length ? t.list_head + '\n' + lines.join('\n') : t.list_empty, 'help')
+      patch.staff_summary = 'list: ' + chats.length + ' chats'
+    } else if (cmd.cmd === 'switch') {
+      const turns: any[] = (await DB.prepare("SELECT message_id, content FROM chatbot_messages WHERE conversation_id = ? AND role = 'user' ORDER BY created_at DESC, rowid DESC LIMIT 3").bind(conv.conversation_id).all()).results || []
+      let shown: string[] = turns.map((m: any) => String(m.content || ''))
+      if (turns.length && end - Date.now() > 6000) {
+        try {
+          const r = await staffTranslate(env, DB, contact.language || 'en', turns.map((m: any) => ({ id: m.message_id, text: String(m.content || '') })), conv.session_id, 10000)
+          shown = turns.map((m: any) => { const hit = r.find((x: any) => String(x.id) === String(m.message_id)); return hit ? String(hit.text) : String(m.content || '') })
+        } catch (e) {}
+      }
+      await DB.prepare(`
+        INSERT INTO wa_relay_state (contact_phone, active_conversation_id, updated_at) VALUES (?, ?, datetime('now'))
+        ON CONFLICT(contact_phone) DO UPDATE SET active_conversation_id = excluded.active_conversation_id, updated_at = excluded.updated_at
+      `).bind(contact.phone, conv.conversation_id).run()
+      await waSay(DB, contact, conv, t.active_set.replace('{id}', String(conv.conversation_id)) +
+        (shown.length ? '\n' + t.last_turns + '\n' + shown.reverse().map(s => '💬 ' + s.slice(0, 300)).join('\n') : ''))
+      patch.staff_summary = 'switched to #' + conv.conversation_id
+    } else if (cmd.cmd === 'done') {
+      if (!conv) { await waSay(DB, contact, null, t.no_chat); patch.staff_summary = 'done: no chat'; return }
+      await endTakeover(env, DB, conv.conversation_id)
+      await DB.prepare(`
+        INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+        VALUES (1, ?, ?, 'wasender', 'handback', ?)
+      `).bind(conv.session_id, contact.phone, ((contact.name || 'Manager') + ' handed #' + conv.conversation_id + ' back to the AI').slice(0, 200)).run()
+      await waSay(DB, contact, conv, t.done.replace('{id}', String(conv.conversation_id)))
+      patch.staff_summary = 'handback #' + conv.conversation_id
+    } else if (cmd.cmd === 'mute') {
+      const until = new Date(Date.now() + (cmd.minutes || 120) * 60000)
+      await DB.prepare('UPDATE escalation_contacts SET muted_until = ? WHERE contact_id = ?').bind(waSqlTime(until.getTime()), contact.contact_id).run()
+      const local = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hour12: false }).format(until)
+      await waSay(DB, contact, null, t.muted.replace('{until}', local))
+      patch.staff_summary = 'muted ' + (cmd.minutes || 120) + ' min'
+    } else if (cmd.cmd === 'on') {
+      await DB.prepare('UPDATE escalation_contacts SET muted_until = NULL WHERE contact_id = ?').bind(contact.contact_id).run()
+      await waSay(DB, contact, null, t.unmuted)
+      patch.staff_summary = 'unmuted'
+    }
+    return
+  }
+
+  if (!conv) {
+    await waSay(DB, contact, null, t.no_chat)
+    patch.intent = 'unclear'; patch.error = 'no open chat'
+    return
+  }
+  const instruction = (tagOf(text) ? text.replace(/^#\d{1,6}\b\s*/, '') : text).trim()
+  if (!instruction) {
+    await waSay(DB, contact, conv, t.unclear_text.replace('{heard}', ''))
+    patch.intent = 'unclear'
+    return
+  }
+
+  // Candidates: the resolved chat first, then other chats this contact was told about in the last 6 h
+  const otherIds: any[] = (await DB.prepare(`
+    SELECT conversation_id FROM wa_outbox
+    WHERE contact_phone = ? AND kind IN ('alert', 'forward') AND conversation_id IS NOT NULL AND conversation_id != ? AND created_at > datetime('now', '-6 hours')
+    GROUP BY conversation_id ORDER BY MAX(id) DESC LIMIT 3
+  `).bind(contact.phone, conv.conversation_id).all()).results || []
+  const candidates: any[] = [conv]
+  for (const o of otherIds) { const cd = await waConversation(DB, o.conversation_id); if (cd) candidates.push(cd) }
+  const reads = await DB.batch([
+    ...candidates.map(cd => DB.prepare('SELECT role, content FROM chatbot_messages WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 6').bind(cd.conversation_id)),
+    ...candidates.map(cd => DB.prepare("SELECT CAST((julianday('now') - julianday(MAX(created_at))) * 1440 AS INTEGER) AS mins FROM chatbot_messages WHERE conversation_id = ? AND role = 'user'").bind(cd.conversation_id)),
+    DB.prepare('SELECT name, chatbot_name FROM properties WHERE property_id = 1')
+  ])
+  candidates.forEach((cd, i) => {
+    cd.messages = ((reads[i] && reads[i].results) || []).slice().reverse()
+    const mr = reads[candidates.length + i] && reads[candidates.length + i].results && reads[candidates.length + i].results[0]
+    cd.mins = mr && mr.mins != null ? mr.mins : null
+  })
+  const prop: any = (reads[reads.length - 1] && reads[reads.length - 1].results && reads[reads.length - 1].results[0]) || {}
+  const hotelName = prop.name || 'our hotel'
+  const chatbotName = prop.chatbot_name || 'Hotel Assistant'
+  const nav = await buildNavigationCatalog(DB, 1).catch(() => ({ text: '', valid: new Set<string>() }))
+  const guestLang = await waGuestLang(env, DB, conv, contact.language || 'en', end)
+  const staffLangName = LANG_NAMES[normLang(contact.language || 'en')] || 'English'
+  const staffName = contact.name || 'Front desk'
+
+  const res: any = await waUnderstand(env,
+    waSystemPrompt(hotelName, chatbotName, staffName, LANG_NAMES[guestLang] || 'English', staffLangName),
+    waUserPrompt(hotelName, chatbotName, staffName, staffLang, instruction, String(job.quoted_text || ''), candidates, nav.text), end)
+
+  const num = (v: any) => { const n = Number(v); return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0 }
+  const intent = ['reply', 'command', 'unclear'].includes(String(res.intent)) ? String(res.intent) : 'unclear'
+  const command = typeof res.command === 'string' && res.command.trim() ? res.command.trim().toLowerCase() : null
+  const confidence = num(res.confidence)
+  let targetConf = num(res.target_confidence)
+  let target = candidates.find(cd => String(cd.session_id) === String(res.target_session_id || ''))
+  if (!target) { target = candidates[0]; if (candidates.length > 1) targetConf = Math.min(targetConf, 0.4) }
+  if (candidates.length === 1) targetConf = 1
+  let guestMessage = String(res.guest_message || '').trim()
+  if (guestMessage.includes('app://')) {
+    guestMessage = guestMessage.replace(/\[([^\]]+)\]\((app:\/\/[^)\s]+)\)/g, (m: string, label: string, url: string) => nav.valid.has(url) ? m : label)
+    guestMessage = guestMessage.replace(/(?<!\]\()app:\/\/[A-Za-z0-9\/_\-:.%]+/g, '')
+  }
+  guestMessage = guestMessage.slice(0, 1200)
+  const summary = String(res.staff_summary || '').replace(/\s+/g, ' ').trim().slice(0, 500)
+  patch.intent = intent
+  patch.guest_message = guestMessage || null
+  patch.staff_summary = summary || null
+  patch.conversation_id = target.conversation_id
+  if (!patch.staff_lang && staffLangCode(res.staff_lang) !== 'unknown') patch.staff_lang = staffLangCode(res.staff_lang)
+  const heard = instruction.slice(0, 120)
+
+  if (intent !== 'unclear' && candidates.length > 1 && targetConf < 0.5) {
+    const options = candidates.map(cd => (cd.room_number || '?') + ' ' + (cd.guest_name || t.guest) + ' #' + cd.conversation_id).join(' / ')
+    await waSay(DB, contact, null, t.which_room.replace('{options}', options).replace('{id}', String(candidates[0].conversation_id)))
+    patch.intent = 'ambiguous'
+    return
+  }
+
+  if (intent === 'reply' && confidence >= 0.6 && guestMessage) {
+    await storeStaffReply(DB, target.conversation_id, guestMessage, 'wa:' + (contact.name || contact.phone), 'whatsapp')
+    await DB.batch([
+      DB.prepare('UPDATE chatbot_conversations SET wa_handler_phone = ? WHERE conversation_id = ?').bind(contact.phone, target.conversation_id),
+      DB.prepare("UPDATE staff_test_ring SET until = datetime('now', '-1 second') WHERE id = 1"),
+      DB.prepare('UPDATE escalation_contacts SET last_reply_at = datetime(\'now\') WHERE contact_id = ?').bind(contact.contact_id),
+      DB.prepare(`
+        INSERT INTO wa_relay_state (contact_phone, active_conversation_id, updated_at) VALUES (?, ?, datetime('now'))
+        ON CONFLICT(contact_phone) DO UPDATE SET active_conversation_id = excluded.active_conversation_id, updated_at = excluded.updated_at
+      `).bind(contact.phone, target.conversation_id),
+      DB.prepare(`
+        INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+        VALUES (1, ?, ?, 'wasender', 'replied', ?)
+      `).bind(target.session_id, contact.phone, ((contact.name || 'Manager') + ': ' + guestMessage).slice(0, 200))
+    ])
+    if (command === 'handback') await endTakeover(env, DB, target.conversation_id)
+    await waSay(DB, contact, target, (summary || t.sent_prefix + guestMessage) + (command === 'handback' ? '\n' + t.done.replace('{id}', String(target.conversation_id)) : ''))
+    return
+  }
+
+  if (intent === 'command' && command) {
+    if (command === 'handback') {
+      await endTakeover(env, DB, target.conversation_id)
+      await DB.prepare(`
+        INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+        VALUES (1, ?, ?, 'wasender', 'handback', ?)
+      `).bind(target.session_id, contact.phone, ((contact.name || 'Manager') + ' handed #' + target.conversation_id + ' back to the AI').slice(0, 200)).run()
+      await waSay(DB, contact, target, summary || t.done.replace('{id}', String(target.conversation_id)))
+    } else {
+      await DB.batch([
+        DB.prepare("UPDATE chatbot_conversations SET staff_ack_at = CURRENT_TIMESTAMP, first_ack_at = COALESCE(first_ack_at, CURRENT_TIMESTAMP) WHERE conversation_id = ?").bind(target.conversation_id),
+        DB.prepare("UPDATE staff_test_ring SET until = datetime('now', '-1 second') WHERE id = 1"),
+        DB.prepare(`
+          INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+          VALUES (1, ?, ?, 'wasender', 'acknowledged', ?)
+        `).bind(target.session_id, contact.phone, ((contact.name || 'Manager') + ' (' + command + '): ' + heard).slice(0, 200))
+      ])
+      await waSay(DB, contact, target, summary || t.ack.replace('{id}', String(target.conversation_id)))
+    }
+    return
+  }
+
+  patch.intent = 'unclear'
+  await waSay(DB, contact, target, (job.kind === 'voice' ? t.unclear_voice : t.unclear_text).replace('{heard}', heard))
+}
+
+// Claim, run and settle one wa_inbound row; failures retry from the drain
+// (45 s later) up to three attempts, then the contact is asked to type it.
+async function processWaInbound(env: any, DB: any, id: string, deadline?: number): Promise<void> {
+  const end = deadline || (Date.now() + 24000)
+  const claim = await DB.prepare("UPDATE wa_inbound SET status = 'working', attempts = attempts + 1, updated_at = datetime('now') WHERE id = ? AND status = 'pending'").bind(id).run()
+  if (!claim.meta || !claim.meta.changes) return
+  const job: any = await DB.prepare('SELECT * FROM wa_inbound WHERE id = ?').bind(id).first()
+  if (!job) return
+  const contact: any = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND phone = ? ORDER BY is_active DESC, contact_id LIMIT 1').bind(job.contact_phone).first()
+  const patch: any = {}
+  let status = 'done'
+  if (!contact) {
+    status = 'ignored'; patch.error = 'no contact'
+  } else {
+    try {
+      await waHandleInbound(env, DB, job, contact, end, patch)
+    } catch (e: any) {
+      const err = String((e && e.message) || e).slice(0, 200)
+      patch.error = err
+      if (Number(job.attempts || 1) >= 3) {
+        status = 'failed'
+        try { await waSay(DB, contact, null, WA_CHROME[waUiLang(contact)].failed) } catch (e2) {}
+      } else {
+        status = 'pending'
+      }
+      console.error('wa inbound', id, 'attempt', job.attempts, err)
+    }
+  }
+  await DB.prepare(`
+    UPDATE wa_inbound SET status = ?, error = ?, transcript = COALESCE(?, transcript), staff_lang = COALESCE(?, staff_lang),
+      intent = COALESCE(?, intent), guest_message = COALESCE(?, guest_message), staff_summary = COALESCE(?, staff_summary),
+      conversation_id = COALESCE(?, conversation_id),
+      media_json = CASE WHEN ? IN ('done', 'failed', 'ignored') THEN NULL ELSE media_json END,
+      updated_at = datetime('now'), done_at = CASE WHEN ? IN ('done', 'failed', 'ignored') THEN datetime('now') ELSE done_at END
+    WHERE id = ?
+  `).bind(status, patch.error == null ? null : patch.error, patch.transcript == null ? null : patch.transcript, patch.staff_lang == null ? null : patch.staff_lang,
+    patch.intent == null ? null : patch.intent, patch.guest_message == null ? null : patch.guest_message, patch.staff_summary == null ? null : patch.staff_summary,
+    patch.conversation_id == null ? null : patch.conversation_id, status, status, id).run()
+  if (end - Date.now() > 7000) { try { await drainWaOutbox(env, DB, end) } catch (e) {} }
+}
+
+// Ring-check tick: unstick rows a killed worker left 'working', give up on
+// rows that failed three times, and run what the webhook's waitUntil missed.
+async function drainWaInbound(env: any, DB: any): Promise<void> {
+  const end = Date.now() + 24000
+  await DB.prepare("UPDATE wa_inbound SET status = 'pending', updated_at = datetime('now') WHERE status = 'working' AND updated_at <= datetime('now', '-2 minutes')").run()
+  const dead: any[] = (await DB.prepare("SELECT id, contact_phone FROM wa_inbound WHERE status = 'pending' AND attempts >= 3 LIMIT 5").all()).results || []
+  for (const d of dead) {
+    await DB.prepare("UPDATE wa_inbound SET status = 'failed', media_json = NULL, error = COALESCE(error, 'gave up after 3 attempts'), updated_at = datetime('now'), done_at = datetime('now') WHERE id = ?").bind(d.id).run()
+    const contact: any = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND phone = ? ORDER BY is_active DESC, contact_id LIMIT 1').bind(d.contact_phone).first()
+    if (contact) { try { await waSay(DB, contact, null, WA_CHROME[waUiLang(contact)].failed) } catch (e) {} }
+  }
+  const rows: any[] = (await DB.prepare("SELECT id FROM wa_inbound WHERE status = 'pending' AND attempts < 3 AND created_at <= datetime('now', '-45 seconds') ORDER BY created_at LIMIT 2").all()).results || []
+  for (const r of rows) {
+    if (end - Date.now() < 8000) break
+    await processWaInbound(env, DB, r.id, end)
+  }
+  if (dead.length && end - Date.now() > 7000) { try { await drainWaOutbox(env, DB, end) } catch (e) {} }
+}
+
+// A guest wrote (or spoke) in a chat: forward the line to every "instant"
+// contact and to whoever is handling the chat from WhatsApp, in their own
+// language. Only guest ('user') rows ever reach here — the callers hook the
+// user inserts, so staff and AI lines can never loop back.
+async function relayGuestMessage(env: any, DB: any, conversationId: any, text: string): Promise<number> {
+  const line = String(text || '').trim()
+  if (!line || conversationId == null) return 0
+  const [convRes, ctRes] = await DB.batch([
+    DB.prepare('SELECT ' + WA_CONV_COLS + ' FROM chatbot_conversations WHERE conversation_id = ? AND property_id = 1').bind(conversationId),
+    DB.prepare(`
+      SELECT contact_id, name, phone, language, relay_mode, muted_until FROM escalation_contacts
+      WHERE property_id = 1 AND is_active = 1
+        AND (phone = (SELECT wa_handler_phone FROM chatbot_conversations WHERE conversation_id = ?)
+             OR (relay_mode = 'instant' AND (muted_until IS NULL OR muted_until <= datetime('now'))))
+      ORDER BY contact_id
+    `).bind(conversationId)
+  ])
+  const conv: any = convRes.results && convRes.results[0]
+  const contacts: any[] = (ctRes.results || []).filter((ct: any, i: number, arr: any[]) => arr.findIndex((x: any) => x.phone === ct.phone) === i)
+  if (!conv || !contacts.length) return 0
+
+  const srcRef = 'src:' + await waTextHash(line)
+  const end = Date.now() + 20000
+  const translated = new Map<string, { text: string; lang: string }>()
+  let queued = 0
+  for (const ct of contacts) {
+    const ui = waUiLang(ct)
+    const t = WA_CHROME[ui]
+    const lang = normLang(ct.language || 'en')
+    const [dup, first] = await DB.batch([
+      DB.prepare("SELECT 1 AS x FROM wa_outbox WHERE contact_phone = ? AND kind = 'forward' AND detail LIKE ? AND created_at >= datetime('now', '-60 seconds') LIMIT 1").bind(ct.phone, srcRef + '%'),
+      DB.prepare("SELECT 1 AS x FROM wa_outbox WHERE contact_phone = ? AND kind = 'forward' AND conversation_id = ? LIMIT 1").bind(ct.phone, conv.conversation_id)
+    ])
+    if (dup.results && dup.results.length) continue
+    let tr = translated.get(lang)
+    if (!tr) {
+      tr = { text: line, lang: 'unknown' }
+      if (end - Date.now() > 4000) {
+        try {
+          const r = await staffTranslate(env, DB, lang, [{ id: 'g', text: line.slice(0, 1000) }], conv.session_id, 10000)
+          if (r[0]) tr = { text: String(r[0].text || line), lang: r[0].lang || 'unknown' }
+        } catch (e) {}
+      }
+      translated.set(lang, tr)
+    }
+    const guestLang = (tr.lang !== 'unknown' ? tr.lang : '') || conv.guest_lang || conv.site_lang || ''
+    const differs = tr.lang !== 'unknown' ? normLang(tr.lang) !== lang : tr.text !== line
+    const body = waChatLine(conv, ui, guestLang) + '\n💬 ' + tr.text.slice(0, 1000) +
+      (differs && tr.text !== line ? '\n[' + line.slice(0, 300) + ']' : '') +
+      (!(first.results && first.results.length) ? '\n' + t.forward_hint.replace(/\{id\}/g, String(conv.conversation_id)) : '')
+    await enqueueWa(DB, { contact_phone: ct.phone, conversation_id: conv.conversation_id, kind: 'forward', text: body, priority: 2, detail: srcRef })
+    queued++
+  }
+  if (queued) { try { await drainWaOutbox(env, DB, Date.now() + 22000) } catch (e) {} }
+  return queued
+}
+
+// The linked WhatsApp number itself must not be an escalation contact (its
+// messages arrive as our own echoes). Asked from WaSender's status endpoint,
+// else read from the jid in the last successful send.
+async function waOwnNumber(env: any, DB: any): Promise<string> {
+  const digitsOf = (v: any) => { const s = String(v || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, ''); return /^\d{8,16}$/.test(s) ? s : '' }
+  if (env.WASENDER_TOKEN) {
+    try {
+      const r = await fetch('https://www.wasenderapi.com/api/status', {
+        headers: { 'Authorization': 'Bearer ' + env.WASENDER_TOKEN }, signal: AbortSignal.timeout(5000)
+      })
+      if (r.ok) {
+        const d: any = await r.json().catch(() => null)
+        const pick = [d && d.data && d.data.phone_number, d && d.data && d.data.phone, d && d.data && d.data.jid,
+          d && d.data && d.data.me && d.data.me.id, d && d.data && d.data.user && d.data.user.id,
+          d && d.phone_number, d && d.phone, d && d.jid, d && d.me && d.me.id, d && d.user && d.user.id]
+        for (const v of pick) { const n = digitsOf(v); if (n) return n }
+      }
+    } catch (e) {}
+  }
+  try {
+    const rows = await DB.batch([
+      DB.prepare("SELECT detail FROM wa_outbox WHERE status = 'sent' AND detail LIKE '%\"jid\"%' ORDER BY id DESC LIMIT 1"),
+      DB.prepare("SELECT detail FROM escalation_log WHERE status = 'sent' AND detail LIKE '%\"jid\"%' ORDER BY log_id DESC LIMIT 1")
+    ])
+    for (const rs of rows) {
+      const d = rs.results && rs.results[0] && rs.results[0].detail
+      const m = String(d || '').match(/"jid"\s*:\s*"\+?(\d{8,16})/)
+      if (m) return m[1]
+    }
+  } catch (e) {}
+  return ''
+}
+
+function waSamePhone(a: string, b: string): boolean {
+  if (!a || !b) return false
+  return a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))
 }
 
 // Is the WhatsApp channel genuinely able to send right now? A saved token is
@@ -96445,12 +97480,37 @@ app.get('/api/staff/escalation/config', async (c) => {
       SELECT session_id, contact_phone, channel, status, detail, sent_at, level
       FROM escalation_log ORDER BY log_id DESC LIMIT 25
     `).all()
+    // Relay activity: what is queued/sent to contacts and what they sent back
+    let outbox: any[] = [], inbound: any[] = [], plan = { hint: 'unknown', retry_after: 0 }
+    try {
+      const [ob, ib] = await DB.batch([
+        DB.prepare(`
+          SELECT o.id, o.kind, o.contact_phone,
+            (SELECT name FROM escalation_contacts ct WHERE ct.property_id = 1 AND ct.phone = o.contact_phone ORDER BY ct.is_active DESC, ct.contact_id LIMIT 1) AS contact,
+            o.conversation_id, o.status, o.attempts, o.retry_after, o.created_at, o.sent_at, substr(o.text, 1, 120) AS text
+          FROM wa_outbox o ORDER BY o.id DESC LIMIT 25
+        `),
+        DB.prepare(`
+          SELECT i.id, i.contact_phone,
+            (SELECT name FROM escalation_contacts ct WHERE ct.property_id = 1 AND ct.phone = i.contact_phone ORDER BY ct.is_active DESC, ct.contact_id LIMIT 1) AS contact,
+            i.kind, i.intent, i.status, i.conversation_id, substr(COALESCE(i.transcript, i.text, ''), 1, 120) AS text,
+            i.staff_summary, i.error, i.attempts, i.created_at
+          FROM wa_inbound i ORDER BY i.created_at DESC, i.rowid DESC LIMIT 25
+        `)
+      ])
+      outbox = ob.results || []
+      inbound = ib.results || []
+      plan = await waPlanHint(DB)
+    } catch (e) { /* relay tables missing: the ladder still works */ }
     return c.json({
       success: true,
       settings: s || {},
       contacts: contacts.results || [],
       levels: levels.results || [],
       log: log.results || [],
+      outbox,
+      inbound,
+      plan_hint: plan.hint,
       whatsapp_ready: health.state === 'ready',
       channel: health.channel,
       channel_state: health.state,
@@ -96461,9 +97521,11 @@ app.get('/api/staff/escalation/config', async (c) => {
   }
 })
 
-// WaSender webhook: a manager replying on WhatsApp closes the loop.
-// If the reply comes from a number we escalate to, treat it as an
-// acknowledgement — the phone stops ringing and repeat alerts stop.
+// WaSender webhook: a contact's WhatsApp message (typed reply, command or
+// voice note) is parked in wa_inbound and processed after the 200. One
+// message arrives as several events, so the row's primary key (the WhatsApp
+// message id) is the dedupe. Only registered, active contacts get in; the
+// hotel's own line (fromMe) counts when its text is not an echo of our sends.
 app.post('/api/staff/wasender-webhook', async (c) => {
   const { DB } = c.env
   try {
@@ -96475,43 +97537,52 @@ app.post('/api/staff/wasender-webhook', async (c) => {
     }
 
     const payload = await c.req.json().catch(() => ({}))
-    const flat = JSON.stringify(payload)
+    const lidWrites = waLidStatements(DB, payload)
+    if (lidWrites.length) { try { await DB.batch(lidWrites) } catch (e) {} }
+    const msgs = waParseInbound(payload)
+    if (!msgs.length) return c.json({ success: true, ignored: 'no inbound message' })
 
-    // Ignore our own outgoing messages
-    if (/"fromMe"\s*:\s*true/.test(flat)) return c.json({ success: true, ignored: 'outgoing' })
-
-    // Pull the sender's number out of whatever shape the event arrives in
-    const jid = (flat.match(/"(?:remoteJid|from|jid|sender)"\s*:\s*"(\d{6,})@/) || [])[1] || ''
-    if (!jid) return c.json({ success: true, ignored: 'no sender' })
-
-    const contact = await DB.prepare(
-      'SELECT contact_id, name, phone FROM escalation_contacts WHERE property_id = 1 AND is_active = 1 AND phone = ?'
-    ).bind(jid).first()
-    if (!contact) return c.json({ success: true, ignored: 'not an escalation contact' })
-
-    const text = (flat.match(/"(?:conversation|text|body)"\s*:\s*"([^"]{1,200})"/) || [])[1] || ''
-
-    // Acknowledge everything outstanding, exactly like tapping Acknowledge. Only chats that were
-    // actually waiting (ring-state's rule) get a first acknowledgement time; SET reads the old staff_ack_at.
-    await DB.prepare(`
-      UPDATE chatbot_conversations SET
-        first_ack_at = CASE WHEN first_ack_at IS NULL AND EXISTS (
-          SELECT 1 FROM chatbot_messages m
-          WHERE m.conversation_id = chatbot_conversations.conversation_id AND m.role = 'user'
-            AND m.created_at > datetime('now', '-20 minutes')
-            AND (chatbot_conversations.staff_ack_at IS NULL OR m.created_at > chatbot_conversations.staff_ack_at)
-        ) THEN datetime('now') ELSE first_ack_at END,
-        staff_ack_at = datetime('now')
-      WHERE property_id = 1
-    `).run()
-    await DB.prepare('UPDATE feedback_submissions SET is_read = 1 WHERE property_id = 1 AND is_read = 0').run()
-    await DB.prepare("UPDATE staff_test_ring SET until = datetime('now', '-1 second') WHERE id = 1").run()
-    await DB.prepare(`
-      INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
-      VALUES (1, 'whatsapp-reply', ?, 'wasender', 'acknowledged', ?)
-    `).bind(contact.phone, ((contact.name || 'Manager') + ' replied: ' + text).slice(0, 200)).run()
-
-    return c.json({ success: true, acknowledged_by: contact.name || contact.phone })
+    let queued = 0
+    let ignored = ''
+    for (const m of msgs.slice(0, 5)) {
+      let phone = m.phone
+      if (!phone && m.lid) {
+        const r = await DB.prepare('SELECT phone FROM wa_lids WHERE lid = ?').bind(m.lid).first()
+        phone = r && r.phone ? String(r.phone) : ''
+      }
+      if (!phone) { console.log('wasender-webhook: unresolved lid ' + waMaskPhone(m.lid)); ignored = 'unresolved lid'; continue }
+      const contact = await DB.prepare(
+        'SELECT contact_id, name, phone, language, relay_mode FROM escalation_contacts WHERE property_id = 1 AND is_active = 1 AND phone = ? LIMIT 1'
+      ).bind(phone).first()
+      if (!contact) { console.log('wasender-webhook: not a contact ' + waMaskPhone(phone) + (m.fromMe ? ' (fromMe)' : '')); ignored = 'not an escalation contact'; continue }
+      if (m.fromMe && m.text) {
+        // The hotel's own line chatting with itself: our sends echo back as fromMe
+        // (coalesced messages contain each queued text), staff-typed lines do not.
+        const echo = await DB.prepare(`
+          SELECT 1 AS x FROM wa_outbox WHERE contact_phone = ? AND status = 'sent' AND sent_at >= datetime('now', '-30 minutes')
+            AND instr(?, TRIM(text)) > 0 LIMIT 1
+        `).bind(phone, m.text).first()
+        if (echo) { ignored = 'echo of our own send'; continue }
+      }
+      if (!m.id) { ignored = 'no message id'; continue }
+      const kind = m.audio ? 'voice' : 'text'
+      const a = m.audio || {}
+      const media = m.audio ? JSON.stringify({
+        url: a.url || null, directPath: a.directPath || null, mediaKey: a.mediaKey || null, mimetype: a.mimetype || null,
+        fileLength: a.fileLength == null ? null : String(a.fileLength), fileSha256: a.fileSha256 || null, fileEncSha256: a.fileEncSha256 || null,
+        seconds: Number(a.seconds || 0)
+      }) : null
+      const status = contact.relay_mode === 'off' ? 'ignored' : 'pending'
+      const claim = await DB.prepare(`
+        INSERT OR IGNORE INTO wa_inbound (id, property_id, contact_phone, kind, text, quoted_text, media_json, status)
+        VALUES (?, 1, ?, ?, ?, ?, ?, ?)
+      `).bind('mid:' + m.id, contact.phone, kind, m.text || null, m.quoted || null, media, status).run()
+      if (!claim.meta || !claim.meta.changes) { ignored = 'duplicate'; continue }
+      if (status === 'ignored') { ignored = 'relay off for this contact'; continue }
+      queued++
+      try { c.executionCtx.waitUntil(processWaInbound(c.env, DB, 'mid:' + m.id).catch(() => {})) } catch (e) {}
+    }
+    return c.json(queued ? { success: true, queued } : { success: true, queued: 0, ignored })
   } catch (e) {
     // Always 200 quickly: a webhook that errors gets disabled by the provider
     return c.json({ success: true })
@@ -96551,6 +97622,8 @@ app.post('/api/staff/escalation/settings', async (c) => {
   } catch (e) { return c.json({ success: false }, 500) }
 })
 
+const WA_RELAY_MODES = ['alerts', 'instant', 'off']
+
 app.post('/api/staff/escalation/contacts', async (c) => {
   const { DB } = c.env
   try {
@@ -96558,11 +97631,55 @@ app.post('/api/staff/escalation/contacts', async (c) => {
     const phone = String(b.phone || '').replace(/[^0-9]/g, '')
     if (!phone) return c.json({ success: false, error: 'phone required' }, 400)
     const level = Math.min(4, Math.max(1, parseInt(b.level, 10) || 1))
+    const relayMode = String(b.relay_mode || 'alerts').toLowerCase()
+    if (!WA_RELAY_MODES.includes(relayMode)) return c.json({ success: false, error: 'bad_relay_mode' }, 400)
+    const language = normLang(b.language || 'en')
+    if (!LANG_NAMES[language]) return c.json({ success: false, error: 'bad_language' }, 400)
+    const own = await waOwnNumber(c.env, DB)
+    if (own && waSamePhone(own, phone)) {
+      return c.json({ success: false, error: 'own_number', message: 'This is the hotel\'s own WhatsApp number (the one that sends the alerts). Add the manager\'s personal number instead.' }, 400)
+    }
     await DB.prepare(`
-      INSERT INTO escalation_contacts (property_id, name, phone, callmebot_key, is_active, level)
-      VALUES (1, ?, ?, ?, 1, ?)
-    `).bind(b.name || '', phone, b.callmebot_key || null, level).run()
+      INSERT INTO escalation_contacts (property_id, name, phone, callmebot_key, is_active, level, relay_mode, language)
+      VALUES (1, ?, ?, ?, 1, ?, ?, ?)
+    `).bind(b.name || '', phone, b.callmebot_key || null, level, relayMode, language).run()
     return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+// Pause, re-activate or retune a contact without deleting it.
+app.patch('/api/staff/escalation/contacts/:id', async (c) => {
+  const { DB } = c.env
+  try {
+    const id = parseInt(c.req.param('id'), 10)
+    if (!id) return c.json({ success: false, error: 'bad_id' }, 400)
+    const b = await c.req.json().catch(() => ({}))
+    const sets: string[] = []
+    const vals: any[] = []
+    if ('relay_mode' in b) {
+      const m = String(b.relay_mode || '').toLowerCase()
+      if (!WA_RELAY_MODES.includes(m)) return c.json({ success: false, error: 'bad_relay_mode' }, 400)
+      sets.push('relay_mode = ?'); vals.push(m)
+    }
+    if ('language' in b) {
+      const l = normLang(b.language || 'en')
+      if (!LANG_NAMES[l]) return c.json({ success: false, error: 'bad_language' }, 400)
+      sets.push('language = ?'); vals.push(l)
+    }
+    if ('is_active' in b) { sets.push('is_active = ?'); vals.push(b.is_active ? 1 : 0) }
+    if ('muted_until' in b) {
+      if (b.muted_until === null || b.muted_until === '') sets.push('muted_until = NULL')
+      else {
+        const d = new Date(b.muted_until)
+        if (isNaN(d.getTime())) return c.json({ success: false, error: 'bad_muted_until' }, 400)
+        sets.push('muted_until = ?'); vals.push(waSqlTime(d.getTime()))
+      }
+    }
+    if (!sets.length) return c.json({ success: false, error: 'nothing_to_update' }, 400)
+    const r = await DB.prepare('UPDATE escalation_contacts SET ' + sets.join(', ') + ' WHERE contact_id = ? AND property_id = 1').bind(...vals, id).run()
+    if (!r.meta || !r.meta.changes) return c.json({ success: false, error: 'not_found' }, 404)
+    const contact = await DB.prepare('SELECT * FROM escalation_contacts WHERE contact_id = ?').bind(id).first()
+    return c.json({ success: true, contact })
   } catch (e) { return c.json({ success: false }, 500) }
 })
 
@@ -96580,18 +97697,22 @@ app.post('/api/staff/escalation/test', async (c) => {
     const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND is_active = 1').all()
     const list = contacts.results || []
     if (!list.length) return c.json({ success: false, error: 'No escalation numbers saved yet' }, 400)
+    // Queued, not sent: the outbox paces the sends so a second contact no
+    // longer hits WaSender's per-minute limit.
     const results: any[] = []
     for (const contact of list) {
-      const res = await sendWhatsApp(c.env, contact,
-        '🔔 Old Palace test alert — WhatsApp escalation is working. No action needed.',
-        ['Test Guest (Room 000)', '5', 'This is a test of the escalation alert'])
-      await DB.prepare(`
+      const text = waUiLang(contact) === 'ar'
+        ? '🔔 تنبيه تجريبي من أولد بالاس — تصعيد واتساب يعمل. لا يلزم أي إجراء.'
+        : '🔔 Old Palace test alert — WhatsApp escalation is working. No action needed.'
+      const log = await DB.prepare(`
         INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
-        VALUES (1, 'test', ?, ?, ?, ?)
-      `).bind(contact.phone, res.channel, res.ok ? 'sent' : 'failed', res.detail).run()
-      results.push({ phone: contact.phone, ok: res.ok, channel: res.channel, detail: res.detail })
+        VALUES (1, 'test', ?, 'outbox', 'queued', 'queued for WhatsApp')
+      `).bind(contact.phone).run()
+      await enqueueWa(DB, { contact_phone: contact.phone, kind: 'test', text, priority: 3, detail: 'log:' + (log.meta && log.meta.last_row_id) })
+      results.push({ phone: contact.phone, ok: true, queued: true, channel: 'outbox', detail: 'queued' })
     }
-    return c.json({ success: true, results })
+    try { c.executionCtx.waitUntil(drainWaOutbox(c.env, DB).catch(() => {})) } catch (e) {}
+    return c.json({ success: true, queued: results.length, results })
   } catch (e: any) {
     return c.json({ success: false, error: String(e).slice(0, 200) }, 500)
   }
@@ -96732,7 +97853,7 @@ app.get('/api/staff/inbox/:property_id', async (c) => {
   const { property_id } = c.req.param()
   try {
     const convos = await DB.prepare(`
-      SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number, c.is_ai_paused, c.started_at, c.guest_lang,
+      SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number, c.is_ai_paused, c.started_at, c.guest_lang, c.admin_takeover_by,
         (SELECT content FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_message,
         (SELECT role FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_role,
         (SELECT created_at FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_at,
