@@ -27,7 +27,7 @@ function openPage(key, opts) {
 function venueChips(o, tl) {
   var c = [];
   if (!o.images.length) c.push('<span class="chip warn">' + t('chip.noPhoto') + '</span>');
-  if (o.opening_hours) c.push('<span class="chip">🕒 ' + edEsc(o.opening_hours) + '</span>');
+  if (o.opening_hours) c.push('<span class="chip" dir="ltr">🕒 ' + edEsc(o.opening_hours) + '</span>');
   if (o.price != null && o.price !== '' && +o.price > 0) c.push('<span class="chip">' + edEsc((+o.price).toLocaleString()) + ' ' + edEsc(o.currency || 'EGP') + '</span>');
   if ((tl.type === 'restaurant' && o.enable_booking === 1) || (tl.type !== 'restaurant' && o.requires_booking === 1)) c.push('<span class="chip ok">' + t('chip.booking') + '</span>');
   if (tl.type === 'restaurant') { var mp = +o.menu_pages || 0; c.push(o.offering_id === MAIN_RESTAURANT_ID && !mp ? '<span class="chip">' + t('chip.elkasr') + '</span>' : mp ? '<span class="chip ok">📄 ' + t('chip.menuPages', { n: mp }) + '</span>' : '<span class="chip warn">' + t('chip.noMenu') + '</span>'); }
