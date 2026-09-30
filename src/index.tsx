@@ -16521,6 +16521,7 @@ PLATFORM FEATURES YOU KNOW:
    - Bookings: beach and El Kasr restaurant bookings with guests/covers, check-ins, no-shows and walk-ins
    - Health: warns when WhatsApp alerts to managers are not being delivered or an Ops phone stops checking in
    - Download CSV exports the daily numbers
+   - WhatsApp escalation (AI Chatbot tab → WhatsApp Escalation): managers on the list get a WhatsApp alert when a guest waits too long and can answer straight from WhatsApp — reply to the alert, or send a voice note telling the concierge what to say — the guest receives it in their own language; "done" hands the chat back to the AI; each number is "Alerts only" or "Instant" (every guest message) and reads English or Arabic
 
 3. RESTAURANT MANAGEMENT:
    - Add: Go to Offerings tab → click "Add New Offering" → select "Restaurant" → fill details (name, description, hours, menu)
@@ -52828,6 +52829,8 @@ app.get('/staff/app', (c) => {
         .b.admin{align-self:flex-end;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;border-top-right-radius:5px;font-weight:500}
         .b .rl{font-size:.55rem;letter-spacing:.14em;text-transform:uppercase;opacity:.65;display:block;margin-bottom:3px}
         .b .rl .mic{display:inline-block;font-size:.72rem;letter-spacing:0;margin-right:5px;vertical-align:-1px;cursor:default}
+        .b .rl .mic.wa{color:#25D366;font-size:.8rem}
+        .b.admin .rl .mic.wa{color:#075E54}
         #takeoverBar{padding:10px 14px;border-top:1px solid rgba(212,175,55,.2);display:flex;gap:8px;align-items:center}
         #takeoverBar button{flex:1;border-radius:999px;padding:11px;font-size:.75rem;font-weight:700;cursor:pointer;border:none}
         .btn-take{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307}
@@ -54162,7 +54165,30 @@ app.get('/staff/app', (c) => {
             var r1 = await fetch('/api/staff/inbox/'+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
             chats = (r1&&r1.conversations)||[];
             renderChats();
+            syncOpenChat();
         }catch(e){}
+    }
+    // A manager answering over WhatsApp is stored as admin_takeover_by 'wa:<name>'
+    function waHandler(c){
+        var by = c && c.admin_takeover_by;
+        if(!c || !c.is_ai_paused || typeof by!=='string' || by.indexOf('wa:')!==0) return '';
+        return by.slice(3).trim() || 'A manager';
+    }
+    function chatSubText(){
+        var wa = waHandler(cur);
+        return (cur.room_number?'Room '+cur.room_number+' · ':'')+(cur.is_ai_paused ? (wa ? wa+' (WhatsApp) is handling this chat' : 'You are handling this chat') : 'AI is handling this chat');
+    }
+    // The open chat keeps its own copy of the row: refresh the header when the handler changes under it
+    function syncOpenChat(){
+        if(!cur) return;
+        var u=null;
+        for(var i=0;i<chats.length;i++){ if(chats[i].session_id===cur.session_id){ u=chats[i]; break; } }
+        if(!u) return;
+        var by = u.admin_takeover_by||null;
+        if(u.is_ai_paused===cur.is_ai_paused && by===(cur.admin_takeover_by||null)) return;
+        cur.is_ai_paused=u.is_ai_paused; cur.admin_takeover_by=by;
+        document.getElementById('chatSub').textContent=chatSubText();
+        renderTakeover();
     }
     function renderChats(){
         var el=document.getElementById('listChats');
@@ -54175,7 +54201,7 @@ app.get('/staff/app', (c) => {
                 '<div class="top"><div class="who">'+esc(who)+'</div><div class="when">'+ago(c.last_at)+'</div></div>'+
                 '<div class="msg">'+esc(c.last_message||'—')+'</div>'+
                 '<div class="chips">'+
-                    (c.is_ai_paused?'<span class="chip live">You are handling</span>':'<span class="chip ai">AI handling</span>')+
+                    (c.is_ai_paused?'<span class="chip live">'+(waHandler(c)?esc(waHandler(c))+' (WhatsApp) is handling':'You are handling')+'</span>':'<span class="chip ai">AI handling</span>')+
                     (room?'<span class="chip">'+esc(room.replace(' · ',''))+'</span>':'')+
                     (c.guest_lang && c.guest_lang!=='en' ? '<span class="chip">'+esc(LANGNAME[c.guest_lang]||c.guest_lang)+'</span>' : '')+
                     '<span class="chip">'+(c.message_count||0)+' msgs</span>'+
@@ -54208,7 +54234,7 @@ app.get('/staff/app', (c) => {
         stopRing(true);
         try{ fetch('/api/staff/ack-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1,session_id:cur.session_id})}); }catch(e){}
         document.getElementById('chatName').textContent = cur.guest_name || 'Guest';
-        document.getElementById('chatSub').textContent = (cur.room_number?'Room '+cur.room_number+' · ':'')+(cur.is_ai_paused?'You are handling this chat':'AI is handling this chat');
+        document.getElementById('chatSub').textContent = chatSubText();
         document.getElementById('chat').classList.add('open');
         renderTakeover();
         await loadMsgs();
@@ -55914,7 +55940,8 @@ app.get('/staff/app', (c) => {
                 if(role==='user' && isForeign) foreign=tr.lang;
                 var shown = isForeign ? tr.text : m.content;
                 var ln = isForeign ? esc(LANGNAME[tr.lang]||tr.lang).replace(/"/g,'&quot;') : '';
-                var spoken = m.channel==='voice' ? '<span class="mic" title="Spoken">🎤</span>' : '';
+                var spoken = m.channel==='voice' ? '<span class="mic" title="Spoken">🎤</span>'
+                    : (m.channel==='whatsapp' ? '<span class="mic wa" title="Sent from WhatsApp"><i class="fab fa-whatsapp"></i></span>' : '');
                 var html = '<div class="b '+role+'"><span class="rl">'+spoken+label+
                     (isForeign?'<span class="langflag">'+ln+'</span>':'')+'</span>'+esc(shown);
                 if(isForeign){
@@ -55933,7 +55960,7 @@ app.get('/staff/app', (c) => {
         if(!cur) return;
         var sent = await sendMsg('Hello, this is the front desk. How may I help you?');
         if(!sent || !cur) return;
-        cur.is_ai_paused=1;
+        cur.is_ai_paused=1; cur.admin_takeover_by=null;
         document.getElementById('chatSub').textContent=(cur.room_number?'Room '+cur.room_number+' · ':'')+'You are handling this chat';
         renderTakeover();
     };
@@ -55973,7 +56000,7 @@ app.get('/staff/app', (c) => {
                 return;
             }
             if(!cur) return;
-            cur.is_ai_paused=1;
+            cur.is_ai_paused=1; cur.admin_takeover_by=null;
             renderTakeover();
             await loadMsgs();
             return true;
@@ -56310,9 +56337,10 @@ body.embed .wrap{padding:0;max-width:none}
 .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .card h2{font-size:1.05rem;font-weight:800;color:#111827;margin-bottom:6px;display:flex;align-items:center;gap:9px}
 .card h2 i{color:#25D366}
+.card h3{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:700;margin:14px 0 2px}
 label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin:12px 0 5px}
-input{width:100%;background:#fff;border:1px solid #d1d5db;border-radius:9px;padding:10px 12px;color:#111827;font-size:.92rem}
-input:focus{outline:none;border-color:#25D366;box-shadow:0 0 0 3px rgba(37,211,102,.15)}
+input,select{width:100%;background:#fff;border:1px solid #d1d5db;border-radius:9px;padding:10px 12px;color:#111827;font-size:.92rem;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:#25D366;box-shadow:0 0 0 3px rgba(37,211,102,.15)}
 .row{display:flex;gap:12px;flex-wrap:wrap}
 .row>div{flex:1;min-width:150px}
 .btn{border:none;border-radius:9px;padding:11px 20px;font-weight:700;font-size:.85rem;cursor:pointer;margin-top:16px;margin-right:8px}
@@ -56320,20 +56348,49 @@ input:focus{outline:none;border-color:#25D366;box-shadow:0 0 0 3px rgba(37,211,1
 .btn-gold:hover{background:#1d4ed8}
 .btn-wa{background:#25D366;color:#fff}
 .btn-wa:hover{background:#1eb856}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.88rem}
-th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #f0f1f3}
-th{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:700}
-td button{border:1px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:7px;padding:6px 11px;font-size:.75rem;cursor:pointer;font-weight:600}
-.pill{display:inline-block;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;font-weight:800;padding:4px 11px;border-radius:999px;background:#f3f4f6;color:#4b5563}
+th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #f0f1f3;vertical-align:top}
+th{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:700;white-space:nowrap}
+td button{border:1px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:7px;padding:6px 11px;font-size:.75rem;cursor:pointer;font-weight:600;white-space:nowrap;font-family:inherit}
+td button.b-soft{border-color:#d1d5db;background:#f9fafb;color:#374151}
+td button.b-soft:hover{background:#f3f4f6}
+td select.sel{width:auto;min-width:150px;padding:7px 9px;font-size:.82rem}
+td .acts{display:flex;gap:6px;flex-wrap:wrap}
+tr.paused td{color:#9ca3af}
+tr.paused td b{color:#9ca3af}
+.pill{display:inline-block;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;font-weight:800;padding:4px 11px;border-radius:999px;background:#f3f4f6;color:#4b5563;white-space:nowrap}
 .pill.ok{background:#dcfce7;color:#15803d}
 .pill.warn{background:#fef3c7;color:#a16207}
+.pill.bad{background:#fee2e2;color:#b91c1c}
 .muted{color:#6b7280;font-size:.86rem;line-height:1.65}
+.sub{font-size:.72rem;color:#6b7280;margin-top:4px;font-weight:400}
 .log{font-size:.8rem;color:#4b5563;max-height:240px;overflow:auto}
 .log div{padding:8px 0;border-bottom:1px solid #f3f4f6}
 .ok{color:#16a34a;font-weight:700}.bad{color:#dc2626;font-weight:700}
-code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:#be123c}
+code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:#be123c;white-space:nowrap}
 .switch{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:.9rem;font-weight:600;color:#374151}
 .switch input{width:auto}
+.banner{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:.9rem;font-weight:600;line-height:1.5;display:flex;gap:10px;align-items:flex-start}
+.banner i{margin-top:3px;flex-shrink:0}
+.banner[hidden]{display:none}
+.err{margin-top:12px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 12px;font-size:.86rem;font-weight:600;line-height:1.5}
+.err[hidden]{display:none}
+.flash{display:inline-block;margin-top:16px;font-size:.84rem;font-weight:600;color:#15803d;vertical-align:middle;line-height:1.5}
+.flash.bad{color:#b91c1c}
+.how{padding-left:22px;margin-top:10px;font-size:.9rem;line-height:1.7;color:#374151}
+.how li{margin-bottom:8px}
+.how li::marker{font-weight:800;color:#25D366}
+.cmds{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:8px;font-size:.86rem;color:#374151;line-height:1.7}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+.act{padding:9px 0;border-bottom:1px solid #f3f4f6;font-size:.84rem}
+.act .top{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.act .kind{font-weight:700;color:#111827}
+.act .when{margin-left:auto;color:#9ca3af;font-size:.74rem;white-space:nowrap}
+.act .txt{color:#374151;margin-top:4px;line-height:1.5}
+.act .res{color:#15803d;margin-top:3px;font-size:.8rem;line-height:1.5}
+[dir=auto]{unicode-bidi:plaintext}
+@media (max-width:700px){.two{grid-template-columns:1fr}.wrap{padding:14px}.card{padding:16px}}
 </style>
 </head>
 <body>
@@ -56343,13 +56400,15 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
 </header>
 <div class="wrap">
 
+  <div class="banner" id="planWarn" hidden><i class="fas fa-triangle-exclamation"></i><div>Your WaSender plan allows 1 message per minute and 50 per day — upgrade before using Instant. Until then, guest messages will queue up and reach the team late.</div></div>
+
   <div class="card">
     <h2>Escalation ladder</h2>
     <p class="muted">When a guest is not acknowledged in the Ops app, alerts climb this ladder. Each level starts after the guest has waited its "starts after" time, and keeps repeating on its own rhythm until its cap — or until anyone acknowledges.</p>
-    <table>
+    <div class="tw"><table>
       <thead><tr><th>Level</th><th>Starts after (min)</th><th>Repeat every (min)</th><th>Max alerts</th><th>People</th></tr></thead>
       <tbody id="lvlRows"></tbody>
-    </table>
+    </table></div>
     <label style="margin-top:14px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="enabled" style="width:auto">Escalation enabled</label>
     <button class="btn btn-gold" onclick="saveSettings()">Save ladder</button>
     <span id="chan" style="margin-left:12px"></span>
@@ -56357,20 +56416,59 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
 
   <div class="card">
     <h2>Who gets alerted</h2>
+    <p class="muted">Each person here gets alerts on WhatsApp and can answer the guest by simply replying — the concierge translates both ways. The hotel's own WhatsApp number cannot be on this list.</p>
     <div class="row">
-      <div><label>Name</label><input id="cname" placeholder="Duty Manager"></div>
-      <div><label>WhatsApp number (with country code)</label><input id="cphone" placeholder="201001234567"></div>
-      <div><label>Level</label><select id="clevel" style="width:100%;background:#fff;border:1px solid #d1d5db;border-radius:9px;padding:10px 12px;color:#111827;font-size:.92rem">
+      <div><label>Name</label><input id="cname" placeholder="Duty Manager" dir="auto"></div>
+      <div><label>WhatsApp number (with country code)</label><input id="cphone" placeholder="201001234567" inputmode="tel"></div>
+      <div><label>Level</label><select id="clevel">
         <option value="1">Level 1 — first response</option>
         <option value="2">Level 2</option>
         <option value="3">Level 3</option>
         <option value="4">Level 4 — last resort</option>
       </select></div>
+      <div><label>Relay</label><select id="crelay">
+        <option value="alerts">Alerts only (can reply)</option>
+        <option value="instant">Instant: every guest message</option>
+        <option value="off">Off</option>
+      </select></div>
+      <div><label>Reads</label><select id="clang">
+        <option value="en">English</option>
+        <option value="ar">Arabic — العربية</option>
+      </select></div>
       <div><label>CallMeBot key (optional)</label><input id="ckey" placeholder="free fallback"></div>
     </div>
+    <div class="err" id="cerr" hidden></div>
     <button class="btn btn-gold" onclick="addContact()">Add number</button>
     <button class="btn btn-wa" onclick="testSend()"><i class="fab fa-whatsapp"></i> Send test now</button>
-    <table><thead><tr><th>Level</th><th>Name</th><th>Number</th><th>Channel</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+    <span class="flash" id="flash"></span>
+    <div class="tw"><table><thead><tr><th>Level</th><th>Name</th><th>Number</th><th>Relay</th><th>Reads</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-circle-question"></i>How it works</h2>
+    <p class="muted">Everyone on the list can answer guests straight from WhatsApp — no app needed. The concierge translates both ways, so staff write in their own language and the guest reads theirs.</p>
+    <ol class="how">
+      <li><b>You get a message</b> when a guest has waited too long (or straight away, if you are set to <em>Instant</em>). It starts with the chat tag, room and name — for example <code>#17 · Room 204 · Anna (German)</code> — followed by the guest's words in your language.</li>
+      <li><b>Reply to it</b> — whatever you type goes to the guest in <em>their</em> language.</li>
+      <li><b>Or send a voice note</b> telling the concierge what to say — "tell her the pool closes at six and we are sorry". It writes that politely to the guest and sends you a one-line confirmation of what was said.</li>
+      <li><b>Several guests waiting?</b> Start with the tag: <code>#17 your answer</code>. Sending just <code>#17</code> shows that chat's last messages.</li>
+      <li><b>Finished?</b> Send <code>done</code> (or <code>#17 done</code>, <code>تم</code>) to hand the chat back to the AI.</li>
+    </ol>
+    <div class="cmds">
+      <span><code>list</code> / <code>القائمة</code> — guests waiting now</span>
+      <span><code>help</code> / <code>مساعدة</code> — all commands</span>
+      <span><code>mute 2h</code> / <code>كتم</code> — pause instant messages · <code>on</code> / <code>تشغيل</code> resumes</span>
+    </div>
+    <p class="muted" style="margin-top:12px"><b>Relay</b> sets what each person receives: <em>Alerts only</em> — the ladder alerts, and they can reply; <em>Instant</em> — every guest message the moment it arrives; <em>Off</em> — alerts still arrive but replies are ignored. <b>Reads</b> is the language that person receives messages in — guests always get their own language. <b>Pause</b> stops a number completely without removing it.</p>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-right-left"></i>Relay activity</h2>
+    <p class="muted">The latest messages sent to the team on WhatsApp, and what came back. Messages go out one by one — on the trial plan, one per minute.</p>
+    <div class="two">
+      <div><h3>To the team</h3><div class="log" id="outbox"></div></div>
+      <div><h3>From the team</h3><div class="log" id="inbound"></div></div>
+    </div>
   </div>
 
   <div class="card">
@@ -56398,16 +56496,36 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
 var EMBED = new URLSearchParams(location.search).has('embed');
 if(EMBED) document.body.classList.add('embed');
 if(!EMBED && !localStorage.getItem('admin_token')) window.location.href='/admin/login';
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+var RELAY = {alerts:'Alerts only (can reply)', instant:'Instant: every guest message', off:'Off'};
+var READS = {en:'English', ar:'Arabic — العربية'};
+var KIND = {alert:'Alert', forward:'Guest message', confirm:'Confirmation', help:'Help', test:'Test'};
+var OB_ST = {pending:['queued','pill'], sent:['sent','pill ok'], failed:['failed','pill bad']};
+var IB_ST = {pending:['waiting','pill'], working:['processing','pill'], done:['done','pill ok'], failed:['failed','pill bad'], ignored:['ignored','pill']};
+var INTENT = {reply:'Reply to guest', command:'Command', unclear:'Not understood'};
+var LOG_OK = {sent:1, acknowledged:1, replied:1};
+// D1 stamps are UTC 'YYYY-MM-DD HH:MM:SS'; ISO strings pass through
+function tsMs(s){ if(!s) return 0; s=String(s); var t=Date.parse(/[TZ]/.test(s)?s:s.replace(' ','T')+'Z'); return isNaN(t)?0:t; }
+function ago(s){ var t=tsMs(s); if(!t) return ''; var d=Math.max(0,(Date.now()-t)/1000); if(d<60) return 'just now'; if(d<3600) return Math.floor(d/60)+' min ago'; if(d<86400) return Math.floor(d/3600)+' h ago'; return Math.floor(d/86400)+' d ago'; }
+function clock(s){ var t=tsMs(s); if(!t) return ''; var dt=new Date(t); var today=dt.toDateString()===new Date().toDateString(); return (today?'':dt.toLocaleDateString(undefined,{day:'numeric',month:'short'})+' ')+dt.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); }
+function isOn(c){ return c.is_active===1 || c.is_active===true || c.is_active==='1'; }
+function isMuted(c){ return tsMs(c.muted_until) > Date.now(); }
+function opts(map, sel){
+  var keys=Object.keys(map); if(sel && !map[sel]) keys.push(sel);
+  return keys.map(function(k){ return '<option value="'+esc(k)+'"'+(k===sel?' selected':'')+'>'+esc(map[k]||k)+'</option>'; }).join('');
+}
+function flash(msg, bad){ var f=document.getElementById('flash'); f.textContent=msg||''; f.className='flash'+(bad?' bad':''); if(msg && !bad) setTimeout(function(){ if(f.textContent===msg) f.textContent=''; }, 6000); }
+function getConfig(){ return fetch('/api/staff/escalation/config',{cache:'no-store'}).then(function(r){return r.json()}); }
 async function load(){
-  var d = await fetch('/api/staff/escalation/config',{cache:'no-store'}).then(function(r){return r.json()});
+  var d = await getConfig();
   var s = d.settings||{};
   document.getElementById('enabled').checked = s.enabled===1;
-  document.getElementById('chan').innerHTML = d.whatsapp_ready
+  document.getElementById('chan').innerHTML = (d.whatsapp_ready
     ? '<span class="pill ok"><i class="fas fa-check"></i> ' + (d.channel||'WhatsApp') + ' connected</span>'
     : '<span class="pill warn"><i class="fas fa-triangle-exclamation"></i> ' +
       (d.channel ? d.channel + ' not sending yet' : 'No WhatsApp channel yet') + '</span>' +
-      (d.channel_note ? '<div class="muted" style="margin-top:10px">' + esc(d.channel_note) + '</div>' : '');
+      (d.channel_note ? '<div class="muted" style="margin-top:10px">' + esc(d.channel_note) + '</div>' : ''))
+    + (d.plan_hint==='trial' ? ' <span class="pill warn" style="margin-left:6px">Trial plan: 1 message/min, 50/day</span>' : '');
   var LVL_NAMES = {1:'Level 1 — first response',2:'Level 2',3:'Level 3',4:'Level 4 — last resort'};
   var contactsByLevel = {};
   (d.contacts||[]).forEach(function(c){ var L=c.level||1; (contactsByLevel[L]=contactsByLevel[L]||[]).push(c); });
@@ -56424,19 +56542,60 @@ async function load(){
       '<td><input type="number" min="0" style="width:90px" id="lvS'+l.level+'" value="'+l.start_after_minutes+'"></td>'+
       '<td><input type="number" min="1" style="width:90px" id="lvR'+l.level+'" value="'+l.repeat_minutes+'"></td>'+
       '<td><input type="number" min="1" style="width:90px" id="lvM'+l.level+'" value="'+l.max_alerts+'"></td>'+
-      '<td class="muted">'+(people||'<span class="bad">nobody — level inactive</span>')+'</td>'+
+      '<td class="muted" dir="auto">'+(people||'<span class="bad">nobody — level inactive</span>')+'</td>'+
     '</tr>';
   }).join('');
-  document.getElementById('rows').innerHTML = (d.contacts||[]).map(function(c){
-    return '<tr><td><span class="pill">L'+(c.level||1)+'</span></td><td>'+esc(c.name||'—')+'</td><td>+'+esc(c.phone)+'</td><td>'+
-      (d.whatsapp_ready?(d.channel||'WhatsApp'):(c.callmebot_key?'CallMeBot':'<span class="bad">none</span>'))+
-      '</td><td><button onclick="del('+c.contact_id+')">Remove</button></td></tr>';
-  }).join('') || '<tr><td colspan="5" class="muted">No numbers yet.</td></tr>';
+  document.getElementById('rows').innerHTML = (d.contacts||[]).map(function(c){ return contactRow(c, d); }).join('')
+    || '<tr><td colspan="7" class="muted">No numbers yet.</td></tr>';
   document.getElementById('log').innerHTML = (d.log||[]).map(function(l){
-    return '<div><span class="pill">L'+(l.level||1)+'</span> <span class="'+(l.status==='sent'?'ok':(l.status==='acknowledged'?'ok':'bad'))+'">'+esc(l.status)+'</span> · +'+esc(l.contact_phone)+
-      ' · '+esc(l.channel)+' · '+esc(l.sent_at)+(l.status==='failed'?'<br>'+esc((l.detail||'').slice(0,160)):'')+'</div>';
+    var cls = LOG_OK[l.status] ? 'ok' : (l.status==='queued' ? '' : 'bad');
+    return '<div><span class="pill">L'+(l.level||1)+'</span> <span class="'+cls+'">'+esc(l.status)+'</span> · +'+esc(l.contact_phone)+
+      ' · '+esc(l.channel)+' · '+esc(l.sent_at)+(l.status==='failed'?'<br><span dir="auto">'+esc((l.detail||'').slice(0,160))+'</span>':'')+'</div>';
   }).join('') || '<div class="muted">Nothing sent yet.</div>';
+  renderActivity(d);
 }
+function contactRow(c, d){
+  var id = c.contact_id, on = isOn(c), muted = isMuted(c);
+  var channel = d.whatsapp_ready ? (d.channel||'WhatsApp') : (c.callmebot_key ? 'CallMeBot' : '<span class="bad">no channel</span>');
+  var status = !on ? '<span class="pill">Paused</span>'
+    : muted ? '<span class="pill warn">Muted until '+esc(clock(c.muted_until))+'</span><div class="acts" style="margin-top:6px"><button class="b-soft" onclick="patch('+id+',{muted_until:null})">Unmute</button></div>'
+    : '<span class="pill ok">Active</span>' + (c.relay_mode==='instant' ? '<div class="acts" style="margin-top:6px"><button class="b-soft" onclick="mute('+id+')">Mute 2 h</button></div>' : '');
+  var last = c.last_reply_at ? '<div class="sub">Last reply '+esc(ago(c.last_reply_at))+'</div>' : '';
+  return '<tr'+(on?'':' class="paused"')+'>'+
+    '<td><span class="pill">L'+(c.level||1)+'</span></td>'+
+    '<td dir="auto"><b>'+esc(c.name||'—')+'</b></td>'+
+    '<td>+'+esc(c.phone)+'<div class="sub">'+channel+'</div></td>'+
+    '<td><select class="sel" onchange="patch('+id+',{relay_mode:this.value})">'+opts(RELAY, c.relay_mode||'alerts')+'</select></td>'+
+    '<td><select class="sel" onchange="patch('+id+',{language:this.value})">'+opts(READS, c.language||'en')+'</select></td>'+
+    '<td>'+status+last+'</td>'+
+    '<td><div class="acts"><button class="b-soft" onclick="patch('+id+',{is_active:'+(on?'false':'true')+'})">'+(on?'Pause':'Resume')+'</button>'+
+    '<button onclick="del('+id+')">Remove</button></div></td></tr>';
+}
+function who(x){ return x.contact_name || x.contact || x.name || (x.contact_phone ? '+'+x.contact_phone : ''); }
+function renderActivity(d){
+  var anyInstant = (d.contacts||[]).some(function(c){ return c.relay_mode==='instant' && isOn(c); });
+  document.getElementById('planWarn').hidden = !(anyInstant && d.plan_hint==='trial');
+  document.getElementById('outbox').innerHTML = (d.outbox||[]).map(function(o){
+    var st = OB_ST[o.status] || [o.status||'?','pill'];
+    var when = o.status==='sent' ? 'sent '+ago(o.sent_at||o.created_at) : (o.status==='failed' ? 'failed '+ago(o.sent_at||o.created_at) : 'queued '+ago(o.created_at));
+    if(o.status==='pending' && tsMs(o.retry_after)>Date.now()) when += ' · next try '+clock(o.retry_after);
+    if(o.attempts>1) when += ' · '+o.attempts+' tries';
+    return '<div class="act"><div class="top"><span class="'+st[1]+'">'+esc(st[0])+'</span> <span class="kind">'+esc(KIND[o.kind]||o.kind||'Message')+'</span> → <span dir="auto">'+esc(who(o))+'</span><span class="when">'+esc(when)+'</span></div>'+
+      (o.text ? '<div class="txt" dir="auto">'+esc(o.text)+'</div>' : '')+
+      (o.status==='failed' && o.detail ? '<div class="sub bad" dir="auto">'+esc(String(o.detail).slice(0,160))+'</div>' : '')+'</div>';
+  }).join('') || '<div class="muted">Nothing queued yet.</div>';
+  document.getElementById('inbound').innerHTML = (d.inbound||[]).map(function(i){
+    var st = IB_ST[i.status] || [i.status||'?','pill'];
+    var text = i.kind==='voice' ? (i.transcript||i.text) : (i.text||i.transcript);
+    var tag = i.conversation_id ? ' · #'+i.conversation_id : '';
+    var result = i.staff_summary || (i.status==='failed' && i.error ? String(i.error).slice(0,160) : '');
+    return '<div class="act"><div class="top"><span class="'+st[1]+'">'+esc(st[0])+'</span> <span class="kind" dir="auto">'+esc(who(i)||'Unknown')+'</span> · '+(i.kind==='voice'?'🎤 voice note':'text')+
+      (i.intent ? ' · '+esc(INTENT[i.intent]||i.intent) : '')+esc(tag)+'<span class="when">'+esc(ago(i.created_at))+'</span></div>'+
+      (text ? '<div class="txt" dir="auto">'+(i.kind==='voice'?'I heard: ':'')+'"'+esc(String(text).slice(0,120))+'"</div>' : '')+
+      (result ? '<div class="res" dir="auto">'+esc(result)+'</div>' : '')+'</div>';
+  }).join('') || '<div class="muted">No replies yet.</div>';
+}
+async function refreshActivity(){ try{ renderActivity(await getConfig()); }catch(e){} }
 async function saveSettings(){
   var levels=[1,2,3,4].map(function(L){
     return {
@@ -56457,23 +56616,43 @@ async function saveSettings(){
 }
 async function addContact(){
   var phone=document.getElementById('cphone').value.trim();
-  if(!phone){ alert('Enter a WhatsApp number'); return; }
-  await fetch('/api/staff/escalation/contacts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  var err=document.getElementById('cerr'); err.hidden=true; err.textContent='';
+  if(!phone){ err.textContent='Enter a WhatsApp number'; err.hidden=false; return; }
+  var d = await fetch('/api/staff/escalation/contacts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     name:document.getElementById('cname').value.trim(), phone:phone,
     level:parseInt(document.getElementById('clevel').value)||1,
+    relay_mode:document.getElementById('crelay').value,
+    language:document.getElementById('clang').value,
     callmebot_key:document.getElementById('ckey').value.trim()
-  })});
+  })}).then(function(r){return r.json()}).catch(function(){ return {success:false, message:'No connection — try again'}; });
+  if(!d.success){ err.textContent = d.message || d.error || 'Could not add this number'; err.hidden=false; return; }
   document.getElementById('cname').value=''; document.getElementById('cphone').value=''; document.getElementById('ckey').value='';
+  flash('Number added');
   load();
 }
+async function patch(id, body){
+  var d = await fetch('/api/staff/escalation/contacts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()}).catch(function(){ return {success:false, message:'No connection — try again'}; });
+  flash(d.success ? 'Saved' : (d.message || d.error || 'Could not save'), !d.success);
+  load();
+}
+function mute(id){ patch(id, {muted_until: new Date(Date.now()+2*3600*1000).toISOString().slice(0,19).replace('T',' ')}); }
 async function del(id){ if(!confirm('Remove this number?'))return; await fetch('/api/staff/escalation/contacts/'+id,{method:'DELETE'}); load(); }
 async function testSend(){
-  var d = await fetch('/api/staff/escalation/test',{method:'POST'}).then(function(r){return r.json()});
-  if(!d.success){ alert(d.error||'Test failed'); }
-  else { alert(d.results.map(function(r){return '+'+r.phone+': '+(r.ok?'sent via '+r.channel:'FAILED — '+r.detail);}).join('\\n')); }
+  flash('Queuing test…');
+  var d = await fetch('/api/staff/escalation/test',{method:'POST'}).then(function(r){return r.json()}).catch(function(){ return {success:false, message:'No connection — try again'}; });
+  if(!d.success){ flash(d.message || d.error || 'Test failed', true); }
+  else {
+    var rs = d.results||[];
+    var bad = rs.filter(function(r){ return !(r.ok || r.queued); });
+    var n = rs.length ? rs.length - bad.length : (d.queued || d.count || 0);
+    flash('Test queued'+(n ? ' for '+n+' number'+(n===1?'':'s') : '')+' — it goes out within a minute or so; watch "Relay activity" below.'+
+      (bad.length ? ' Not queued: '+bad.map(function(r){ return '+'+r.phone+' ('+(r.detail||'failed')+')'; }).join(', ') : ''), bad.length>0);
+  }
   load();
 }
 load();
+setInterval(function(){ if(document.visibilityState==='visible') refreshActivity(); }, 30000);
 </script>
 </body>
 </html>
@@ -61870,7 +62049,7 @@ app.get('/admin/dashboard', (c) => {
                     <h2 class="text-2xl font-bold text-gray-800 mb-2">
                         <i class="fab fa-whatsapp mr-2" style="color:#25D366;"></i>When nobody answers a guest
                     </h2>
-                    <p class="text-gray-600">If a guest message isn't acknowledged in the Ops app in time, these numbers get a WhatsApp alert. Sent直 through Meta's Cloud API — about $0.007 per message.</p>
+                    <p class="text-gray-600">If a guest message isn't acknowledged in the Ops app in time, these numbers get a WhatsApp alert — and they can answer the guest straight from WhatsApp, by text or voice note, in any language.</p>
                 </div>
                 <iframe id="escalationFrame" data-src="/admin/escalation?embed=1"
                         style="width:100%;height:calc(100vh - 250px);min-height:620px;border:0;border-radius:14px;background:transparent;"></iframe>
@@ -75058,6 +75237,9 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         staff: {
           checkIn: 'Staff can check in guests at /staff/beach-check-in. Scan the QR code or manually enter the 6-digit booking code. System validates and marks guest as checked in.',
           management: 'View all bookings in Beach Booking Management → Todays Bookings section. See guest details, spot assignments, and check-in status.'
+        },
+        chatbot: {
+          whatsapp: 'Go to AI Chatbot → WhatsApp Escalation. The people on the list get a WhatsApp alert when a guest waits too long, and can answer straight from WhatsApp: reply to the alert, or send a voice note telling the concierge what to say — the guest receives it in their own language. Sending "done" hands the chat back to the AI. Set each number to "Alerts only" or "Instant" (every guest message) and choose whether they read English or Arabic.'
         }
       };
       
@@ -75127,10 +75309,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         if (msg.includes('check') && msg.includes('in')) {
           return { text: systemKnowledge.staff.checkIn, action: () => window.open('/staff/beach-check-in', '_blank') };
         }
-        
+
+        // WhatsApp escalation / replying from WhatsApp
+        if (msg.includes('whatsapp') || msg.includes('escalat') || msg.includes('voice note')) {
+          return { text: systemKnowledge.chatbot.whatsapp, action: () => { document.querySelector('[data-tab="chatbot"]')?.click(); try { chatbotSub('esc'); } catch (e) {} } };
+        }
+
         // General help
         if (msg.includes('help') || msg.includes('how')) {
-          return { text: 'I can help you with:\\n\\n- Beach booking settings and configuration\\n- Analytics and reports\\n- QR code design\\n- Settings and branding\\n- Restaurant management\\n- Staff check-in\\n\\nWhat would you like to know more about?', action: null };
+          return { text: 'I can help you with:\\n\\n- Beach booking settings and configuration\\n- Analytics and reports\\n- QR code design\\n- Settings and branding\\n- Restaurant management\\n- Staff check-in\\n- WhatsApp escalation and replying from WhatsApp\\n\\nWhat would you like to know more about?', action: null };
         }
         
         // Default response
