@@ -392,7 +392,7 @@ function renderEmbed(screen) {
   if (!host) {
     host = document.createElement('div'); host.id = id; host.className = 'embed-host';
     var src = s.embed + (s.withProperty ? '&property=' + encodeURIComponent(AUTH.propertyId) : '');
-    host.innerHTML = '<div class="embed-note"><span>ℹ️</span><span class="emb-note-t"></span>' + (s.classic ? '<a class="btn btn-secondary btn-sm emb-full" href="/admin/dashboard#' + edAttr(s.classic) + '" target="_blank" rel="noopener"></a>' : '') + '</div><iframe src="' + edAttr(src) + '" title="' + edAttr(t(s.i18n)) + '"></iframe>';
+    host.innerHTML = '<div class="embed-note"><span>ℹ️</span><span class="emb-note-t"></span>' + (s.classic ? '<a class="btn btn-secondary btn-sm emb-full" href="/admin/dashboard?embed=1#' + edAttr(s.classic) + '" target="_blank" rel="noopener"></a>' : '') + '</div><iframe src="' + edAttr(src) + '" title="' + edAttr(t(s.i18n)) + '"></iframe>';
     document.getElementById('embeds').appendChild(host);
   }
   host.querySelector('.emb-note-t').textContent = t(s.note);
