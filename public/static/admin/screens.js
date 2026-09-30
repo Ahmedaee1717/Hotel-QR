@@ -253,12 +253,15 @@ async function rsTurnOn() {
   var btn = document.getElementById('rs-on'); if (btn) btn.disabled = true;
   var r = await api('POST', '/api/admin/offerings', { offering_type: 'room_service', title_en: 'Room Service', short_description_en: 'Enjoy meals and drinks delivered to your room.', images: '[]', price: 0, requires_booking: 0 });
   if (!r.ok) { if (btn) btn.disabled = false; toast(errText(r, t('toast.fail')), 'error'); return; }
-  if (!C.customSections.some(function (x) { return x.section_key === 'room-service'; })) {
+  var rsTile = C.customSections.find(function (x) { return x.section_key === 'room-service'; }), r2 = null;
+  if (!rsTile) {
     var last = C.customSections.reduce(function (m, x) { return Math.max(m, +x.display_order || 0); }, 0);
-    var r2 = await api('POST', '/api/admin/custom-sections', { section_key: 'room-service', section_name_en: 'Room Service', icon_class: 'fas fa-bell-concierge', color_class: '#6b1529', is_visible: 1, display_order: last + 1 });
-    if (!r2.ok) { toast(errText(r2, t('toast.fail')), 'error'); }
+    r2 = await api('POST', '/api/admin/custom-sections', { section_key: 'room-service', section_name_en: 'Room Service', icon_class: 'fas fa-bell-concierge', color_class: '#6b1529', is_visible: 1, display_order: last + 1 });
+  } else if (+rsTile.is_visible !== 1) {
+    r2 = await api('PUT', '/api/admin/custom-sections/' + rsTile.section_id, { is_visible: 1 });
   }
-  toast(t('rs.turnedOn'), 'success');
+  if (r2 && !r2.ok) toast(errText(r2, t('toast.fail')), 'error');
+  else toast(t('rs.turnedOn'), 'success');
   await refresh({ force: true });
 }
 async function rsAction(act, id) {
@@ -449,7 +452,7 @@ function renderChatbot(tab, opts) {
   var host = stageHost('cb-wrap');
   host.innerHTML = '<div class="cb-col"><div id="cb-status"></div>'
     + '<div class="cb-bin"><div class="ed-group-title">' + t('cb.binTitle') + '</div><p class="cb-bin-sub">' + t('cb.binSub') + '</p>'
-    + '<textarea class="form-input" id="f-cb-dump" rows="6" dir="ltr" placeholder="' + edAttr(t('cb.binPh')) + '"></textarea>'
+    + '<textarea class="form-input" id="f-cb-dump" rows="6" dir="auto" placeholder="' + edAttr(t('cb.binPh')) + '"></textarea>'
     + '<div class="cb-bin-row"><button class="btn btn-primary" type="button" id="cb-ingest">' + t('cb.ingest') + '</button><span class="cb-bin-msg" id="cb-ingest-msg"></span></div>'
     + '<div class="form-hint">✅ ' + t('cb.binNote') + '</div></div>'
     + '<div class="cb-list"><div class="cb-list-hd"><div class="ed-group-title" style="margin:0">' + t('cb.knows') + ' <span class="ed-hint" id="cb-count"></span></div><input class="form-input cb-search" id="cb-q" type="search" placeholder="' + edAttr(t('cb.search')) + '" value="' + edAttr(CB.q) + '" aria-label="' + edAttr(t('cb.search')) + '"></div><div id="cb-docs"><div class="sk sk-block"></div></div></div></div>';

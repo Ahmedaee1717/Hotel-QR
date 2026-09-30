@@ -144,7 +144,7 @@ var SCREENS = {
   beach: { i18n: 'sc.beach', icon: 'fas fa-umbrella-beach', hash: 'beach', cap: 'cap.beach', embed: '/admin/beach-setup?embed=1', note: 'emb.beach', help: 'beach' },
   feedback: { i18n: 'sc.feedback', icon: 'fas fa-comment-dots', hash: 'feedback', cap: 'cap.feedback', help: 'feedback' },
   map: { i18n: 'sc.map', icon: 'fas fa-map-location-dot', hash: 'map', cap: 'cap.map', embed: '/admin/map-editor?embed=1', note: 'emb.map', help: 'map' },
-  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', tabs: ['conversations', 'teach', 'whatsapp'], help: 'chatbot' },
+  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', perm: 'settings_manage', tabs: ['conversations', 'teach', 'whatsapp'], help: 'chatbot' },
   whatsapp: { i18n: 'sc.whatsapp', icon: 'fab fa-whatsapp', hash: 'whatsapp', cap: 'cap.whatsapp', embed: '/admin/escalation?embed=1', note: 'emb.whatsapp', help: 'chatbot' },
   staff: { i18n: 'sc.staff', icon: 'fas fa-users', hash: 'staff', cap: 'cap.staff', embed: '/admin/ops-staff?embed=1', note: 'emb.staff', perm: 'users_view', help: 'behind' },
   elkasr: { i18n: 'sc.elkasr', icon: 'fas fa-chair', hash: 'elkasr', cap: 'cap.elkasr', embed: '/admin/restaurant-setup/' + MAIN_RESTAURANT_ID + '?embed=1', withProperty: true, note: 'emb.elkasr', help: 'behind' },
@@ -153,8 +153,8 @@ var SCREENS = {
   help: { i18n: 'sc.help', icon: 'fas fa-life-ring', hash: 'help', cap: 'cap.help' },
   // Advanced: the two panes that still live only in the older dashboard page (/admin/dashboard), shown inside this admin.
   // `classic` is the tab id on that page; renderEmbed shows an "open full screen" link only when it is set.
-  frontdesk: { i18n: 'sc.frontdesk', icon: 'fas fa-desktop', hash: 'frontdesk', embed: '/admin/dashboard?embed=1#frontdesk', dashTab: 'frontdesk', classic: 'frontdesk', note: 'emb.frontdesk', help: 'advanced' },
-  seasonal: { i18n: 'sc.seasonal', icon: 'fas fa-snowflake', hash: 'seasonal', embed: '/admin/dashboard?embed=1#settings', dashTab: 'settings', classic: 'settings', note: 'emb.seasonal', help: 'advanced' },
+  frontdesk: { i18n: 'sc.frontdesk', icon: 'fas fa-desktop', hash: 'frontdesk', perm: 'frontdesk_view', embed: '/admin/dashboard?embed=1#frontdesk', dashTab: 'frontdesk', classic: 'frontdesk', note: 'emb.frontdesk', help: 'advanced' },
+  seasonal: { i18n: 'sc.seasonal', icon: 'fas fa-snowflake', hash: 'seasonal', perm: 'settings_view', embed: '/admin/dashboard?embed=1#settings', dashTab: 'settings', classic: 'settings', note: 'emb.seasonal', help: 'advanced' },
 };
 function navItem(screen) {
   var s = SCREENS[screen]; if (s.perm && !can(s.perm)) return '';
@@ -214,6 +214,7 @@ function stageReset() {
   var E = shellEls();
   E.stage.querySelectorAll(':scope > *').forEach(function (x) { x.style.display = 'none'; });
   document.querySelectorAll('#embeds .embed-host').forEach(function (x) { x.classList.remove('on'); });
+  var fd = document.getElementById('emb-frontdesk'); if (fd) fd.remove(); // it polls and rings — only while it is on screen
   E.screen.classList.add('active');
 }
 function stageHost(id) {
@@ -398,8 +399,8 @@ async function downloadQR(url) {
 }
 function printQR(url) {
   var win = window.open('', '_blank'); if (!win) return;
-  win.document.write('<html><head><title>QR</title></head><body style="text-align:center;padding:50px;font-family:Georgia,serif"><h1>' + edEsc(C.property.name || '') + '</h1><img src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + encodeURIComponent(url) + '" style="width:500px;height:500px"><p>' + edEsc(url) + '</p></body></html>');
-  win.document.close(); setTimeout(function () { win.print(); }, 400);
+  win.document.write('<html><head><title>QR</title></head><body style="text-align:center;padding:50px;font-family:Georgia,serif"><h1>' + edEsc(C.property.name || '') + '</h1><img src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + encodeURIComponent(url) + '" style="width:500px;height:500px" onload="setTimeout(function(){window.print()},150)" title="The QR picture could not load. Check the internet connection and try again." onerror="this.replaceWith(document.createTextNode(this.title))"><p>' + edEsc(url) + '</p></body></html>');
+  win.document.close();
 }
 
 /* ---- HOTEL & HOME SCREEN: Look · Tiles · Contact ---- */
