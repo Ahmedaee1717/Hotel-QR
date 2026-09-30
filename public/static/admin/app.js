@@ -8,7 +8,7 @@ var GUEST_DOMAIN = 'https://www.oldpalaceresort.online';
 var MAIN_RESTAURANT_ID = 3; // El Kasr — its table bookings live in /admin/restaurant-setup/3
 var PLACEHOLDER_PHONE = '+20 123 456 7890', PLACEHOLDER_EMAIL = '@paradiseresort.com';
 
-/* ---- auth: same localStorage the classic dashboard uses; every request carries the two headers ---- */
+/* ---- auth: the same localStorage every admin page uses; every request carries the two headers ---- */
 var AUTH = { user: null, userId: '', propertyId: '', slug: 'paradise-resort', perms: [] };
 function authInit() {
   var u = null; try { u = JSON.parse(localStorage.getItem('admin_user') || 'null'); } catch (e) {}
@@ -141,15 +141,20 @@ var SCREENS = {
   page: { hash: 'page', help: 'page' },
   roomservice: { i18n: 'sc.roomservice', icon: 'fas fa-bell-concierge', hash: 'room-service', cap: 'cap.roomservice', help: 'roomservice' },
   info: { i18n: 'sc.info', icon: 'fas fa-circle-info', hash: 'info', cap: 'cap.info', help: 'info' },
-  beach: { i18n: 'sc.beach', icon: 'fas fa-umbrella-beach', hash: 'beach', cap: 'cap.beach', embed: '/admin/beach-setup?embed=1', note: 'emb.beach', classic: 'beach', help: 'beach' },
+  beach: { i18n: 'sc.beach', icon: 'fas fa-umbrella-beach', hash: 'beach', cap: 'cap.beach', embed: '/admin/beach-setup?embed=1', note: 'emb.beach', help: 'beach' },
   feedback: { i18n: 'sc.feedback', icon: 'fas fa-comment-dots', hash: 'feedback', cap: 'cap.feedback', help: 'feedback' },
-  map: { i18n: 'sc.map', icon: 'fas fa-map-location-dot', hash: 'map', cap: 'cap.map', embed: '/admin/map-editor?embed=1', note: 'emb.map', classic: 'resortmap', help: 'map' },
-  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', embed: '/admin/dashboard?embed=1#chatbot', dashTab: 'chatbot', note: 'emb.chatbot', classic: 'chatbot', help: 'behind' },
-  whatsapp: { i18n: 'sc.whatsapp', icon: 'fab fa-whatsapp', hash: 'whatsapp', cap: 'cap.whatsapp', embed: '/admin/escalation?embed=1', note: 'emb.whatsapp', classic: 'chatbot', help: 'behind' },
-  staff: { i18n: 'sc.staff', icon: 'fas fa-users', hash: 'staff', cap: 'cap.staff', embed: '/admin/ops-staff?embed=1', note: 'emb.staff', classic: 'opsstaff', perm: 'users_view', help: 'behind' },
-  elkasr: { i18n: 'sc.elkasr', icon: 'fas fa-chair', hash: 'elkasr', cap: 'cap.elkasr', embed: '/admin/restaurant-setup/' + MAIN_RESTAURANT_ID + '?embed=1', withProperty: true, note: 'emb.elkasr', classic: 'mainrestaurant', help: 'behind' },
-  analytics: { i18n: 'sc.analytics', icon: 'fas fa-chart-line', hash: 'analytics', cap: 'cap.analytics', embed: '/admin/analytics?embed=1', withProperty: true, note: 'emb.analytics', classic: 'analytics', perm: 'analytics_view', help: 'behind' },
+  map: { i18n: 'sc.map', icon: 'fas fa-map-location-dot', hash: 'map', cap: 'cap.map', embed: '/admin/map-editor?embed=1', note: 'emb.map', help: 'map' },
+  chatbot: { i18n: 'sc.chatbot', icon: 'fas fa-robot', hash: 'chatbot', cap: 'cap.chatbot', tabs: ['teach', 'conversations'], help: 'chatbot' },
+  whatsapp: { i18n: 'sc.whatsapp', icon: 'fab fa-whatsapp', hash: 'whatsapp', cap: 'cap.whatsapp', embed: '/admin/escalation?embed=1', note: 'emb.whatsapp', help: 'chatbot' },
+  staff: { i18n: 'sc.staff', icon: 'fas fa-users', hash: 'staff', cap: 'cap.staff', embed: '/admin/ops-staff?embed=1', note: 'emb.staff', perm: 'users_view', help: 'behind' },
+  elkasr: { i18n: 'sc.elkasr', icon: 'fas fa-chair', hash: 'elkasr', cap: 'cap.elkasr', embed: '/admin/restaurant-setup/' + MAIN_RESTAURANT_ID + '?embed=1', withProperty: true, note: 'emb.elkasr', help: 'behind' },
+  analytics: { i18n: 'sc.analytics', icon: 'fas fa-chart-line', hash: 'analytics', cap: 'cap.analytics', embed: '/admin/analytics?embed=1', withProperty: true, note: 'emb.analytics', perm: 'analytics_view', help: 'behind' },
+  qr: { i18n: 'sc.qr', icon: 'fas fa-qrcode', hash: 'qr', cap: 'cap.qr', help: 'behind' },
   help: { i18n: 'sc.help', icon: 'fas fa-life-ring', hash: 'help', cap: 'cap.help' },
+  // Advanced: the two panes that still live only in the older dashboard page (/admin/dashboard), shown inside this admin.
+  // `classic` is the tab id on that page; renderEmbed shows an "open full screen" link only when it is set.
+  frontdesk: { i18n: 'sc.frontdesk', icon: 'fas fa-desktop', hash: 'frontdesk', embed: '/admin/dashboard?embed=1#frontdesk', dashTab: 'frontdesk', classic: 'frontdesk', note: 'emb.frontdesk', help: 'advanced' },
+  seasonal: { i18n: 'sc.seasonal', icon: 'fas fa-snowflake', hash: 'seasonal', embed: '/admin/dashboard?embed=1#settings', dashTab: 'settings', classic: 'settings', note: 'emb.seasonal', help: 'advanced' },
 };
 function navItem(screen) {
   var s = SCREENS[screen]; if (s.perm && !can(s.perm)) return '';
@@ -163,8 +168,8 @@ function buildSidebar() {
   }).join('');
   nav.innerHTML = '<div class="nav-section"><div class="nav-section-label">' + t('grp.home') + '</div>' + navItem('home') + navItem('hotel') + '</div>'
     + '<div class="nav-section"><div class="nav-section-label">' + t('grp.pages') + '</div>' + tiles + '<button class="nav-add" type="button" data-go="newtile"><span class="nav-emoji">＋</span><span>' + t('nav.newTile') + '</span></button></div>'
-    + '<div class="nav-section"><div class="nav-section-label">' + t('grp.behind') + '</div>' + navItem('chatbot') + navItem('whatsapp') + navItem('staff') + navItem('elkasr') + navItem('analytics') + navItem('help')
-    + '<a class="nav-item" href="/admin/dashboard" target="_blank" rel="noopener"><span class="nav-emoji"><i class="fas fa-table-columns"></i></span><span class="nav-label">' + t('sc.classic') + '</span><span class="nav-ext">↗</span></a></div>';
+    + '<div class="nav-section"><div class="nav-section-label">' + t('grp.behind') + '</div>' + navItem('chatbot') + navItem('whatsapp') + navItem('staff') + navItem('elkasr') + navItem('analytics') + navItem('qr') + navItem('help') + '</div>'
+    + '<div class="nav-section"><div class="nav-section-label">' + t('grp.advanced') + '</div>' + navItem('frontdesk') + navItem('seasonal') + '</div>';
   nav.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { navGo(b.dataset.go); }); });
   markSidebar();
 }
@@ -221,8 +226,9 @@ function hashFor(screen, opts) {
   opts = opts || {};
   if (screen === 'page') { var tl = tileByKey(opts.key); return tl && tl.kind === 'type' ? TYPE_META[tl.type].hash : 'page/' + opts.key; }
   if (screen === 'info' && opts.page) return 'info/' + opts.page;
-  if (screen === 'hotel' && opts.tab) return 'hotel/' + opts.tab;
-  return SCREENS[screen] ? SCREENS[screen].hash : 'home';
+  var s = SCREENS[screen];
+  if (s && s.tabs && opts.tab) return s.hash + '/' + opts.tab; // hotel/look, chatbot/teach …
+  return s ? s.hash : 'home';
 }
 var _hashSelf = false;
 function setHash(h) { if (('#' + h) === location.hash) return; _hashSelf = true; try { history.replaceState(null, '', '#' + h); } catch (e) { location.hash = h; } setTimeout(function () { _hashSelf = false; }, 0); }
@@ -235,7 +241,7 @@ function routeFromHash() {
   if (a === 'page' && b) { openPage(b, { fromHash: true }); return; }
   if (a === 'room-service') { go('roomservice', { fromHash: true }); return; }
   if (a === 'info') { go('info', { page: b || null, fromHash: true }); return; }
-  if (a === 'hotel') { go('hotel', { tab: b || 'look', fromHash: true }); return; }
+  if (SCREENS[a] && SCREENS[a].tabs) { go(a, { tab: b || SCREENS[a].tabs[0], fromHash: true }); return; } // #hotel/tiles, #chatbot/conversations
   if (SCREENS[a]) { go(a, { fromHash: true }); return; }
   go('home', { fromHash: true });
 }
@@ -266,6 +272,8 @@ function go(screen, opts) {
   else if (screen === 'roomservice') renderRoomService();
   else if (screen === 'info') renderInfoList(opts.page || null);
   else if (screen === 'feedback') renderFeedback();
+  else if (screen === 'chatbot') renderChatbot(tab, opts);
+  else if (screen === 'qr') renderQr();
   else if (screen === 'help') renderHelp(opts.chapter);
   markSidebar();
   try { E.body.scrollTop = 0; document.getElementById('content').scrollTop = 0; } catch (e) {}
@@ -331,7 +339,7 @@ function renderHome() {
     { ico: '🖼', t: t('task.photo'), s: t('sc.dining'), go: function () { openPage('type:restaurant'); } },
     { ico: 'ℹ️', t: t('task.info'), s: t('sc.info'), go: function () { go('info'); openInfoEditor(null); } },
     { ico: '👁', t: t('task.tile'), s: t('sc.hotel'), go: function () { go('hotel', { tab: 'tiles' }); } },
-    { ico: '🔳', t: t('task.qr'), s: t('home.qr'), go: function () { var q = document.getElementById('hm-qr'); if (q) q.scrollIntoView({ behavior: 'smooth', block: 'center' }); } },
+    { ico: '🔳', t: t('task.qr'), s: t('sc.qr'), go: function () { go('qr'); } },
   ];
   var att = computeAttention();
   document.getElementById('hm-left').innerHTML =
@@ -350,12 +358,27 @@ function renderHome() {
   left.querySelectorAll('[data-att]').forEach(function (b) { b.addEventListener('click', function () { att[+b.dataset.att].go(); }); });
   left.querySelectorAll('[data-task]').forEach(function (b) { b.addEventListener('click', function () { tasks[+b.dataset.task].go(); }); });
   left.querySelectorAll('[data-tile]').forEach(function (b) { b.addEventListener('click', function () { openTile(b.dataset.tile); }); });
-  var url = GUEST_DOMAIN + '/hotel/' + encodeURIComponent(AUTH.slug) + '?src=qr';
-  document.getElementById('hm-qr').innerHTML = '<div class="hm-qr-t">' + t('home.qr') + '</div><img class="hm-qr-img" alt="QR code" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url) + '"><div class="hm-qr-url">' + edEsc(url) + '</div>'
-    + '<div class="hm-qr-actions"><button class="btn btn-primary btn-sm" type="button" id="hm-qr-dl">⬇ ' + t('home.qrDownload') + '</button><button class="btn btn-secondary btn-sm" type="button" id="hm-qr-print">🖨 ' + t('home.qrPrint') + '</button></div>';
-  document.getElementById('hm-qr-dl').addEventListener('click', function () { downloadQR(url); });
-  document.getElementById('hm-qr-print').addEventListener('click', function () { printQR(url); });
+  renderQrCard('hm-qr', false);
   edPhone('hm-phone-host', [['home', t('tab.home')], ['category', t('sc.dining')]], 'home', function (tab) { return tab === 'home' ? pvHome() : pvCategory('type:restaurant'); });
+}
+// The QR card: the same component on Home (compact) and on the QR screen (full: copy link + where to print it).
+function guestQrUrl() { return GUEST_DOMAIN + '/hotel/' + encodeURIComponent(AUTH.slug) + '?src=qr'; }
+function renderQrCard(hostId, full) {
+  var host = document.getElementById(hostId); if (!host) return;
+  var url = guestQrUrl();
+  host.innerHTML = '<div class="hm-qr-t">' + t('home.qr') + '</div><img class="hm-qr-img' + (full ? ' big' : '') + '" alt="QR code" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url) + '">'
+    + (full ? '<div class="form-label" style="margin-top:6px">' + t('qr.link') + '</div>' : '') + '<div class="hm-qr-url" dir="ltr">' + edEsc(url) + '</div>'
+    + '<div class="hm-qr-actions"><button class="btn btn-primary btn-sm" type="button" id="' + hostId + '-dl">⬇ ' + t('home.qrDownload') + '</button><button class="btn btn-secondary btn-sm" type="button" id="' + hostId + '-print">🖨 ' + t('home.qrPrint') + '</button>'
+    + (full ? '<button class="btn btn-secondary btn-sm" type="button" id="' + hostId + '-copy">📋 ' + t('qr.copy') + '</button>' : '') + '</div>'
+    + (full ? '<div class="sc-note plain" style="margin:16px 0 0;text-align:start"><span>🖨</span><div>' + t('qr.note') + '</div></div>' : '');
+  document.getElementById(hostId + '-dl').addEventListener('click', function () { downloadQR(url); });
+  document.getElementById(hostId + '-print').addEventListener('click', function () { printQR(url); });
+  var cp = document.getElementById(hostId + '-copy'); if (cp) cp.addEventListener('click', function () { copyText(url); });
+}
+async function copyText(s) {
+  try { await navigator.clipboard.writeText(s); toast(t('qr.copied'), 'success'); return; } catch (e) {}
+  try { var ta = document.createElement('textarea'); ta.value = s; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast(t('qr.copied'), 'success'); }
+  catch (e2) { window.prompt(t('qr.link'), s); }
 }
 function openTile(key) {
   var tl = tileByKey(key); if (!tl) return;
