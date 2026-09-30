@@ -58367,6 +58367,24 @@ app.get('/admin/dashboard', (c) => {
   // Advanced tools (the former classic dashboard): Front desk monitor + Seasonal effects & sounds.
   // Everything else moved to the guest-app admin at /admin/app; old #tab links are redirected there.
   // Version: 2026-09-30-advanced-tools
+  // The old address opens the new admin. Only the admin itself loads this page (?embed=1) for its
+  // two Advanced screens; the hash (or ?tab=) of an old bookmark picks the matching screen there.
+  if (c.req.query('embed') === undefined) {
+    c.header('Cache-Control', 'no-store')
+    return c.html(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="robots" content="noindex"><title>Old Palace admin</title></head><body style="background:#f7f5f1">
+<script>
+(function () {
+  var MAP = { offerings: 'dining', customsections: 'dining', restaurants: 'dining', alacarte: 'dining',
+    infopages: 'info', qrcode: 'qr', feedback: 'feedback', analytics: 'analytics', beach: 'beach',
+    mainrestaurant: 'elkasr', resortmap: 'map', opsstaff: 'staff', users: 'staff', chatbot: 'chatbot',
+    frontdesk: 'frontdesk', settings: 'seasonal' };
+  var t = ((location.hash || '').slice(1) || new URLSearchParams(location.search).get('tab') || '').replace(/[^a-z]/g, '');
+  var p = new URLSearchParams(location.search).get('property');
+  location.replace('/admin/app' + (p ? '?property=' + encodeURIComponent(p) : '') + (MAP[t] ? '#' + MAP[t] : ''));
+})();
+</script>
+<noscript><a href="/admin/app">Open the admin</a></noscript></body></html>`)
+  }
   return c.html(`
 <!DOCTYPE html>
 <html lang="en">
