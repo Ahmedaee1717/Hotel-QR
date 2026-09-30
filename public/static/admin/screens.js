@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Screens: a guest page (Dining, Events, Spa, Services, each custom tile) with its
-   venue editor and menu pages; Room service; Info pages; Feedback; the embedded
-   classic screens; Help; and the Ctrl+K palette. Needs app.js (data, router).
+   venue editor and menu pages; Room service; Info pages; Feedback; the AI concierge;
+   the QR code; the embedded screens; Help; and the Ctrl+K palette. Needs app.js (data, router).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ---- THE PAGE SCREEN: a guest page = places beside the live phone ---- */
@@ -41,7 +41,7 @@ function renderPageScreen(tl, opts) {
   var w = stageHost('pg-wrap'), v = vocab(tl.key), offs = offeringsFor(tl.key), name = tileLabel(tl);
   if (!w.firstChild) w.innerHTML = '<div class="pg-grid"><div class="pg-cards" id="pg-cards-host"></div><div id="pg-phone-host"></div></div>';
   var note = '';
-  if (tl.type === 'activity') note = '<div class="sc-note"><span>ℹ️</span><div>' + t('cap.experiences') + '</div><a class="btn btn-secondary btn-sm" href="/admin/dashboard#activities" target="_blank" rel="noopener">' + t('sc.classic') + ' ↗</a></div>';
+  if (tl.type === 'activity') note = '<div class="sc-note"><span>ℹ️</span><div>' + t('cap.experiences') + '</div></div>';
   if (opts.justCreated) note += '<div class="sc-note"><span>🎉</span><div>' + t('new.created') + '</div></div>';
   var cards = offs.length ? offs.map(function (o, i) {
     var sub = o.tile_subtitle || edPlain(o.short_description_en).slice(0, 110);
@@ -210,7 +210,8 @@ function rsCategoryLabel(cat) { var c = (C.roomService.categories || []).find(fu
 function renderRoomService(keepPhone) {
   var host = stageHost('rs-wrap'), rs = C.roomService, off = rs.offering;
   if (!off) {
-    host.innerHTML = '<div class="pg-empty"><b>' + t('rs.notSetUp') + '</b>' + t('rs.notSetUpSub') + '<div style="margin-top:12px"><a class="btn btn-secondary btn-sm" href="/admin/dashboard#restaurants" target="_blank" rel="noopener">' + t('sc.classic') + ' ↗</a></div></div>';
+    host.innerHTML = '<div class="pg-empty"><b>' + t('rs.notSetUp') + '</b>' + t('rs.notSetUpSub') + '<div style="margin-top:14px"><button class="btn btn-primary" type="button" id="rs-on">🔔 ' + t('rs.turnOn') + '</button></div></div>';
+    document.getElementById('rs-on').addEventListener('click', rsTurnOn);
     return;
   }
   var cs = C.customSections.find(function (x) { return x.section_key === 'room-service'; }) || {};
@@ -246,6 +247,20 @@ function renderRoomService(keepPhone) {
   edPhone('rs-phone-host', [['room-service', t('sc.roomservice')], ['home', t('tab.homeTile')]], 'room-service', function (tab) { return tab === 'home' ? pvHome({ highlight: 'cs:room-service' }) : { type: 'op-preview', view: 'room-service' }; }, t('rs.pvNote'));
 }
 function rsReloadPhone() { var f = document.getElementById('ed-pv-frame'); if (f) { ED.ready = false; f.src = f.src; } }
+// Turn on: create the room-service offering (the menu hangs off it), and the home tile if the property never had one.
+// There is no "switch off" — hiding the tile (Hotel › Tiles 👁) already takes it off the guest home screen.
+async function rsTurnOn() {
+  var btn = document.getElementById('rs-on'); if (btn) btn.disabled = true;
+  var r = await api('POST', '/api/admin/offerings', { offering_type: 'room_service', title_en: 'Room Service', short_description_en: 'Enjoy meals and drinks delivered to your room.', images: '[]', price: 0, requires_booking: 0 });
+  if (!r.ok) { if (btn) btn.disabled = false; toast(errText(r, t('toast.fail')), 'error'); return; }
+  if (!C.customSections.some(function (x) { return x.section_key === 'room-service'; })) {
+    var last = C.customSections.reduce(function (m, x) { return Math.max(m, +x.display_order || 0); }, 0);
+    var r2 = await api('POST', '/api/admin/custom-sections', { section_key: 'room-service', section_name_en: 'Room Service', icon_class: 'fas fa-bell-concierge', color_class: '#6b1529', is_visible: 1, display_order: last + 1 });
+    if (!r2.ok) { toast(errText(r2, t('toast.fail')), 'error'); }
+  }
+  toast(t('rs.turnedOn'), 'success');
+  await refresh({ force: true });
+}
 async function rsAction(act, id) {
   if (act === 'add') { openRsItemEditor(null); return; }
   var it = C.roomService.items.find(function (x) { return x.item_id === id; }); if (!it) return;
@@ -371,18 +386,170 @@ async function renderFeedback() {
   });
 }
 
-/* ---- EMBEDDED CLASSIC SCREENS: each iframe is mounted once, then only shown/hidden ---- */
+/* ---- EMBEDDED SCREENS (beach, map, WhatsApp, staff, El Kasr, analytics, the two advanced panes): each iframe is mounted once, then only shown/hidden ---- */
 function renderEmbed(screen) {
   var s = SCREENS[screen], id = 'emb-' + screen, host = document.getElementById(id);
   if (!host) {
     host = document.createElement('div'); host.id = id; host.className = 'embed-host';
     var src = s.embed + (s.withProperty ? '&property=' + encodeURIComponent(AUTH.propertyId) : '');
-    host.innerHTML = '<div class="embed-note"><span>ℹ️</span><span class="emb-note-t"></span><a class="btn btn-secondary btn-sm" href="/admin/dashboard#' + edAttr(s.classic || '') + '" target="_blank" rel="noopener">' + t('emb.openClassic') + '</a></div><iframe src="' + edAttr(src) + '" title="' + edAttr(t(s.i18n)) + '"></iframe>';
+    host.innerHTML = '<div class="embed-note"><span>ℹ️</span><span class="emb-note-t"></span>' + (s.classic ? '<a class="btn btn-secondary btn-sm emb-full" href="/admin/dashboard#' + edAttr(s.classic) + '" target="_blank" rel="noopener"></a>' : '') + '</div><iframe src="' + edAttr(src) + '" title="' + edAttr(t(s.i18n)) + '"></iframe>';
     document.getElementById('embeds').appendChild(host);
   }
   host.querySelector('.emb-note-t').textContent = t(s.note);
+  var full = host.querySelector('.emb-full'); if (full) full.textContent = t('emb.openFull');
   host.classList.add('on');
-  if (s.dashTab) { try { host.querySelector('iframe').contentWindow.postMessage({ type: 'op-admin-tab', tab: s.dashTab }, location.origin); } catch (e) {} }
+  if (s.dashTab) { // tell the embedded page which of its tabs to show: now (already loaded) and again once it (re)loads
+    var fr = host.querySelector('iframe'), post = function () { try { fr.contentWindow.postMessage({ type: 'op-admin-tab', tab: s.dashTab }, location.origin); } catch (e) {} };
+    if (!fr.dataset.tabWired) { fr.dataset.tabWired = '1'; fr.addEventListener('load', post); }
+    post();
+  }
+}
+
+/* ---- AI CONCIERGE: Teach the AI (status · the bin · what it knows) and Conversations (the agent page, mounted once) ---- */
+var CB = { settings: null, docs: null, q: '', loading: null };
+var CB_CATS = ['dining', 'rooms', 'spa', 'beach', 'activities', 'policy', 'facilities', 'contact', 'general'];
+var CB_CAT_ALIAS = { restaurant: 'dining', room_service: 'dining', event: 'activities', activity: 'activities', service: 'facilities', info_page: 'policy' }; // older auto-filed notes
+var CB_VOICE_MODELS = [['gpt-realtime-2.1-mini', 'cb.voiceStd'], ['gpt-realtime-2.1', 'cb.voicePrem']];
+function cbCat(type) { var c = String(type || '').toLowerCase(); return CB_CATS.indexOf(c) !== -1 ? c : (CB_CAT_ALIAS[c] || 'general'); }
+function cbDate(s) {
+  if (!s) return '';
+  var str = String(s), d = new Date(str.replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(str) ? '' : 'Z'));
+  if (isNaN(d.getTime())) return str.slice(0, 10);
+  try { return d.toLocaleDateString(LANG === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return str.slice(0, 10); }
+}
+async function cbLoadSettings() {
+  var r = await api('GET', '/api/chatbot/settings/' + encodeURIComponent(AUTH.propertyId));
+  if (r.ok) CB.settings = r.data.settings || {};
+  return r;
+}
+function cbLoadDocs() {
+  if (CB.loading) return CB.loading;
+  CB.loading = api('GET', '/api/admin/chatbot/documents?property_id=' + encodeURIComponent(AUTH.propertyId)).then(function (r) {
+    CB.loading = null;
+    if (r.ok) CB.docs = (r.data.documents || []).map(function (d) { d.document_id = +d.document_id; return d; });
+    return r;
+  });
+  return CB.loading;
+}
+function renderChatbot(tab, opts) {
+  opts = opts || {};
+  if (tab === 'conversations') {
+    var cw = stageHost('cb-conv-wrap');
+    if (!cw.firstChild) cw.innerHTML = '<div class="sc-note plain"><span>💬</span><div class="cb-conv-note"></div></div><div class="cb-conv"><iframe src="/admin/ai-agent?embed=1" title="' + edAttr(t('tab.conversations')) + '"></iframe></div>';
+    cw.querySelector('.cb-conv-note').textContent = t('cb.convNote');
+    return;
+  }
+  if (opts.q != null) CB.q = opts.q;
+  var host = stageHost('cb-wrap');
+  host.innerHTML = '<div class="cb-col"><div id="cb-status"></div>'
+    + '<div class="cb-bin"><div class="ed-group-title">' + t('cb.binTitle') + '</div><p class="cb-bin-sub">' + t('cb.binSub') + '</p>'
+    + '<textarea class="form-input" id="f-cb-dump" rows="6" dir="ltr" placeholder="' + edAttr(t('cb.binPh')) + '"></textarea>'
+    + '<div class="cb-bin-row"><button class="btn btn-primary" type="button" id="cb-ingest">' + t('cb.ingest') + '</button><span class="cb-bin-msg" id="cb-ingest-msg"></span></div>'
+    + '<div class="form-hint">✅ ' + t('cb.binNote') + '</div></div>'
+    + '<div class="cb-list"><div class="cb-list-hd"><div class="ed-group-title" style="margin:0">' + t('cb.knows') + ' <span class="ed-hint" id="cb-count"></span></div><input class="form-input cb-search" id="cb-q" type="search" placeholder="' + edAttr(t('cb.search')) + '" value="' + edAttr(CB.q) + '" aria-label="' + edAttr(t('cb.search')) + '"></div><div id="cb-docs"><div class="sk sk-block"></div></div></div></div>';
+  cbRenderStatus();
+  document.getElementById('cb-ingest').addEventListener('click', cbIngest);
+  var q = document.getElementById('cb-q'); q.addEventListener('input', function () { CB.q = q.value; cbRenderDocs(); });
+  if (CB.docs) cbRenderDocs();
+  cbLoadDocs().then(function (r) {
+    if (V3.screen !== 'chatbot' || !document.getElementById('cb-docs')) return;
+    if (!r.ok && !CB.docs) { document.getElementById('cb-docs').innerHTML = '<div class="pg-empty"><b>' + t('cb.loadFail') + '</b>' + edEsc(errText(r, t('err.generic'))) + '</div>'; return; }
+    cbRenderDocs();
+  });
+  cbLoadSettings().then(function (r) {
+    if (V3.screen !== 'chatbot') return;
+    if (!r.ok && !CB.settings) { var st = document.getElementById('cb-status'); if (st) st.innerHTML = '<div class="pg-empty"><b>' + t('err.generic') + '</b>' + edEsc(errText(r, t('err.generic'))) + '</div>'; return; }
+    cbRenderStatus();
+  });
+}
+function cbRenderStatus() {
+  var host = document.getElementById('cb-status'); if (!host) return;
+  var s = CB.settings;
+  if (!s) { host.innerHTML = '<div class="ed-group"><div class="sk sk-line" style="width:40%"></div><div class="sk sk-line" style="width:70%"></div><div class="sk sk-line" style="width:55%"></div></div>'; return; }
+  var vm = s.voice_model || CB_VOICE_MODELS[0][0], models = CB_VOICE_MODELS.map(function (m) { return [m[0], t(m[1])]; });
+  if (!models.some(function (m) { return m[0] === vm; })) models.push([vm, vm]); // an unknown but valid model set elsewhere stays as it is
+  host.innerHTML = '<div class="ed-group"><div class="ed-group-title">' + t('cb.status') + '</div>'
+    + edSwitch('f-cb-on', t('cb.live'), t('cb.liveSub'), +s.chatbot_enabled === 1)
+    + edField('f-cb-name', t('cb.name'), s.chatbot_name, { ph: t('cb.namePh') })
+    + '<div class="cb-divider"></div>'
+    + edSwitch('f-cb-voice', '🎙 ' + t('cb.voice'), t('cb.voiceSub'), +s.voice_enabled === 1)
+    + '<div class="form-group" style="max-width:360px"><label class="form-label" for="f-cb-vmodel">' + t('cb.voiceModel') + '</label><select class="form-input form-select" id="f-cb-vmodel">' + models.map(function (m) { return '<option value="' + edAttr(m[0]) + '"' + (m[0] === vm ? ' selected' : '') + '>' + edEsc(m[1]) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="form-hint">' + t('cb.voiceNote', { min: s.voice_daily_minutes == null ? '—' : s.voice_daily_minutes }) + '</div>'
+    + '<div class="cb-actions"><button class="btn btn-primary" type="button" id="cb-save">' + t('act.saveChanges') + '</button></div></div>';
+  document.getElementById('cb-save').addEventListener('click', cbSaveSettings);
+}
+// The server rewrites all five chatbot columns on every save (unsent = null), so the four we do not edit go back exactly as loaded;
+// the voice keys are sent only when the admin changed them (the server validates the model).
+async function cbSaveSettings() {
+  var s = CB.settings || {}, btn = document.getElementById('cb-save'); btn.disabled = true;
+  var b = { chatbot_enabled: edChecked('f-cb-on') ? 1 : 0, chatbot_name: edVal('f-cb-name').trim(), chatbot_greeting_en: s.chatbot_greeting_en == null ? null : s.chatbot_greeting_en, chatbot_primary_color: s.chatbot_primary_color == null ? null : s.chatbot_primary_color, chatbot_avatar_url: s.chatbot_avatar_url == null ? null : s.chatbot_avatar_url };
+  var voiceOn = edChecked('f-cb-voice') ? 1 : 0, vm = edVal('f-cb-vmodel');
+  if (voiceOn !== (+s.voice_enabled === 1 ? 1 : 0)) b.voice_enabled = voiceOn;
+  if (vm && vm !== (s.voice_model || CB_VOICE_MODELS[0][0])) b.voice_model = vm;
+  var r = await api('POST', '/api/admin/chatbot/settings', b); btn.disabled = false;
+  if (!r.ok) { toast(errText(r, t('toast.fail')), 'error'); return; }
+  toast(t('cb.settingsSaved'), 'success');
+  await cbLoadSettings(); // re-read: the server is the truth for the voice keys
+  if (V3.screen === 'chatbot' && V3.tab === 'teach') cbRenderStatus();
+}
+async function cbIngest() {
+  var ta = document.getElementById('f-cb-dump'), btn = document.getElementById('cb-ingest'), msg = document.getElementById('cb-ingest-msg');
+  var content = ta.value.trim(); if (!content) { toast(t('cb.ingestEmpty'), 'error'); ta.focus(); return; }
+  btn.disabled = true; msg.textContent = t('cb.ingesting');
+  var r = await api('POST', '/api/admin/chatbot/smart-ingest', { property_id: +AUTH.propertyId || AUTH.propertyId, content: content });
+  if (!document.getElementById('cb-ingest')) return;
+  btn.disabled = false; msg.textContent = '';
+  if (!r.ok) { toast(errText(r, t('toast.fail')), 'error'); return; }
+  ta.value = '';
+  toast(t(r.data.ai_processed ? 'cb.filedAi' : 'cb.filed', { title: r.data.title || '' }), 'success');
+  CB.docs = null; await cbLoadDocs(); if (V3.screen === 'chatbot') cbRenderDocs(r.data.document_id);
+}
+function cbFilter() {
+  var q = (CB.q || '').trim().toLowerCase(), docs = CB.docs || [];
+  return q ? docs.filter(function (d) { return ((d.title || '') + ' ' + (d.content || '')).toLowerCase().indexOf(q) !== -1; }) : docs;
+}
+function cbRenderDocs(highlightId) {
+  var host = document.getElementById('cb-docs'), cnt = document.getElementById('cb-count'); if (!host) return;
+  var docs = CB.docs || [], list = cbFilter();
+  if (cnt) cnt.textContent = docs.length === 1 ? t('cb.note1') : t('cb.notes', { n: docs.length });
+  host.innerHTML = !docs.length ? '<div class="pg-empty"><b>' + t('cb.empty') + '</b></div>'
+    : !list.length ? '<div class="pg-empty">' + edEsc(t('cb.noMatch', { q: CB.q.trim() })) + '</div>'
+    : list.map(function (d) {
+      var cat = cbCat(d.document_type), n = +d.chunk_count || 0;
+      return '<div class="cb-doc' + (highlightId && +d.document_id === +highlightId ? ' flash' : '') + '" data-id="' + d.document_id + '"><div class="cb-doc-main"><span class="chip cb-chip ' + cat + '">' + t('cbcat.' + cat) + '</span><div class="cb-doc-title">' + edEsc(d.title) + '</div><div class="cb-doc-body" dir="auto">' + edEsc(edPlain(d.content)) + '</div><div class="cb-doc-meta">' + edEsc((n === 1 ? t('cb.piece1') : t('cb.pieces', { n: n })) + ' · ' + cbDate(d.updated_at || d.created_at)) + '</div></div>'
+        + '<div class="cb-doc-actions"><button class="btn btn-secondary btn-sm" type="button" data-cb="edit" data-id="' + d.document_id + '">✎ ' + t('act.edit') + '</button><button class="btn btn-secondary btn-sm btn-quiet-danger" type="button" data-cb="del" data-id="' + d.document_id + '">' + t('cb.remove') + '</button></div></div>';
+    }).join('');
+  host.querySelectorAll('[data-cb]').forEach(function (b) { b.addEventListener('click', function () { cbAction(b.dataset.cb, +b.dataset.id); }); });
+}
+async function cbAction(act, id) {
+  var d = (CB.docs || []).find(function (x) { return x.document_id === id; }); if (!d) return;
+  if (act === 'edit') { cbEditDoc(d); return; }
+  if (act === 'del') {
+    if (!(await v3Confirm(t('cb.removeConfirm', { name: d.title }), { ok: t('cb.remove') }))) return;
+    var r = await api('DELETE', '/api/admin/chatbot/documents/' + id); if (!r.ok) { toast(errText(r, t('toast.deleteFail')), 'error'); return; }
+    toast(t('cb.removed'), 'success'); CB.docs = null; await cbLoadDocs(); if (V3.screen === 'chatbot') cbRenderDocs();
+  }
+}
+function cbEditDoc(d) {
+  var cat = cbCat(d.document_type);
+  var body = '<div class="ed-form"><div class="ed-group">' + edField('f-cbd-title', t('cb.title'), d.title)
+    + '<div class="form-group"><label class="form-label" for="f-cbd-cat">' + t('cb.category') + '</label><select class="form-input form-select" id="f-cbd-cat">' + CB_CATS.map(function (c) { return '<option value="' + c + '"' + (c === cat ? ' selected' : '') + '>' + t('cbcat.' + c) + '</option>'; }).join('') + '</select></div>'
+    + edField('f-cbd-content', t('cb.content'), d.content, { textarea: true, rows: 9, hint: t('cb.contentHint') }) + '</div></div>';
+  openModal(t('cb.edit', { name: d.title }), body, { width: 720, onSave: async function () {
+    var title = edVal('f-cbd-title').trim(), content = edVal('f-cbd-content').trim();
+    if (!title) { toast(t('cb.titleRequired'), 'error'); document.getElementById('f-cbd-title').focus(); return; }
+    if (!content) { toast(t('cb.contentRequired'), 'error'); document.getElementById('f-cbd-content').focus(); return; }
+    var r = await api('PUT', '/api/admin/chatbot/documents/' + d.document_id, { property_id: +AUTH.propertyId || AUTH.propertyId, title: title, content: content, document_type: edVal('f-cbd-cat') });
+    if (!r.ok) throw new Error(errText(r, t('toast.fail')));
+    closeModal(); toast(t('cb.saved'), 'success'); CB.docs = null; await cbLoadDocs(); if (V3.screen === 'chatbot') cbRenderDocs(d.document_id);
+  } });
+}
+
+/* ---- QR CODE: the same card as on Home, plus the link to copy and where to print it ---- */
+function renderQr() {
+  var host = stageHost('qr-wrap');
+  host.innerHTML = '<div class="qr-page"><div class="hm-qr" id="qr-card"></div></div>';
+  renderQrCard('qr-card', true);
 }
 
 /* ---- HELP: chapters as data (help.js), one per screen, EN + AR ---- */
@@ -415,6 +582,8 @@ function cmdkItems() {
   C.infoPages.forEach(function (pg) { items.push({ ico: pg.icon_class || 'fas fa-info-circle', t: pg.title_en, path: t('cmdk.info'), go: function () { go('info', { page: pg.page_key }); } }); });
   Object.keys(SCREENS).forEach(function (k) { var s = SCREENS[k]; if (!s.i18n || (s.perm && !can(s.perm))) return; items.push({ ico: s.icon, t: t(s.i18n), path: t('cmdk.screen'), go: function () { go(k); } }); });
   [['tab.tiles', 'hotel', 'tiles'], ['tab.contact', 'hotel', 'contact'], ['tab.look', 'hotel', 'look']].forEach(function (p) { items.push({ ico: 'fas fa-arrow-right', t: t(p[0]), path: t('sc.hotel'), go: function () { go(p[1], { tab: p[2] }); } }); });
+  [['tab.teach', 'teach', 'fas fa-graduation-cap'], ['tab.conversations', 'conversations', 'fas fa-comments']].forEach(function (p) { items.push({ ico: p[2], t: t(p[0]), path: t('sc.chatbot'), go: function () { go('chatbot', { tab: p[1] }); } }); });
+  (CB.docs || []).forEach(function (d) { items.push({ ico: 'fas fa-brain', t: d.title, path: t('cmdk.note'), go: function () { go('chatbot', { tab: 'teach', q: d.title }); } }); });
   return items;
 }
 var _ck = { items: [], sel: 0, res: [] };
@@ -423,6 +592,7 @@ function openCmdk() {
   var box = document.getElementById('cmdk');
   _ck.items = cmdkItems(); _ck.sel = 0;
   box.classList.add('open'); var inp = document.getElementById('cmdk-in'); inp.value = ''; renderCmdk(''); setTimeout(function () { inp.focus(); }, 30);
+  if (!CB.docs) cbLoadDocs().then(function () { if (CB.docs && box.classList.contains('open')) { _ck.items = cmdkItems(); renderCmdk(inp.value); } }); // the AI's notes join the list once loaded
 }
 function closeCmdk() { document.getElementById('cmdk').classList.remove('open'); }
 function renderCmdk(q) {
