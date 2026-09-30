@@ -1,0 +1,8 @@
+# The WhatsApp line (WaSender session) is shared by Signabot (signalift.io) and the Old Palace
+# alert relay. WaSender can post to one webhook only: this Worker sits on that address, shows
+# every event to Old Palace first, and hands Signabot everything Old Palace does not claim.
+name = "oldpalace-wa-bridge"
+main = "index.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+routes = [{ pattern = "signalift.io/api/wa-public/hook*", zone_name = "signalift.io" }]

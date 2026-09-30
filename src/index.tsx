@@ -80428,7 +80428,14 @@ async function whatsappHealth(env: any, DB?: any) {
       const body = await r.text()
       let state = 'error'
       let note = body.slice(0, 160)
-      if (r.ok) { state = 'ready'; note = '' }
+      let st = ''
+      try { const j: any = JSON.parse(body); st = String((j && ((j.data && j.data.status) || j.status)) || '').toLowerCase() } catch (e) {}
+      if (r.ok && (!st || st === 'connected' || st === 'open' || st === 'ready')) { state = 'ready'; note = '' }
+      else if (r.ok || /not connected|disconnected|logged.?out|need.?scan|qr/i.test(body + ' ' + st)) {
+        // WaSender answers 200 with the session's own state: logged out means nothing is delivered
+        state = 'disconnected'
+        note = 'The WhatsApp line is logged out in WaSender (' + (st || 'not connected') + '). Open the WaSender dashboard and scan the QR code with the WhatsApp phone again — until then no alert is delivered.'
+      }
       else if (r.status === 429) {
         // Out of quota this minute, not broken — keep the previous verdict
         state = 'ready'
@@ -80698,14 +80705,14 @@ app.get('/api/staff/escalation/wa-groups', async (c) => {
   try {
     const r = await fetch('https://www.wasenderapi.com/api/groups', { headers: { 'Authorization': 'Bearer ' + c.env.WASENDER_TOKEN }, signal: AbortSignal.timeout(8000) })
     const d: any = await r.json().catch(() => null)
-    if (!r.ok || !d || d.success === false) return c.json({ success: false, error: (d && (d.message || d.error)) || ('WhatsApp answered ' + r.status) }, 502)
+    if (!r.ok || !d || d.success === false) return c.json({ success: false, error: (d && (d.message || d.error)) || ('WhatsApp answered ' + r.status) })
     const list: any[] = Array.isArray(d.data) ? d.data : (d.data && Array.isArray(d.data.items) ? d.data.items : [])
     const groups = list.map((g: any) => ({ jid: String(g.jid || g.id || ''), name: String(g.name || g.subject || '').slice(0, 80) }))
       .filter((g) => /^[0-9-]{6,40}@g\.us$/.test(g.jid))
       .sort((a, b) => a.name.localeCompare(b.name))
     return c.json({ success: true, groups })
   } catch (e: any) {
-    return c.json({ success: false, error: 'Could not reach WhatsApp — try again.' }, 502)
+    return c.json({ success: false, error: 'Could not reach WhatsApp — try again.' })
   }
 })
 
