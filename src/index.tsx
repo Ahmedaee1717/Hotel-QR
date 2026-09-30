@@ -6,6 +6,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 type Bindings = {
   DB: D1Database
   ASSETS: Fetcher
+  MEDIA: R2Bucket
   OPS_PIN_PEPPER?: string
 }
 
@@ -417,6 +418,173 @@ function getAuthenticatedPropertyId(c: any): string | null {
     console.error('Missing X-Property-ID header in authenticated request')
   }
   return property_id
+}
+
+// Middleware: any one of several permissions is enough. The guest-app editor is used by
+// hotel managers (offerings_manage) and by F&B managers, whose role only carries restaurant_*.
+function requireAnyPermission(slugs: string[]) {
+  return async (c: any, next: () => Promise<void>) => {
+    const userId = c.get('userId') || parseInt(c.req.header('X-User-ID') || '0')
+    if (!userId) {
+      return c.json({ error: 'Unauthorized - Missing user ID' }, 401)
+    }
+    const permissions = await getUserPermissions(c.env.DB, userId)
+    if (!slugs.some(s => permissions.includes(s))) {
+      return c.json({ error: 'Forbidden - Insufficient permissions for ' + slugs.join(' / ') }, 403)
+    }
+    await next()
+  }
+}
+
+// ============================================
+// GUEST-APP EDITOR HELPERS (photos in R2, tile keys, partial writes)
+// ============================================
+
+// Photos uploaded from the admin live in the R2 bucket MEDIA and are served by GET /api/img/<key>.
+const MEDIA_TYPES: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }
+const MEDIA_MAX_BYTES = 12 * 1024 * 1024
+const MEDIA_KEY_RE = /^p\d+\/\d{4}\/[A-Za-z0-9._-]+$/
+const MEDIA_URL_PREFIX = '/api/img/'
+
+function mediaExt(name: string, type: string): string | null {
+  const m = /\.([a-z0-9]+)$/i.exec(name || '')
+  let ext = m ? m[1].toLowerCase() : ''
+  if (!MEDIA_TYPES[ext]) {
+    ext = Object.keys(MEDIA_TYPES).find(k => MEDIA_TYPES[k] === String(type || '').toLowerCase()) || ''
+  }
+  return MEDIA_TYPES[ext] ? ext : null
+}
+
+// The first bytes must match the picture type claimed — a renamed .html file is not a photo
+function mediaLooksLikeImage(b: Uint8Array, ext: string): boolean {
+  if (b.length < 12) return false
+  if (ext === 'jpg' || ext === 'jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff
+  if (ext === 'png') return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47
+  if (ext === 'gif') return b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38
+  if (ext === 'webp') return b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  return false
+}
+
+function mediaNewKey(propertyId: string | number, ext: string): string {
+  const now = new Date()
+  const rand = Math.random().toString(36).slice(2, 8)
+  return `p${propertyId}/${now.getUTCFullYear()}/${now.getTime()}-${rand}.${ext}`
+}
+
+async function mediaStore(env: any, propertyId: string | number, bytes: ArrayBuffer | Uint8Array, ext: string): Promise<{ key: string, url: string }> {
+  const key = mediaNewKey(propertyId, ext)
+  await env.MEDIA.put(key, bytes, { httpMetadata: { contentType: MEDIA_TYPES[ext] } })
+  return { key, url: MEDIA_URL_PREFIX + key }
+}
+
+// Stores one uploaded photo. Refusals come back in plain words for the admin screens.
+async function mediaStoreUpload(env: any, propertyId: string | number, file: any): Promise<{ key: string, url: string } | { error: string }> {
+  if (!env.MEDIA) return { error: 'Photo storage is not connected on this server' }
+  if (!file || typeof file === 'string' || typeof file.arrayBuffer !== 'function') return { error: 'No photo was sent' }
+  const ext = mediaExt(file.name, file.type)
+  if (!ext) return { error: 'Only JPG, PNG, WEBP or GIF photos can be uploaded' }
+  if (file.size > MEDIA_MAX_BYTES) return { error: 'This photo is larger than 12 MB — please use a smaller one' }
+  const bytes = await file.arrayBuffer()
+  if (!mediaLooksLikeImage(new Uint8Array(bytes), ext)) return { error: 'This file is not a photo' }
+  return mediaStore(env, propertyId, bytes, ext)
+}
+
+// Removes a photo from the bucket when the URL is one of ours; outside links are left alone
+async function mediaDeleteUrl(env: any, url: any): Promise<void> {
+  if (!env.MEDIA || typeof url !== 'string' || !url.startsWith(MEDIA_URL_PREFIX)) return
+  const key = url.slice(MEDIA_URL_PREFIX.length)
+  if (!MEDIA_KEY_RE.test(key)) return
+  try { await env.MEDIA.delete(key) } catch (e) { console.error('media delete failed', key, e) }
+}
+
+// Home-screen tile keys (shared with the guest page and the admin app)
+const TILE_KEY_RE = /^(type:(restaurant|event|spa|service|activity)|cs:\S{1,80}|beach|info:\S{1,120}|feedback|map)$/
+
+function parseTileOrder(raw: any): string[] {
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return Array.isArray(v) ? v.filter((k: any) => typeof k === 'string' && TILE_KEY_RE.test(k)) : []
+  } catch (e) { return [] }
+}
+
+// The order luxBuildHome uses when properties.tile_order is empty (hidden tiles included)
+function defaultTileOrder(customSections: any[], infoPages: any[]): string[] {
+  return [
+    'type:restaurant', 'type:event', 'type:spa', 'type:service', 'type:activity',
+    ...customSections.map((s: any) => 'cs:' + s.section_key),
+    'beach',
+    ...infoPages.map((p: any) => 'info:' + p.page_key),
+    'feedback', 'map'
+  ]
+}
+
+function parseImageList(raw: any): string[] {
+  if (Array.isArray(raw)) return raw.filter((x: any) => typeof x === 'string' && x.trim()).map((x: string) => x.trim())
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  try {
+    const v = JSON.parse(raw)
+    return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string' && x.trim()).map((x: string) => x.trim()) : []
+  } catch (e) {
+    return /^https?:\/\//.test(raw.trim()) ? [raw.trim()] : []
+  }
+}
+
+function toFlag(v: any): number {
+  return (v === true || v === 1 || v === '1' || v === 'true' || v === 'on') ? 1 : 0
+}
+
+// 'hot_and_soft_drinks' → 'Hot and Soft Drinks', 'breakfast_3' → 'Breakfast'
+function friendlyCategoryLabel(key: any): string {
+  const small = new Set(['and', 'or', 'of', 'the', 'with', 'a', 'in', 'on'])
+  const words = String(key || '').replace(/_\d+$/, '').replace(/[_\-]+/g, ' ').trim().split(/\s+/).filter(Boolean)
+  const label = words.map((w, i) => (i > 0 && small.has(w.toLowerCase())) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+  return label || 'Menu'
+}
+
+function slugifyKey(text: any, fallback: string): string {
+  const s = String(text || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return s.slice(0, 60) || fallback
+}
+
+// Accepts 'H12' (guest-side id) or '12'; only hotel_offerings rows of this property
+async function ownedOffering(DB: D1Database, propertyId: string, rawId: any): Promise<any | null> {
+  const s = String(rawId || '')
+  const id = parseInt(/^[Hh]\d+$/.test(s) ? s.slice(1) : s, 10)
+  if (!id || /^[Aa]\d+$/.test(s)) return null
+  return await DB.prepare(`
+    SELECT offering_id, offering_type, title_en, custom_section_key, status FROM hotel_offerings
+    WHERE offering_id = ? AND property_id = ?
+  `).bind(id, parseInt(propertyId, 10)).first()
+}
+
+// Room-service item photos need a column that migration 20260930b adds; until it is applied the
+// routes simply leave photos out. The check is cached per isolate (re-checked every 5 min when absent).
+let alacarteImageColumn: { has: boolean, at: number } | null = null
+async function alacarteHasImageColumn(DB: D1Database): Promise<boolean> {
+  const now = Date.now()
+  if (alacarteImageColumn && (alacarteImageColumn.has || now - alacarteImageColumn.at < 5 * 60 * 1000)) return alacarteImageColumn.has
+  let has = false
+  try {
+    const r = await DB.prepare(`PRAGMA table_info(alacarte_menu_items)`).all()
+    has = (r.results || []).some((col: any) => col.name === 'image_url')
+  } catch (e) { has = false }
+  alacarteImageColumn = { has, at: now }
+  return has
+}
+
+// One JSON body or a 400 in plain words
+async function readJsonBody(c: any): Promise<any | null> {
+  try {
+    const data = await c.req.json()
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : null
+  } catch (e) { return null }
+}
+
+function isSafeImageUrl(u: any): boolean {
+  if (typeof u !== 'string') return false
+  const s = u.trim()
+  if (!s || s.length > 2000) return false
+  return /^https?:\/\//i.test(s) || s.startsWith(MEDIA_URL_PREFIX) || s.startsWith('/static/')
 }
 
 // Middleware: Check if property has access to a feature (subscription-based)
@@ -4982,7 +5150,7 @@ app.post('/api/admin/login', async (c) => {
     const beachAccess = await getUserResourceAccess(DB, user.user_id, 'beach')
     
     // Smart redirect: Direct users to their primary workspace
-    let redirectTo = '/admin/dashboard'; // Default for full admins
+    let redirectTo = '/admin/app'; // Default for full admins: the guest-app editor (classic dashboard stays at /admin/dashboard)
     
     // If user has limited permissions, redirect to their specific workspace
     // permissions is already an array of strings (permission keys)
@@ -6607,8 +6775,8 @@ app.get('/api/admin/property-settings', async (c) => {
   }
 })
 
-// Update property design settings
-app.put('/api/admin/property-settings', async (c) => {
+// Update property design settings (classic dashboard: writes every column it sends)
+app.put('/api/admin/property-settings', requirePermission('settings_manage'), async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
@@ -6720,24 +6888,71 @@ app.get('/api/admin/custom-sections', async (c) => {
   }
 })
 
-// Create new custom section
-app.post('/api/admin/custom-sections', async (c) => {
+// Create new custom section (a home-screen tile). With section_key it upserts (the classic
+// room-service card relies on that); without one the key is made from the name and kept unique.
+app.post('/api/admin/custom-sections', requirePermission('sections_manage'), async (c) => {
   const { DB } = c.env
-  const data = await c.req.json()
-  
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+
   // CRITICAL: Get property_id from authenticated user's header
   const property_id = getAuthenticatedPropertyId(c)
   if (!property_id) {
     return c.json({ error: 'Unauthorized - No property ID' }, 401)
   }
-  
+
+  const section_name_en = String(data.section_name_en || '').trim()
+  if (!section_name_en) {
+    return c.json({ error: 'Give the tile a name' }, 400)
+  }
+  if (data.tile_image_url !== undefined && data.tile_image_url !== null && data.tile_image_url !== '' && !isSafeImageUrl(data.tile_image_url)) {
+    return c.json({ error: 'The tile photo must be an uploaded photo or a web link' }, 400)
+  }
+
   try {
+    const requestedKey = String(data.section_key || '').trim()
+    if (!requestedKey) {
+      const base = slugifyKey(section_name_en, 'tile')
+      const taken = await DB.prepare(`
+        SELECT section_key FROM custom_sections WHERE property_id = ? AND (section_key = ? OR section_key LIKE ?)
+      `).bind(property_id, base, base + '-%').all()
+      const keys = new Set((taken.results || []).map((r: any) => String(r.section_key).toLowerCase()))
+      let section_key = base
+      for (let n = 2; keys.has(section_key.toLowerCase()); n++) section_key = base + '-' + n
+      const last = await DB.prepare(`SELECT COALESCE(MAX(display_order), 0) AS m FROM custom_sections WHERE property_id = ?`).bind(property_id).first()
+      const display_order = data.display_order !== undefined && data.display_order !== null && data.display_order !== ''
+        ? (parseInt(data.display_order, 10) || 0)
+        : (Number(last?.m) || 0) + 1
+      const result = await DB.prepare(`
+        INSERT INTO custom_sections (
+          property_id, section_key, section_name_en, subtitle_en, description_en,
+          icon_class, color_class, color_class_end, display_order, is_visible, link_url, tile_image_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        property_id,
+        section_key,
+        section_name_en,
+        data.subtitle_en ? String(data.subtitle_en).trim() : null,
+        data.description_en ? String(data.description_en).trim() : null,
+        data.icon_class || 'fas fa-star',
+        data.color_class || 'blue',
+        data.color_class_end || null,
+        display_order,
+        data.is_visible !== undefined ? toFlag(data.is_visible) : 1,
+        data.link_url || null,
+        data.tile_image_url ? String(data.tile_image_url).trim() : null
+      ).run()
+      return c.json({ success: true, section_id: result.meta.last_row_id, section_key })
+    }
+
     // Check if section already exists (for upsert behavior)
     const existing = await DB.prepare(`
-      SELECT section_id FROM custom_sections 
+      SELECT section_id FROM custom_sections
       WHERE property_id = ? AND section_key = ?
-    `).bind(property_id, data.section_key).first()
-    
+    `).bind(property_id, requestedKey).first()
+
     if (existing) {
       // Update existing section
       await DB.prepare(`
@@ -6759,34 +6974,39 @@ app.post('/api/admin/custom-sections', async (c) => {
         data.icon_class || 'fas fa-star',
         data.color_class || 'blue',
         data.color_class_end || null,
-        data.is_visible !== undefined ? data.is_visible : 1,
+        data.is_visible !== undefined ? toFlag(data.is_visible) : 1,
         data.link_url || null,
         existing.section_id
       ).run()
-      
-      return c.json({ success: true, section_id: existing.section_id })
+      if (data.tile_image_url !== undefined) {
+        await DB.prepare(`UPDATE custom_sections SET tile_image_url = ? WHERE section_id = ?`)
+          .bind(data.tile_image_url ? String(data.tile_image_url).trim() : null, existing.section_id).run()
+      }
+
+      return c.json({ success: true, section_id: existing.section_id, section_key: requestedKey })
     } else {
       // Insert new section
       const result = await DB.prepare(`
         INSERT INTO custom_sections (
-          property_id, section_key, section_name_en, subtitle_en, description_en, 
-          icon_class, color_class, color_class_end, display_order, is_visible, link_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          property_id, section_key, section_name_en, subtitle_en, description_en,
+          icon_class, color_class, color_class_end, display_order, is_visible, link_url, tile_image_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,  // Use authenticated property_id
-        data.section_key,
-        data.section_name_en,
+        requestedKey,
+        section_name_en,
         data.subtitle_en || null,
         data.description_en || null,
         data.icon_class || 'fas fa-star',
         data.color_class || 'blue',
         data.color_class_end || null,
         data.display_order || 0,
-        data.is_visible !== undefined ? data.is_visible : 1,
-        data.link_url || null
+        data.is_visible !== undefined ? toFlag(data.is_visible) : 1,
+        data.link_url || null,
+        data.tile_image_url ? String(data.tile_image_url).trim() : null
       ).run()
-      
-      return c.json({ success: true, section_id: result.meta.last_row_id })
+
+      return c.json({ success: true, section_id: result.meta.last_row_id, section_key: requestedKey })
     }
   } catch (error) {
     console.error('Create/update custom section error:', error)
@@ -6794,58 +7014,56 @@ app.post('/api/admin/custom-sections', async (c) => {
   }
 })
 
-// Update custom section
-app.put('/api/admin/custom-sections/:section_id', async (c) => {
+// Update custom section — partial: only the fields sent are written
+const CUSTOM_SECTION_TEXT_FIELDS = [
+  'section_name_en', 'section_name_ar', 'section_name_de', 'section_name_ru', 'section_name_pl',
+  'section_name_it', 'section_name_fr', 'section_name_cs', 'section_name_uk',
+  'icon_class', 'color_class', 'color_class_end', 'subtitle_en', 'description_en', 'link_url', 'tile_image_url'
+]
+app.put('/api/admin/custom-sections/:section_id', requirePermission('sections_manage'), async (c) => {
   const { DB } = c.env
   const { section_id } = c.req.param()
-  const data = await c.req.json()
-  
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+
   try {
-    // Support partial updates - only update if_visible if that's all that's provided
-    if (Object.keys(data).length === 1 && data.hasOwnProperty('is_visible')) {
-      await DB.prepare(`
-        UPDATE custom_sections
-        SET is_visible = ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE section_id = ?
-      `).bind(data.is_visible, section_id).run()
-    } else {
-      // Full update
-      await DB.prepare(`
-        UPDATE custom_sections
-        SET section_name_en = ?,
-            section_name_ar = ?,
-            section_name_de = ?,
-            section_name_ru = ?,
-            section_name_pl = ?,
-            section_name_it = ?,
-            section_name_fr = ?,
-            section_name_cs = ?,
-            section_name_uk = ?,
-            icon_class = ?,
-            color_class = ?,
-            display_order = ?,
-            is_visible = ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE section_id = ?
-      `).bind(
-        data.section_name_en,
-        data.section_name_ar || null,
-        data.section_name_de || null,
-        data.section_name_ru || null,
-        data.section_name_pl || null,
-        data.section_name_it || null,
-        data.section_name_fr || null,
-        data.section_name_cs || null,
-        data.section_name_uk || null,
-        data.icon_class,
-        data.color_class,
-        data.display_order,
-        data.is_visible,
-        section_id
-      ).run()
+    const updates: string[] = []
+    const values: any[] = []
+    for (const f of CUSTOM_SECTION_TEXT_FIELDS) {
+      if (data[f] === undefined) continue
+      let v = data[f] === null ? null : String(data[f]).trim()
+      if (f === 'section_name_en' && !v) return c.json({ error: 'Give the tile a name' }, 400)
+      if (f === 'tile_image_url' && v && !isSafeImageUrl(v)) return c.json({ error: 'The tile photo must be an uploaded photo or a web link' }, 400)
+      if (v === '' && f !== 'section_name_en') v = null
+      updates.push(f + ' = ?')
+      values.push(v)
     }
-    
+    if (data.display_order !== undefined) {
+      updates.push('display_order = ?')
+      values.push(parseInt(data.display_order, 10) || 0)
+    }
+    if (data.is_visible !== undefined) {
+      updates.push('is_visible = ?')
+      values.push(toFlag(data.is_visible))
+    }
+    if (!updates.length) {
+      return c.json({ error: 'Nothing to save' }, 400)
+    }
+    updates.push('updated_at = CURRENT_TIMESTAMP')
+    values.push(section_id, property_id)
+    const result = await DB.prepare(`
+      UPDATE custom_sections SET ${updates.join(', ')} WHERE section_id = ? AND property_id = ?
+    `).bind(...values).run()
+    if (!result.meta || result.meta.changes === 0) {
+      return c.json({ error: 'Tile not found' }, 404)
+    }
+
     return c.json({ success: true })
   } catch (error) {
     console.error('Update custom section error:', error)
@@ -6853,17 +7071,49 @@ app.put('/api/admin/custom-sections/:section_id', async (c) => {
   }
 })
 
-// Delete custom section
-app.delete('/api/admin/custom-sections/:section_id', async (c) => {
+// Delete custom section. Refused (409 has_places) while places still sit on this tile,
+// unless ?force=1: those places are then unlinked and hidden from guests, not deleted.
+app.delete('/api/admin/custom-sections/:section_id', requirePermission('sections_manage'), async (c) => {
   const { DB } = c.env
   const { section_id } = c.req.param()
-  
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const force = c.req.query('force') === '1'
+
   try {
-    await DB.prepare(`
-      DELETE FROM custom_sections WHERE section_id = ?
-    `).bind(section_id).run()
-    
-    return c.json({ success: true })
+    const section = await DB.prepare(`
+      SELECT section_id, section_key FROM custom_sections WHERE section_id = ? AND property_id = ?
+    `).bind(section_id, property_id).first()
+    if (!section) {
+      return c.json({ error: 'Tile not found' }, 404)
+    }
+    const placesRow = await DB.prepare(`
+      SELECT COUNT(*) AS n FROM hotel_offerings WHERE property_id = ? AND custom_section_key = ?
+    `).bind(property_id, section.section_key).first()
+    const places = Number(placesRow?.n) || 0
+    if (places > 0 && !force) {
+      return c.json({
+        success: false,
+        error: 'has_places',
+        places,
+        message: `This tile still has ${places} place${places === 1 ? '' : 's'}. Move or delete them first — or hide the tile instead.`
+      }, 409)
+    }
+
+    const statements = []
+    if (places > 0) {
+      statements.push(DB.prepare(`
+        UPDATE hotel_offerings SET custom_section_key = NULL, status = 'hidden', updated_at = CURRENT_TIMESTAMP
+        WHERE property_id = ? AND custom_section_key = ?
+      `).bind(property_id, section.section_key))
+    }
+    statements.push(DB.prepare(`DELETE FROM custom_section_translations WHERE section_id = ?`).bind(section.section_id))
+    statements.push(DB.prepare(`DELETE FROM custom_sections WHERE section_id = ? AND property_id = ?`).bind(section.section_id, property_id))
+    await DB.batch(statements)
+
+    return c.json({ success: true, hidden_places: places })
   } catch (error) {
     console.error('Delete custom section error:', error)
     return c.json({ error: 'Failed to delete custom section' }, 500)
@@ -6982,64 +7232,110 @@ app.get('/api/admin/info-pages/:page_id', async (c) => {
   }
 })
 
-// Create new info page
-app.post('/api/admin/info-pages', async (c) => {
+// Create new info page (becomes a home-screen tile when published + shown in menu)
+app.post('/api/admin/info-pages', requirePermission('infopages_manage'), async (c) => {
   const { DB } = c.env
-  const data = await c.req.json()
-  
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+
   // CRITICAL: Get property_id from authenticated user's header
   const property_id = getAuthenticatedPropertyId(c)
   if (!property_id) {
     return c.json({ error: 'Unauthorized - No property ID' }, 401)
   }
-  
+
+  const title_en = String(data.title_en || '').trim()
+  if (!title_en) {
+    return c.json({ error: 'Give the page a title' }, 400)
+  }
+  if (data.tile_image_url && !isSafeImageUrl(data.tile_image_url)) {
+    return c.json({ error: 'The tile photo must be an uploaded photo or a web link' }, 400)
+  }
+
   try {
+    // page_key: the one sent, else made from the title and kept unique for this property
+    let page_key = String(data.page_key || '').trim()
+    if (!page_key) {
+      const base = slugifyKey(title_en, 'page')
+      const taken = await DB.prepare(`
+        SELECT page_key FROM info_pages WHERE property_id = ? AND (page_key = ? OR page_key LIKE ?)
+      `).bind(property_id, base, base + '-%').all()
+      const keys = new Set((taken.results || []).map((r: any) => String(r.page_key).toLowerCase()))
+      page_key = base
+      for (let n = 2; keys.has(page_key.toLowerCase()); n++) page_key = base + '-' + n
+    }
+    // New pages go last unless an order was sent
+    let display_order = data.display_order
+    if (display_order === undefined || display_order === null || display_order === '') {
+      const last = await DB.prepare(`SELECT COALESCE(MAX(display_order), 0) AS m FROM info_pages WHERE property_id = ?`).bind(property_id).first()
+      display_order = (Number(last?.m) || 0) + 1
+    }
+
     const result = await DB.prepare(`
       INSERT INTO info_pages (
-        property_id, page_key, title_en, content_en, 
-        icon_class, color_theme, layout_type, is_published, 
-        display_order, show_in_menu
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        property_id, page_key, title_en, content_en,
+        icon_class, color_theme, layout_type, is_published,
+        display_order, show_in_menu, tile_image_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       property_id,  // Use authenticated property_id
-      data.page_key || 'page-' + Date.now(),
-      data.title_en,
-      data.content_en,
+      page_key,
+      title_en,
+      data.content_en !== undefined && data.content_en !== null ? String(data.content_en) : '',
       data.icon_class || 'fas fa-info-circle',
       data.color_theme || 'blue',
       data.layout_type || 'single-column',
-      data.is_published !== undefined ? data.is_published : 1,
-      data.display_order || 0,
-      data.show_in_menu !== undefined ? data.show_in_menu : 1
+      data.is_published !== undefined ? toFlag(data.is_published) : 1,
+      parseInt(display_order, 10) || 0,
+      data.show_in_menu !== undefined ? toFlag(data.show_in_menu) : 1,
+      data.tile_image_url ? String(data.tile_image_url).trim() : null
     ).run()
-    
-    return c.json({ success: true, page_id: result.meta.last_row_id })
+
+    return c.json({ success: true, page_id: result.meta.last_row_id, page_key })
   } catch (error) {
     console.error('Create info page error:', error)
     return c.json({ error: 'Failed to create info page' }, 500)
   }
 })
 
-// Update info page
-app.put('/api/admin/info-pages/:page_id', async (c) => {
+// Update info page — partial (PUT and PATCH behave the same); only the fields sent are written
+async function updateInfoPage(c: any) {
   const { DB } = c.env
   const { page_id } = c.req.param()
-  const data = await c.req.json()
-  
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+
   try {
     // Build update query dynamically based on provided fields
-    const updates = []
-    const values = []
-    
-    if (data.title_en !== undefined) { updates.push('title_en = ?'); values.push(data.title_en); }
-    if (data.content_en !== undefined) { updates.push('content_en = ?'); values.push(data.content_en); }
-    if (data.icon_class !== undefined) { updates.push('icon_class = ?'); values.push(data.icon_class); }
-    if (data.color_theme !== undefined) { updates.push('color_theme = ?'); values.push(data.color_theme); }
-    if (data.layout_type !== undefined) { updates.push('layout_type = ?'); values.push(data.layout_type); }
-    if (data.is_published !== undefined) { updates.push('is_published = ?'); values.push(data.is_published); }
-    if (data.display_order !== undefined) { updates.push('display_order = ?'); values.push(data.display_order); }
-    if (data.show_in_menu !== undefined) { updates.push('show_in_menu = ?'); values.push(data.show_in_menu); }
-    
+    const updates: string[] = []
+    const values: any[] = []
+
+    if (data.title_en !== undefined) {
+      const t = String(data.title_en || '').trim()
+      if (!t) return c.json({ error: 'Give the page a title' }, 400)
+      updates.push('title_en = ?'); values.push(t);
+    }
+    if (data.content_en !== undefined) { updates.push('content_en = ?'); values.push(data.content_en === null ? '' : String(data.content_en)); }
+    if (data.icon_class !== undefined) { updates.push('icon_class = ?'); values.push(data.icon_class || 'fas fa-info-circle'); }
+    if (data.color_theme !== undefined) { updates.push('color_theme = ?'); values.push(data.color_theme || 'blue'); }
+    if (data.layout_type !== undefined) { updates.push('layout_type = ?'); values.push(data.layout_type || 'single-column'); }
+    if (data.is_published !== undefined) { updates.push('is_published = ?'); values.push(toFlag(data.is_published)); }
+    if (data.display_order !== undefined) { updates.push('display_order = ?'); values.push(parseInt(data.display_order, 10) || 0); }
+    if (data.show_in_menu !== undefined) { updates.push('show_in_menu = ?'); values.push(toFlag(data.show_in_menu)); }
+    if (data.tile_image_url !== undefined) {
+      const u = data.tile_image_url ? String(data.tile_image_url).trim() : null
+      if (u && !isSafeImageUrl(u)) return c.json({ error: 'The tile photo must be an uploaded photo or a web link' }, 400)
+      updates.push('tile_image_url = ?'); values.push(u);
+    }
+
     // Add multilingual fields
     const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
     languages.forEach(lang => {
@@ -7052,18 +7348,58 @@ app.put('/api/admin/info-pages/:page_id', async (c) => {
         values.push(data[`content_${lang}`]);
       }
     });
-    
+
+    if (!updates.length) {
+      return c.json({ error: 'Nothing to save' }, 400)
+    }
+
     updates.push('updated_at = datetime(\'now\')');
-    values.push(page_id);
-    
-    await DB.prepare(`
-      UPDATE info_pages SET ${updates.join(', ')} WHERE page_id = ?
+    values.push(page_id, property_id);
+
+    const result = await DB.prepare(`
+      UPDATE info_pages SET ${updates.join(', ')} WHERE page_id = ? AND property_id = ?
     `).bind(...values).run()
-    
+    if (!result.meta || result.meta.changes === 0) {
+      return c.json({ error: 'Info page not found' }, 404)
+    }
+
     return c.json({ success: true })
   } catch (error) {
     console.error('Update info page error:', error)
     return c.json({ error: 'Failed to update info page' }, 500)
+  }
+}
+app.put('/api/admin/info-pages/:page_id', requirePermission('infopages_manage'), updateInfoPage)
+app.patch('/api/admin/info-pages/:page_id', requirePermission('infopages_manage'), updateInfoPage)
+
+// Reorder info pages: {ids:[…]} in guest order (first = top; guests sort display_order ASC)
+app.post('/api/admin/info-pages/reorder', requirePermission('infopages_manage'), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  const ids = data && Array.isArray(data.ids) ? data.ids.map((v: any) => parseInt(v, 10)).filter((n: number) => n > 0) : []
+  if (!ids.length) {
+    return c.json({ error: 'Send the pages in the order you want' }, 400)
+  }
+  try {
+    const owned = await DB.prepare(`
+      SELECT page_id FROM info_pages WHERE property_id = ? AND page_id IN (${ids.map(() => '?').join(',')})
+    `).bind(property_id, ...ids).all()
+    const ok = new Set((owned.results || []).map((r: any) => Number(r.page_id)))
+    const ordered = ids.filter((id: number) => ok.has(id))
+    if (!ordered.length) {
+      return c.json({ error: 'Info page not found' }, 404)
+    }
+    await DB.batch(ordered.map((id: number, i: number) =>
+      DB.prepare(`UPDATE info_pages SET display_order = ?, updated_at = datetime('now') WHERE page_id = ? AND property_id = ?`).bind(i + 1, id, property_id)
+    ))
+    return c.json({ success: true, order: ordered })
+  } catch (error) {
+    console.error('Reorder info pages error:', error)
+    return c.json({ error: 'Failed to reorder info pages' }, 500)
   }
 })
 
@@ -7177,15 +7513,22 @@ app.post('/api/admin/info-pages/parse-csv', async (c) => {
 })
 
 // Delete info page
-app.delete('/api/admin/info-pages/:page_id', async (c) => {
+app.delete('/api/admin/info-pages/:page_id', requirePermission('infopages_manage'), async (c) => {
   const { DB } = c.env
   const { page_id } = c.req.param()
-  
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+
   try {
-    await DB.prepare(`
-      DELETE FROM info_pages WHERE page_id = ?
-    `).bind(page_id).run()
-    
+    const result = await DB.prepare(`
+      DELETE FROM info_pages WHERE page_id = ? AND property_id = ?
+    `).bind(page_id, property_id).run()
+    if (!result.meta || result.meta.changes === 0) {
+      return c.json({ error: 'Info page not found' }, 404)
+    }
+
     return c.json({ success: true })
   } catch (error) {
     console.error('Delete info page error:', error)
@@ -7316,119 +7659,143 @@ app.get('/api/admin/bookings', async (c) => {
   }
 })
 
-// Create hotel offering (Admin) - with auto-translation
-app.post('/api/admin/offerings', async (c) => {
+// Fields of hotel_offerings the editor may write (English source only; guests get DeepSeek at request time)
+const OFFERING_TEXT_FIELDS = [
+  'title_en', 'short_description_en', 'full_description_en', 'tile_subtitle', 'currency', 'location',
+  'opening_hours', 'cuisine_type', 'dress_code', 'event_date', 'event_start_time', 'event_end_time', 'video_url'
+]
+const OFFERING_FLAG_FIELDS = ['requires_booking', 'enable_booking', 'is_featured']
+const OFFERING_PERMISSIONS = ['offerings_manage', 'restaurant_manage']
+const OFFERING_COLUMNS = `offering_id, offering_type, custom_section_key, title_en, short_description_en, full_description_en,
+  tile_subtitle, images, price, currency, location, duration_minutes, opening_hours, cuisine_type, dress_code,
+  requires_booking, enable_booking, event_date, event_start_time, event_end_time, status, display_order, is_featured,
+  occupancy_status, video_url, created_at, updated_at`
+
+// Validates one editor payload into {set: {column: value}} or {error}. `creating` requires a title.
+function offeringFieldsFromBody(data: any, creating: boolean): { set: Record<string, any> } | { error: string } {
+  const set: Record<string, any> = {}
+  for (const f of OFFERING_TEXT_FIELDS) {
+    if (data[f] === undefined) continue
+    if (data[f] !== null && typeof data[f] !== 'string' && typeof data[f] !== 'number') return { error: `${f} must be text` }
+    let v = data[f] === null ? null : String(data[f]).trim()
+    if (f === 'title_en' && !v) return { error: 'Give it a name' }
+    if (v && v.length > (f === 'full_description_en' ? 20000 : 1000)) return { error: `${f} is too long` }
+    if (v === '' && f !== 'title_en') v = null
+    if (f === 'currency' && v) v = v.toUpperCase().slice(0, 3)
+    set[f] = v
+  }
+  if (creating && set.title_en === undefined) return { error: 'Give it a name' }
+  for (const f of OFFERING_FLAG_FIELDS) {
+    if (data[f] !== undefined) set[f] = toFlag(data[f])
+  }
+  if (data.price !== undefined) {
+    if (data.price === null || data.price === '') set.price = null
+    else {
+      const n = Number(data.price)
+      if (!isFinite(n) || n < 0) return { error: 'The price must be a number (0 for free)' }
+      set.price = n
+    }
+  }
+  if (data.duration_minutes !== undefined) {
+    if (data.duration_minutes === null || data.duration_minutes === '') set.duration_minutes = null
+    else {
+      const n = parseInt(data.duration_minutes, 10)
+      if (!(n >= 0)) return { error: 'Duration must be a number of minutes' }
+      set.duration_minutes = n
+    }
+  }
+  if (data.display_order !== undefined) set.display_order = parseInt(data.display_order, 10) || 0
+  if (data.status !== undefined) {
+    if (data.status !== 'active' && data.status !== 'hidden') return { error: 'Status can only be shown (active) or hidden' }
+    set.status = data.status
+  }
+  if (data.custom_section_key !== undefined) {
+    set.custom_section_key = data.custom_section_key ? String(data.custom_section_key).trim() : null
+  }
+  if (data.images !== undefined) {
+    const list = parseImageList(data.images)
+    if (list.length > 12) return { error: 'Up to 12 photos per place' }
+    for (const u of list) {
+      if (u.startsWith('data:')) return { error: 'Upload the photo instead of pasting it' }
+      if (!isSafeImageUrl(u)) return { error: 'Photos must be uploaded photos or web links' }
+    }
+    set.images = JSON.stringify(list)
+  }
+  return { set }
+}
+
+// Create hotel offering (Admin). No stored per-language copies any more — guests are served
+// DeepSeek translations at request time, so the English source is the only thing written.
+app.post('/api/admin/offerings', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
   const { DB } = c.env
-  const data = await c.req.json()
-  
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+
   // CRITICAL: Get property_id from authenticated user's header
   const property_id = getAuthenticatedPropertyId(c)
   if (!property_id) {
     return c.json({ error: 'Unauthorized - No property ID' }, 401)
   }
-  
+
+  const offering_type = String(data.offering_type || '').trim()
+  if (!offering_type) {
+    return c.json({ error: 'Choose what kind of place this is' }, 400)
+  }
+  if (offering_type === 'custom' && !String(data.custom_section_key || '').trim()) {
+    return c.json({ error: 'Choose which tile this place belongs to' }, 400)
+  }
+  const parsed = offeringFieldsFromBody(data, true)
+  if ('error' in parsed) {
+    return c.json({ error: parsed.error }, 400)
+  }
+  const set = parsed.set
+
   try {
-    // Insert the offering first
     const result = await DB.prepare(`
       INSERT INTO hotel_offerings (
         property_id, offering_type, custom_section_key, title_en, short_description_en, full_description_en,
-        images, video_url, price, currency, duration_minutes, requires_booking, location,
-        event_date, event_start_time, event_end_time, status, display_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
+        tile_subtitle, images, video_url, price, currency, duration_minutes, opening_hours, cuisine_type, dress_code,
+        requires_booking, enable_booking, location, event_date, event_start_time, event_end_time,
+        status, display_order, is_featured
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       property_id,  // Use authenticated property_id
-      data.offering_type,
-      data.custom_section_key || null,
-      data.title_en,
-      data.short_description_en,
-      data.full_description_en,
-      data.images,
-      data.video_url || null,
-      data.price || 0,
-      data.duration_minutes,
-      data.requires_booking ? 1 : 0,
-      data.location,
-      data.event_date,
-      data.event_start_time,
-      data.event_end_time
+      offering_type,
+      set.custom_section_key !== undefined ? set.custom_section_key : (data.custom_section_key || null),
+      set.title_en,
+      set.short_description_en ?? null,
+      set.full_description_en ?? null,
+      set.tile_subtitle ?? null,
+      set.images ?? '[]',
+      set.video_url ?? null,
+      set.price ?? 0,
+      set.currency ?? 'EGP',
+      set.duration_minutes ?? null,
+      set.opening_hours ?? null,
+      set.cuisine_type ?? null,
+      set.dress_code ?? null,
+      set.requires_booking ?? 0,
+      set.enable_booking ?? 1,
+      set.location ?? null,
+      set.event_date ?? null,
+      set.event_start_time ?? null,
+      set.event_end_time ?? null,
+      set.status ?? 'active',
+      set.display_order ?? 0,
+      set.is_featured ?? 0
     ).run()
-    
+
     const offering_id = result.meta.last_row_id
-    
-    // Auto-translate to all languages in background
-    const apiKey = c.env.OPENAI_API_KEY
-    if (apiKey) {
-      // Translate in background (don't wait for it)
-      c.executionCtx.waitUntil((async () => {
-        try {
-          // Only translate to languages that exist in DB schema
-          const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms']
-          const translations: any = {}
-          
-          for (const lang of languages) {
-            const textsToTranslate = [
-              data.title_en,
-              data.short_description_en || '',
-              data.full_description_en || ''
-            ]
-            
-            const translated = await translateWithAI(textsToTranslate, lang, apiKey)
-            
-            translations['title_' + lang] = translated[0] || data.title_en
-            translations['short_description_' + lang] = translated[1] || data.short_description_en
-            translations['full_description_' + lang] = translated[2] || data.full_description_en
-          }
-          
-          // Update database with translations (ar, de, ru, pl, it, fr, cs, uk)
-          await DB.prepare(`
-            UPDATE hotel_offerings SET
-              title_ar = ?, short_description_ar = ?, full_description_ar = ?,
-              title_de = ?, short_description_de = ?, full_description_de = ?,
-              title_ru = ?, short_description_ru = ?, full_description_ru = ?,
-              title_pl = ?, short_description_pl = ?, full_description_pl = ?,
-              title_it = ?, short_description_it = ?, full_description_it = ?,
-              title_fr = ?, short_description_fr = ?, full_description_fr = ?,
-              title_cs = ?, short_description_cs = ?, full_description_cs = ?,
-              title_uk = ?, short_description_uk = ?, full_description_uk = ?,
-              updated_at = CURRENT_TIMESTAMP
-            WHERE offering_id = ?
-          `).bind(
-            translations.title_ar, translations.short_description_ar, translations.full_description_ar,
-            translations.title_de, translations.short_description_de, translations.full_description_de,
-            translations.title_ru, translations.short_description_ru, translations.full_description_ru,
-            translations.title_pl, translations.short_description_pl, translations.full_description_pl,
-            translations.title_it, translations.short_description_it, translations.full_description_it,
-            translations.title_fr, translations.short_description_fr, translations.full_description_fr,
-            translations.title_cs, translations.short_description_cs, translations.full_description_cs,
-            translations.title_uk, translations.short_description_uk, translations.full_description_uk,
-            offering_id
-          ).run()
-          
-          console.log('Auto-translated offering ' + offering_id + ' to 8 languages')
-        } catch (error) {
-          console.error('Background translation error:', error)
-        }
-      })())
-    }
-    
-    // If restaurant and menus provided, save them
-    if (data.offering_type === 'restaurant' && data.menu_urls && data.menu_urls.length > 0) {
-      for (let i = 0; i < data.menu_urls.length; i++) {
-        const menuUrl = data.menu_urls[i].trim()
-        if (menuUrl) {
-          await DB.prepare(`
-            INSERT INTO restaurant_menus (
-              offering_id, menu_name, menu_url, menu_type, display_order, is_active
-            ) VALUES (?, ?, ?, 'full', ?, 1)
-          `).bind(offering_id, 'Menu ' + (i + 1), menuUrl, i).run()
-        }
-      }
-    }
-    
-    return c.json({ 
+    const offering: any = await DB.prepare(`SELECT ${OFFERING_COLUMNS} FROM hotel_offerings WHERE offering_id = ?`).bind(offering_id).first()
+    if (offering) offering.images = parseImageList(offering.images)
+
+    return c.json({
       success: true,
       offering_id: offering_id,
-      message: apiKey ? 'Offering created and being translated to 8 languages' : 'Offering created'
+      offering,
+      message: 'Offering created'
     })
   } catch (error) {
     console.error('Create offering error:', error)
@@ -7436,8 +7803,82 @@ app.post('/api/admin/offerings', async (c) => {
   }
 })
 
-// Update hotel offering (Admin)
-app.put('/api/admin/offerings/:offering_id', async (c) => {
+// Update one place — partial: only the fields sent are written, so a text edit can never
+// switch booking off or drop the price (the classic PUT below overwrote five columns at once)
+app.patch('/api/admin/offerings/:offering_id', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+  try {
+    const offering = await ownedOffering(DB, property_id, c.req.param('offering_id'))
+    if (!offering) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    const parsed = offeringFieldsFromBody(data, false)
+    if ('error' in parsed) {
+      return c.json({ error: parsed.error }, 400)
+    }
+    const columns = Object.keys(parsed.set)
+    if (!columns.length) {
+      return c.json({ error: 'Nothing to save' }, 400)
+    }
+    await DB.prepare(`
+      UPDATE hotel_offerings SET ${columns.map(k => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(...columns.map(k => parsed.set[k]), offering.offering_id, parseInt(property_id, 10)).run()
+
+    const fresh: any = await DB.prepare(`SELECT ${OFFERING_COLUMNS} FROM hotel_offerings WHERE offering_id = ?`).bind(offering.offering_id).first()
+    if (fresh) fresh.images = parseImageList(fresh.images)
+    return c.json({ success: true, updated: columns, offering: fresh })
+  } catch (error) {
+    console.error('Patch offering error:', error)
+    return c.json({ error: 'Failed to update offering' }, 500)
+  }
+})
+
+// Reorder places: {ids:[…]} in guest order (first = top). Guests sort display_order DESC.
+app.post('/api/admin/offerings/reorder', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  const ids: number[] = data && Array.isArray(data.ids)
+    ? data.ids.map((v: any) => { const s = String(v); return parseInt(/^[Hh]\d+$/.test(s) ? s.slice(1) : s, 10) }).filter((n: number) => n > 0)
+    : []
+  if (!ids.length) {
+    return c.json({ error: 'Send the places in the order you want' }, 400)
+  }
+  try {
+    const owned = await DB.prepare(`
+      SELECT offering_id FROM hotel_offerings WHERE property_id = ? AND offering_id IN (${ids.map(() => '?').join(',')})
+    `).bind(parseInt(property_id, 10), ...ids).all()
+    const ok = new Set((owned.results || []).map((r: any) => Number(r.offering_id)))
+    const ordered = ids.filter(id => ok.has(id))
+    if (!ordered.length) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    const n = ordered.length
+    await DB.batch(ordered.map((id, i) =>
+      DB.prepare(`UPDATE hotel_offerings SET display_order = ?, updated_at = CURRENT_TIMESTAMP WHERE offering_id = ? AND property_id = ?`)
+        .bind(n - i, id, parseInt(property_id, 10))
+    ))
+    return c.json({ success: true, order: ordered })
+  } catch (error) {
+    console.error('Reorder offerings error:', error)
+    return c.json({ error: 'Failed to reorder offerings' }, 500)
+  }
+})
+
+// Update hotel offering (Admin) — classic dashboard route, unchanged apart from the permission check
+app.put('/api/admin/offerings/:offering_id', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
   const { DB } = c.env
   const { offering_id } = c.req.param()
   const data = await c.req.json()
@@ -7509,21 +7950,26 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
 })
 
 // Delete hotel offering (Admin)
-app.delete('/api/admin/offerings/:offering_id', async (c) => {
+app.delete('/api/admin/offerings/:offering_id', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
   const { DB } = c.env
-  const { offering_id } = c.req.param()
-  
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const rawId = c.req.param('offering_id')
+  const offering_id = parseInt(/^[Hh]\d+$/.test(String(rawId)) ? String(rawId).slice(1) : String(rawId), 10)
+
   console.log('DELETE request for offering_id:', offering_id)
-  
+
   if (!offering_id) {
     return c.json({ error: 'Offering ID is required' }, 400)
   }
-  
+
   try {
-    // First check if offering exists
+    // First check if offering exists (and belongs to this property)
     const existing = await DB.prepare(`
-      SELECT offering_id, title_en, offering_type FROM hotel_offerings WHERE offering_id = ?
-    `).bind(offering_id).first()
+      SELECT offering_id, title_en, offering_type FROM hotel_offerings WHERE offering_id = ? AND property_id = ?
+    `).bind(offering_id, parseInt(property_id, 10)).first()
     
     console.log('Found offering to delete:', existing)
     
@@ -7580,7 +8026,13 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
       DELETE FROM offering_schedule WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    // 7. Delete restaurant_menus
+    // 7. Delete restaurant_menus (menu pages stored in R2 go with them)
+    try {
+      const pages = await DB.prepare(`SELECT page_url FROM restaurant_menus WHERE offering_id = ? AND page_url IS NOT NULL`).bind(offering_id).all()
+      for (const p of (pages.results || [])) await mediaDeleteUrl(c.env, (p as any).page_url)
+    } catch (e) {
+      console.log('Note: menu page photo cleanup skipped:', e.message)
+    }
     await DB.prepare(`
       DELETE FROM restaurant_menus WHERE offering_id = ?
     `).bind(offering_id).run()
@@ -7608,6 +8060,611 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
   } catch (error) {
     console.error('Delete offering error:', error)
     return c.json({ error: 'Failed to delete offering: ' + error.message }, 500)
+  }
+})
+
+// ============================================
+// GUEST-APP EDITOR (new admin at /admin/app): one read, partial writes, menu pages, room service
+// ============================================
+
+// Everything the editor needs in one round trip (D1 is ~100 ms away, so one batch)
+const GUEST_CONTENT_PROPERTY_COLUMNS = `property_id, slug, name, tagline, brand_logo_url, hero_image_url, hero_image_effect,
+  hero_overlay_opacity, primary_color, secondary_color, accent_color, contact_phone, contact_email, address, guest_whatsapp,
+  feedback_survey_url, chatbot_name, chatbot_enabled, show_restaurants, show_events, show_spa, show_service, show_activities,
+  show_hotel_map, section_restaurants_en, section_events_en, section_spa_en, section_service_en, section_activities_en, tile_order`
+
+app.get('/api/admin/guest-content', requireAnyPermission(['settings_view', 'offerings_manage', 'restaurant_manage']), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const pid = parseInt(property_id, 10)
+  try {
+    const withPhotos = await alacarteHasImageColumn(DB)
+    const [propRes, sectionRes, offeringRes, pageRes, beachRes, itemRes, poiRes] = await DB.batch([
+      DB.prepare(`SELECT ${GUEST_CONTENT_PROPERTY_COLUMNS} FROM properties WHERE property_id = ?`).bind(pid),
+      DB.prepare(`SELECT * FROM custom_sections WHERE property_id = ? ORDER BY display_order ASC, section_id ASC`).bind(pid),
+      DB.prepare(`
+        SELECT ${OFFERING_COLUMNS},
+          (SELECT COUNT(*) FROM restaurant_menus rm WHERE rm.offering_id = ho.offering_id AND rm.is_active = 1 AND rm.page_url IS NOT NULL) AS menu_pages,
+          (SELECT COUNT(*) FROM restaurant_menus rm WHERE rm.offering_id = ho.offering_id AND rm.is_active = 1 AND rm.page_url IS NULL) AS legacy_menus
+        FROM hotel_offerings ho
+        WHERE ho.property_id = ?
+        ORDER BY display_order DESC, is_featured DESC, created_at DESC
+      `).bind(pid),
+      DB.prepare(`
+        SELECT page_id, page_key, title_en, content_en, icon_class, color_theme, layout_type, is_published, show_in_menu,
+               display_order, tile_image_url, updated_at
+        FROM info_pages WHERE property_id = ? ORDER BY display_order ASC, page_id ASC
+      `).bind(pid),
+      DB.prepare(`SELECT beach_booking_enabled, booking_button_override_enabled FROM beach_settings WHERE property_id = ?`).bind(pid),
+      DB.prepare(`
+        SELECT item_id, restaurant_id, category, item_name, description, cost_to_hotel, is_premium, is_available, allergens, display_order${withPhotos ? ', image_url' : ''}
+        FROM alacarte_menu_items
+        WHERE property_id = ? AND restaurant_id IN (SELECT offering_id FROM hotel_offerings WHERE property_id = ? AND offering_type = 'room_service')
+        ORDER BY category ASC, display_order ASC, item_name ASC
+      `).bind(pid, pid),
+      DB.prepare(`SELECT COUNT(*) AS n FROM map_pois WHERE property_id = ? AND is_active = 1`).bind(pid)
+    ])
+
+    const propertyRow: any = (propRes.results || [])[0]
+    if (!propertyRow) {
+      return c.json({ error: 'Property not found' }, 404)
+    }
+    const customSections = sectionRes.results || []
+    const offerings = (offeringRes.results || []).map((o: any) => ({ ...o, images: parseImageList(o.images) }))
+    const infoPages = pageRes.results || []
+    const beachRow: any = (beachRes.results || [])[0]
+    const roomServiceOffering = offerings.find((o: any) => o.offering_type === 'room_service') || null
+    const items = (itemRes.results || []).map((it: any) => ({
+      ...it,
+      image_url: withPhotos ? (it.image_url || null) : null,
+      category_label: friendlyCategoryLabel(it.category)
+    }))
+    const categories: { key: string, label: string }[] = []
+    const seen = new Set<string>()
+    for (const it of items) {
+      if (seen.has(it.category)) continue
+      seen.add(it.category)
+      categories.push({ key: it.category, label: it.category_label })
+    }
+    const tileOrder = parseTileOrder(propertyRow.tile_order)
+
+    return c.json({
+      success: true,
+      property: { ...propertyRow, tile_order: tileOrder },
+      customSections,
+      offerings,
+      infoPages,
+      beach: {
+        enabled: !!beachRow && beachRow.beach_booking_enabled === 1,
+        online_booking: !!beachRow && beachRow.booking_button_override_enabled !== 1
+      },
+      roomService: { offering: roomServiceOffering, items, categories, photos_supported: withPhotos },
+      counts: { pois: Number(((poiRes.results || [])[0] as any)?.n) || 0 },
+      tileOrder,
+      defaultTileOrder: defaultTileOrder(customSections, infoPages)
+    })
+  } catch (error) {
+    console.error('Guest content error:', error)
+    return c.json({ error: 'Failed to load guest content' }, 500)
+  }
+})
+
+// Partial property update — only the keys sent are written (the classic PUT overwrites 31 columns)
+const PROPERTY_TEXT_FIELDS = [
+  'name', 'tagline', 'brand_logo_url', 'hero_image_url', 'primary_color', 'secondary_color', 'accent_color',
+  'contact_phone', 'contact_email', 'address', 'guest_whatsapp',
+  'section_restaurants_en', 'section_events_en', 'section_spa_en', 'section_service_en', 'section_activities_en'
+]
+const PROPERTY_FLAG_FIELDS = ['show_restaurants', 'show_events', 'show_spa', 'show_service', 'show_activities', 'show_hotel_map']
+
+app.patch('/api/admin/property-settings', requirePermission('settings_manage'), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+  try {
+    const updates: string[] = []
+    const values: any[] = []
+    for (const f of PROPERTY_TEXT_FIELDS) {
+      if (data[f] === undefined) continue
+      if (data[f] !== null && typeof data[f] !== 'string') return c.json({ error: `${f} must be text` }, 400)
+      let v = data[f] === null ? null : String(data[f]).trim()
+      if (f === 'name' && !v) return c.json({ error: 'The hotel needs a name' }, 400)
+      if (v && v.length > (f === 'address' ? 1000 : 500)) return c.json({ error: `${f} is too long` }, 400)
+      if (/_color$/.test(f) && v && !/^#[0-9a-fA-F]{3,8}$/.test(v)) return c.json({ error: 'Colours must look like #D4AF37' }, 400)
+      if (/_url$/.test(f) && v && !isSafeImageUrl(v)) return c.json({ error: 'The photo must be an uploaded photo or a web link' }, 400)
+      if (v === '' && f !== 'name') v = null
+      updates.push(f + ' = ?')
+      values.push(v)
+    }
+    for (const f of PROPERTY_FLAG_FIELDS) {
+      if (data[f] === undefined) continue
+      updates.push(f + ' = ?')
+      values.push(toFlag(data[f]))
+    }
+    if (data.tile_order !== undefined) {
+      if (data.tile_order !== null && !Array.isArray(data.tile_order)) return c.json({ error: 'tile_order must be a list of tile keys' }, 400)
+      const keys: string[] = []
+      for (const k of (data.tile_order || [])) {
+        if (typeof k !== 'string' || !TILE_KEY_RE.test(k)) return c.json({ error: `Unknown tile "${String(k)}"` }, 400)
+        if (!keys.includes(k)) keys.push(k)
+      }
+      updates.push('tile_order = ?')
+      values.push(data.tile_order === null ? null : JSON.stringify(keys))
+    }
+    if (!updates.length) {
+      return c.json({ error: 'Nothing to save' }, 400)
+    }
+    updates.push('updated_at = CURRENT_TIMESTAMP')
+    values.push(property_id)
+    const result = await DB.prepare(`UPDATE properties SET ${updates.join(', ')} WHERE property_id = ?`).bind(...values).run()
+    if (!result.meta || result.meta.changes === 0) {
+      return c.json({ error: 'Property not found' }, 404)
+    }
+    return c.json({ success: true, updated: updates.slice(0, -1).map(u => u.split(' ')[0]) })
+  } catch (error) {
+    console.error('Patch property settings error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// ---- Restaurant menus: one row per page, each a small photo URL in R2 ----
+
+// Menu pages of a place, in order. Legacy rows (base64 arrays in D1) come back as legacy:true without a URL.
+app.get('/api/admin/offerings/:offering_id/menus', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  try {
+    const offering = await ownedOffering(DB, property_id, c.req.param('offering_id'))
+    if (!offering) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    const rows = await DB.prepare(`
+      SELECT menu_id, menu_name, menu_type, page_no, page_url
+      FROM restaurant_menus
+      WHERE offering_id = ? AND is_active = 1
+      ORDER BY CASE WHEN page_url IS NULL THEN 1 ELSE 0 END, page_no ASC, display_order ASC, menu_id ASC
+    `).bind(offering.offering_id).all()
+    const menus = (rows.results || []).map((m: any) => m.page_url
+      ? { menu_id: m.menu_id, menu_name: m.menu_name, menu_type: m.menu_type, page_no: m.page_no, page_url: m.page_url }
+      : { menu_id: m.menu_id, menu_name: m.menu_name, menu_type: m.menu_type, page_no: null, page_url: null, legacy: true })
+    return c.json({ success: true, menus })
+  } catch (error) {
+    console.error('Get menu pages error:', error)
+    return c.json({ error: 'Failed to load menu pages' }, 500)
+  }
+})
+
+async function nextMenuPageNo(DB: D1Database, offeringId: number): Promise<number> {
+  const row: any = await DB.prepare(`
+    SELECT COALESCE(MAX(page_no), 0) AS m FROM restaurant_menus WHERE offering_id = ? AND page_url IS NOT NULL
+  `).bind(offeringId).first()
+  return (Number(row?.m) || 0) + 1
+}
+
+// Add menu pages: multipart files[] (or file), each photo → R2 → one page row at the end
+app.post('/api/admin/offerings/:offering_id/menus/pages', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  try {
+    const offering = await ownedOffering(DB, property_id, c.req.param('offering_id'))
+    if (!offering) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    let files: any[] = []
+    try {
+      const form = await c.req.formData()
+      files = [...form.getAll('files'), ...form.getAll('files[]'), ...form.getAll('file')].filter(f => f && typeof f !== 'string')
+    } catch (e) {
+      return c.json({ error: 'Send the pages as a form upload (field "files")' }, 400)
+    }
+    if (!files.length) {
+      return c.json({ error: 'No pages were sent' }, 400)
+    }
+    if (files.length > 8) {
+      return c.json({ error: 'Up to 8 pages per upload — add the rest in a second go' }, 400)
+    }
+    let page_no = await nextMenuPageNo(DB, offering.offering_id)
+    const pages: any[] = []
+    const rejected: string[] = []
+    for (const file of files) {
+      const stored = await mediaStoreUpload(c.env, property_id, file)
+      if ('error' in stored) { rejected.push((file.name || 'photo') + ': ' + stored.error); continue }
+      const result = await DB.prepare(`
+        INSERT INTO restaurant_menus (
+          offering_id, menu_name, menu_type, original_image_url, page_url, page_no, display_order, is_active, ocr_status, base_language
+        ) VALUES (?, ?, 'full', ?, ?, ?, ?, 1, 'skipped', 'en')
+      `).bind(offering.offering_id, 'Page ' + page_no, stored.url, stored.url, page_no, page_no).run()
+      pages.push({ menu_id: result.meta.last_row_id, page_no, page_url: stored.url })
+      page_no++
+    }
+    if (!pages.length) {
+      return c.json({ error: rejected[0] || 'No pages were saved', rejected }, 400)
+    }
+    return c.json({ success: true, pages, rejected })
+  } catch (error) {
+    console.error('Add menu pages error:', error)
+    return c.json({ error: 'Failed to add menu pages' }, 500)
+  }
+})
+
+// Reorder menu pages: {ids:[…]} first = page 1
+app.post('/api/admin/offerings/:offering_id/menus/reorder', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  const ids: number[] = data && Array.isArray(data.ids) ? data.ids.map((v: any) => parseInt(v, 10)).filter((n: number) => n > 0) : []
+  if (!ids.length) {
+    return c.json({ error: 'Send the pages in the order you want' }, 400)
+  }
+  try {
+    const offering = await ownedOffering(DB, property_id, c.req.param('offering_id'))
+    if (!offering) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    const owned = await DB.prepare(`
+      SELECT menu_id FROM restaurant_menus WHERE offering_id = ? AND page_url IS NOT NULL AND menu_id IN (${ids.map(() => '?').join(',')})
+    `).bind(offering.offering_id, ...ids).all()
+    const ok = new Set((owned.results || []).map((r: any) => Number(r.menu_id)))
+    const ordered = ids.filter(id => ok.has(id))
+    if (!ordered.length) {
+      return c.json({ error: 'Menu page not found' }, 404)
+    }
+    await DB.batch(ordered.map((id, i) =>
+      DB.prepare(`UPDATE restaurant_menus SET page_no = ?, display_order = ?, menu_name = ?, updated_at = CURRENT_TIMESTAMP WHERE menu_id = ? AND offering_id = ?`)
+        .bind(i + 1, i + 1, 'Page ' + (i + 1), id, offering.offering_id)
+    ))
+    return c.json({ success: true, order: ordered })
+  } catch (error) {
+    console.error('Reorder menu pages error:', error)
+    return c.json({ error: 'Failed to reorder menu pages' }, 500)
+  }
+})
+
+// Delete one menu row (a page, or a legacy menu); our R2 photo goes with it
+app.delete('/api/admin/menus/:menu_id', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const menu_id = parseInt(c.req.param('menu_id'), 10)
+  if (!menu_id) {
+    return c.json({ error: 'Menu page not found' }, 404)
+  }
+  try {
+    const menu: any = await DB.prepare(`
+      SELECT m.menu_id, m.page_url, m.offering_id FROM restaurant_menus m
+      JOIN hotel_offerings ho ON ho.offering_id = m.offering_id
+      WHERE m.menu_id = ? AND ho.property_id = ?
+    `).bind(menu_id, parseInt(property_id, 10)).first()
+    if (!menu) {
+      return c.json({ error: 'Menu page not found' }, 404)
+    }
+    await DB.batch([
+      DB.prepare(`DELETE FROM restaurant_menu_translations WHERE menu_id = ?`).bind(menu_id),
+      DB.prepare(`DELETE FROM restaurant_menus WHERE menu_id = ?`).bind(menu_id)
+    ])
+    await mediaDeleteUrl(c.env, menu.page_url)
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete menu page error:', error)
+    return c.json({ error: 'Failed to delete menu page' }, 500)
+  }
+})
+
+// One-off: move legacy menus (JSON arrays of base64 data URLs inside D1) into R2 page rows.
+// ≤ 8 images per call to stay inside request limits; idempotent (re-runs pick up where they stopped);
+// the integrator loops until remaining_rows is 0.
+app.post('/api/admin/menus/migrate-base64', requirePermission('settings_manage'), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  if (!c.env.MEDIA) {
+    return c.json({ error: 'Photo storage is not connected on this server' }, 500)
+  }
+  const pid = parseInt(property_id, 10)
+  const MAX_IMAGES = 8
+  try {
+    const legacy = await DB.prepare(`
+      SELECT m.menu_id, m.offering_id, m.menu_name, m.menu_type, m.original_image_url
+      FROM restaurant_menus m
+      JOIN hotel_offerings ho ON ho.offering_id = m.offering_id
+      WHERE ho.property_id = ? AND m.is_active = 1 AND m.page_url IS NULL AND m.original_image_url LIKE '[%'
+      ORDER BY m.offering_id ASC, m.display_order ASC, m.menu_id ASC
+    `).bind(pid).all()
+    const rows: any[] = legacy.results || []
+    let budget = MAX_IMAGES
+    let migrated_rows = 0, pages_created = 0, skipped_images = 0
+    const nextPage: Record<number, number> = {}
+
+    for (const row of rows) {
+      let list: any[] = []
+      try { list = JSON.parse(row.original_image_url) } catch (e) { list = [] }
+      const dataUrls = (Array.isArray(list) ? list : []).filter(u => typeof u === 'string' && u.startsWith('data:image/'))
+      if (!dataUrls.length) {
+        await DB.prepare(`UPDATE restaurant_menus SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE menu_id = ?`).bind(row.menu_id).run()
+        migrated_rows++
+        continue
+      }
+      if (budget < dataUrls.length && budget < MAX_IMAGES) break
+      budget -= dataUrls.length
+
+      // A previous run may have stopped half-way through this row: drop its pages and redo them
+      const marker = 'migrated:' + row.menu_id
+      const partial = await DB.prepare(`SELECT menu_id, page_url FROM restaurant_menus WHERE offering_id = ? AND ocr_status = ?`).bind(row.offering_id, marker).all()
+      for (const p of (partial.results || []) as any[]) {
+        await mediaDeleteUrl(c.env, p.page_url)
+        await DB.prepare(`DELETE FROM restaurant_menus WHERE menu_id = ?`).bind(p.menu_id).run()
+      }
+      if (nextPage[row.offering_id] === undefined) nextPage[row.offering_id] = await nextMenuPageNo(DB, row.offering_id)
+
+      const inserts = []
+      for (const dataUrl of dataUrls) {
+        const m = /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i.exec(dataUrl)
+        const ext = m ? (Object.keys(MEDIA_TYPES).find(k => MEDIA_TYPES[k] === m[1].toLowerCase()) || '') : ''
+        if (!m || !ext) { skipped_images++; continue }
+        let bytes: Uint8Array
+        try {
+          const bin = atob(m[2].replace(/\s+/g, ''))
+          bytes = new Uint8Array(bin.length)
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        } catch (e) { skipped_images++; continue }
+        if (!mediaLooksLikeImage(bytes, ext)) { skipped_images++; continue }
+        const stored = await mediaStore(c.env, pid, bytes, ext)
+        const page_no = nextPage[row.offering_id]++
+        inserts.push(DB.prepare(`
+          INSERT INTO restaurant_menus (
+            offering_id, menu_name, menu_type, original_image_url, page_url, page_no, display_order, is_active, ocr_status, base_language
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, 'en')
+        `).bind(row.offering_id, row.menu_name || ('Page ' + page_no), row.menu_type || 'full', stored.url, stored.url, page_no, page_no, marker))
+        pages_created++
+      }
+      inserts.push(DB.prepare(`UPDATE restaurant_menus SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE menu_id = ?`).bind(row.menu_id))
+      await DB.batch(inserts)
+      migrated_rows++
+      if (budget <= 0) break
+    }
+
+    const left: any = await DB.prepare(`
+      SELECT COUNT(*) AS n FROM restaurant_menus m
+      JOIN hotel_offerings ho ON ho.offering_id = m.offering_id
+      WHERE ho.property_id = ? AND m.is_active = 1 AND m.page_url IS NULL AND m.original_image_url LIKE '[%'
+    `).bind(pid).first()
+    return c.json({ success: true, migrated_rows, pages_created, skipped_images, remaining_rows: Number(left?.n) || 0 })
+  } catch (error) {
+    console.error('Migrate menus error:', error)
+    return c.json({ error: 'Failed to migrate menus: ' + error.message }, 500)
+  }
+})
+
+// ---- Room service: the room_service offering + its menu items (alacarte_menu_items) ----
+
+async function roomServiceOfferingFor(DB: D1Database, propertyId: string): Promise<any | null> {
+  return await DB.prepare(`
+    SELECT offering_id, title_en FROM hotel_offerings WHERE property_id = ? AND offering_type = 'room_service' ORDER BY offering_id ASC LIMIT 1
+  `).bind(parseInt(propertyId, 10)).first()
+}
+
+// Intro, hours, photos of the room-service sheet + the tile's subtitle (custom_sections 'room-service')
+app.patch('/api/admin/room-service', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+  try {
+    const rs = await roomServiceOfferingFor(DB, property_id)
+    if (!rs) {
+      return c.json({ error: 'Room service is not switched on yet' }, 404)
+    }
+    const allowed: any = {}
+    for (const f of ['title_en', 'short_description_en', 'full_description_en', 'opening_hours', 'images', 'location']) {
+      if (data[f] !== undefined) allowed[f] = data[f]
+    }
+    const parsed = offeringFieldsFromBody(allowed, false)
+    if ('error' in parsed) {
+      return c.json({ error: parsed.error }, 400)
+    }
+    const columns = Object.keys(parsed.set)
+    const statements = []
+    if (columns.length) {
+      statements.push(DB.prepare(`
+        UPDATE hotel_offerings SET ${columns.map(k => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE offering_id = ?
+      `).bind(...columns.map(k => parsed.set[k]), rs.offering_id))
+    }
+    if (data.subtitle_en !== undefined) {
+      statements.push(DB.prepare(`
+        UPDATE custom_sections SET subtitle_en = ?, updated_at = CURRENT_TIMESTAMP WHERE property_id = ? AND section_key = 'room-service'
+      `).bind(data.subtitle_en ? String(data.subtitle_en).trim() : null, property_id))
+    }
+    if (!statements.length) {
+      return c.json({ error: 'Nothing to save' }, 400)
+    }
+    await DB.batch(statements)
+    return c.json({ success: true, offering_id: rs.offering_id, updated: columns.concat(data.subtitle_en !== undefined ? ['subtitle_en'] : []) })
+  } catch (error) {
+    console.error('Patch room service error:', error)
+    return c.json({ error: 'Failed to update room service' }, 500)
+  }
+})
+
+// One menu item payload → {set} or {error}. `price` is accepted as a friendlier name for cost_to_hotel.
+function roomServiceItemFields(data: any, creating: boolean, withPhotos: boolean): { set: Record<string, any> } | { error: string } {
+  const set: Record<string, any> = {}
+  if (data.item_name !== undefined) {
+    const v = String(data.item_name || '').trim()
+    if (!v) return { error: 'Give the item a name' }
+    set.item_name = v.slice(0, 200)
+  } else if (creating) return { error: 'Give the item a name' }
+  if (data.description !== undefined) set.description = data.description ? String(data.description).trim().slice(0, 2000) : null
+  const priceIn = data.cost_to_hotel !== undefined ? data.cost_to_hotel : data.price
+  if (priceIn !== undefined) {
+    const n = priceIn === null || priceIn === '' ? 0 : Number(priceIn)
+    if (!isFinite(n) || n < 0) return { error: 'The price must be a number (0 for free)' }
+    set.cost_to_hotel = n
+  } else if (creating) set.cost_to_hotel = 0
+  if (data.category !== undefined) {
+    const v = String(data.category || '').trim()
+    set.category = v ? v.slice(0, 80) : 'other'
+  } else if (creating) set.category = 'other'
+  if (data.is_available !== undefined) set.is_available = toFlag(data.is_available)
+  if (data.is_premium !== undefined) set.is_premium = toFlag(data.is_premium)
+  if (data.allergens !== undefined) set.allergens = data.allergens ? String(data.allergens).trim().slice(0, 500) : null
+  if (data.display_order !== undefined) set.display_order = parseInt(data.display_order, 10) || 0
+  if (data.image_url !== undefined && withPhotos) {
+    const u = data.image_url ? String(data.image_url).trim() : null
+    if (u && !isSafeImageUrl(u)) return { error: 'The photo must be an uploaded photo or a web link' }
+    set.image_url = u
+  }
+  return { set }
+}
+
+app.get('/api/admin/room-service/items', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  try {
+    const rs = await roomServiceOfferingFor(DB, property_id)
+    if (!rs) return c.json({ success: true, offering: null, items: [] })
+    const withPhotos = await alacarteHasImageColumn(DB)
+    const rows = await DB.prepare(`
+      SELECT item_id, restaurant_id, category, item_name, description, cost_to_hotel, is_premium, is_available, allergens, display_order${withPhotos ? ', image_url' : ''}
+      FROM alacarte_menu_items WHERE property_id = ? AND restaurant_id = ?
+      ORDER BY category ASC, display_order ASC, item_name ASC
+    `).bind(parseInt(property_id, 10), rs.offering_id).all()
+    const items = (rows.results || []).map((it: any) => ({ ...it, image_url: withPhotos ? (it.image_url || null) : null, category_label: friendlyCategoryLabel(it.category) }))
+    return c.json({ success: true, offering: rs, items, photos_supported: withPhotos })
+  } catch (error) {
+    console.error('Room service items error:', error)
+    return c.json({ error: 'Failed to load menu items' }, 500)
+  }
+})
+
+app.post('/api/admin/room-service/items', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+  try {
+    const rs = await roomServiceOfferingFor(DB, property_id)
+    if (!rs) {
+      return c.json({ error: 'Room service is not switched on yet' }, 404)
+    }
+    const withPhotos = await alacarteHasImageColumn(DB)
+    const parsed = roomServiceItemFields(data, true, withPhotos)
+    if ('error' in parsed) {
+      return c.json({ error: parsed.error }, 400)
+    }
+    const set = parsed.set
+    if (set.display_order === undefined) {
+      const last: any = await DB.prepare(`SELECT COALESCE(MAX(display_order), 0) AS m FROM alacarte_menu_items WHERE restaurant_id = ? AND category = ?`).bind(rs.offering_id, set.category).first()
+      set.display_order = (Number(last?.m) || 0) + 1
+    }
+    if (set.is_available === undefined) set.is_available = 1
+    if (set.is_premium === undefined) set.is_premium = 0
+    const columns = ['property_id', 'restaurant_id', ...Object.keys(set)]
+    const values = [parseInt(property_id, 10), rs.offering_id, ...Object.keys(set).map(k => set[k])]
+    const result = await DB.prepare(`
+      INSERT INTO alacarte_menu_items (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})
+    `).bind(...values).run()
+    return c.json({ success: true, item_id: result.meta.last_row_id, category_label: friendlyCategoryLabel(set.category) })
+  } catch (error) {
+    console.error('Create room service item error:', error)
+    return c.json({ error: 'Failed to add the item' }, 500)
+  }
+})
+
+app.patch('/api/admin/room-service/items/:item_id', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const item_id = parseInt(c.req.param('item_id'), 10)
+  const data = await readJsonBody(c)
+  if (!data) {
+    return c.json({ error: 'Nothing to save' }, 400)
+  }
+  try {
+    const rs = await roomServiceOfferingFor(DB, property_id)
+    if (!rs || !item_id) {
+      return c.json({ error: 'Item not found' }, 404)
+    }
+    const withPhotos = await alacarteHasImageColumn(DB)
+    const parsed = roomServiceItemFields(data, false, withPhotos)
+    if ('error' in parsed) {
+      return c.json({ error: parsed.error }, 400)
+    }
+    const columns = Object.keys(parsed.set)
+    if (!columns.length) {
+      return c.json({ error: data.image_url !== undefined && !withPhotos ? 'Item photos are not switched on yet' : 'Nothing to save' }, 400)
+    }
+    const result = await DB.prepare(`
+      UPDATE alacarte_menu_items SET ${columns.map(k => k + ' = ?').join(', ')} WHERE item_id = ? AND property_id = ? AND restaurant_id = ?
+    `).bind(...columns.map(k => parsed.set[k]), item_id, parseInt(property_id, 10), rs.offering_id).run()
+    if (!result.meta || result.meta.changes === 0) {
+      return c.json({ error: 'Item not found' }, 404)
+    }
+    return c.json({ success: true, updated: columns })
+  } catch (error) {
+    console.error('Patch room service item error:', error)
+    return c.json({ error: 'Failed to update the item' }, 500)
+  }
+})
+
+app.delete('/api/admin/room-service/items/:item_id', requireAnyPermission(OFFERING_PERMISSIONS), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  const item_id = parseInt(c.req.param('item_id'), 10)
+  try {
+    const rs = await roomServiceOfferingFor(DB, property_id)
+    if (!rs || !item_id) {
+      return c.json({ error: 'Item not found' }, 404)
+    }
+    const result = await DB.prepare(`
+      DELETE FROM alacarte_menu_items WHERE item_id = ? AND property_id = ? AND restaurant_id = ?
+    `).bind(item_id, parseInt(property_id, 10), rs.offering_id).run()
+    if (!result.meta || result.meta.changes === 0) {
+      return c.json({ error: 'Item not found' }, 404)
+    }
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete room service item error:', error)
+    return c.json({ error: 'Failed to delete the item' }, 500)
   }
 })
 
@@ -9827,36 +10884,83 @@ app.get('/api/admin/restaurant/:offering_id/menus', async (c) => {
   }
 })
 
-// Admin: Upload image to blob storage (for menu images)
-app.post('/api/admin/upload-image', async (c) => {
+// ============================================
+// PHOTO UPLOADS (R2 bucket MEDIA) + PUBLIC PHOTO URLS
+// ============================================
+
+const UPLOAD_PERMISSIONS = ['offerings_manage', 'settings_manage', 'sections_manage', 'infopages_manage', 'restaurant_manage']
+
+// Admin: upload one photo → { success, url: '/api/img/<key>', key }
+app.post('/api/admin/upload', requireAnyPermission(UPLOAD_PERMISSIONS), async (c) => {
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ success: false, error: 'Unauthorized - No property ID' }, 401)
+  }
+  let file: any = null
   try {
     const formData = await c.req.formData()
-    const file = formData.get('file')
-    
-    if (!file || !(file instanceof File)) {
-      return c.json({ success: false, error: 'No file provided' }, 400)
-    }
-    
-    // For Cloudflare Pages, we need to upload to R2 or external storage
-    // For now, generate a data URL (base64) as a temporary solution
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    const base64 = buffer.toString('base64')
-    const mimeType = file.type || 'image/jpeg'
-    const dataUrl = `data:${mimeType};base64,${base64}`
-    
-    // In production, you would upload to R2 and return the public URL:
-    // const url = await uploadToR2(buffer, file.name, c.env.R2_BUCKET)
-    
-    return c.json({
-      success: true,
-      url: dataUrl,
-      message: 'Image uploaded successfully'
-    })
+    file = formData.get('file')
+  } catch (e) {
+    return c.json({ success: false, error: 'Send the photo as a form upload (field "file")' }, 400)
+  }
+  try {
+    const stored = await mediaStoreUpload(c.env, property_id, file)
+    if ('error' in stored) return c.json({ success: false, error: stored.error }, 400)
+    return c.json({ success: true, url: stored.url, key: stored.key })
+  } catch (error) {
+    console.error('Photo upload error:', error)
+    return c.json({ success: false, error: 'The photo could not be saved. Please try again.' }, 500)
+  }
+})
+
+// Admin (legacy restaurant page): same upload, old response shape — used to return a base64 data URL
+app.post('/api/admin/upload-image', requireAnyPermission(UPLOAD_PERMISSIONS), async (c) => {
+  const property_id = getAuthenticatedPropertyId(c) || '0'
+  let file: any = null
+  try {
+    const formData = await c.req.formData()
+    file = formData.get('file')
+  } catch (e) {
+    return c.json({ success: false, error: 'No file provided' }, 400)
+  }
+  try {
+    const stored = await mediaStoreUpload(c.env, property_id, file)
+    if ('error' in stored) return c.json({ success: false, error: stored.error }, 400)
+    return c.json({ success: true, url: stored.url, key: stored.key, message: 'Image uploaded successfully' })
   } catch (error) {
     console.error('Image upload error:', error)
     return c.json({ success: false, error: 'Failed to upload image: ' + error.message }, 500)
   }
+})
+
+// Public: photos stored in R2. Immutable keys, so browsers and the edge cache keep them for a year.
+app.get('/api/img/*', async (c) => {
+  const key = c.req.path.slice(MEDIA_URL_PREFIX.length)
+  if (!MEDIA_KEY_RE.test(key)) return c.text('Not found', 404)
+
+  const cache: any = (typeof caches !== 'undefined' && (caches as any).default) || null
+  const cacheKey = new Request(new URL(c.req.url).toString(), { method: 'GET' })
+  if (cache) {
+    try {
+      const hit = await cache.match(cacheKey)
+      if (hit) return hit
+    } catch (e) {}
+  }
+
+  if (!c.env.MEDIA) return c.text('Not found', 404)
+  const obj: any = await c.env.MEDIA.get(key)
+  if (!obj) return c.text('Not found', 404)
+
+  const headers = new Headers()
+  headers.set('Content-Type', (obj.httpMetadata && obj.httpMetadata.contentType) || MEDIA_TYPES[key.split('.').pop() || ''] || 'application/octet-stream')
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+  headers.set('X-Content-Type-Options', 'nosniff')
+  if (obj.httpEtag) headers.set('ETag', obj.httpEtag)
+  const res = new Response(obj.body, { status: 200, headers })
+  if (cache) {
+    try { c.executionCtx.waitUntil(cache.put(cacheKey, res.clone())) } catch (e) {}
+  }
+  return res
 })
 
 // Upload and process menu image (with OCR)
@@ -11473,7 +12577,11 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           ho.is_featured,
           ho.display_order,
           ho.custom_section_key,
-          ho.created_at
+          ho.created_at,
+          ho.opening_hours,
+          ho.tile_subtitle,
+          ho.cuisine_type,
+          ho.dress_code
         FROM hotel_offerings ho
         WHERE ho.property_id = ?
           AND ho.status = 'active'
@@ -11516,14 +12624,18 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           a.is_featured,
           a.popularity_score as display_order,
           NULL as custom_section_key,
-          a.created_at
+          a.created_at,
+          NULL as opening_hours,
+          NULL as tile_subtitle,
+          NULL as cuisine_type,
+          NULL as dress_code
         FROM activities a
         JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
         WHERE vp.property_id = ?
           AND a.status = 'active'
           ${offering_type === 'activity' ? '' : (offering_type ? 'AND 1=0' : '')}
       )
-      ORDER BY is_featured DESC, display_order DESC, created_at DESC
+      ORDER BY display_order DESC, is_featured DESC, created_at DESC
     `
     
     // Build params for UNION query
@@ -11601,13 +12713,15 @@ app.get('/api/offerings/:offering_id/menus', async (c) => {
   const { offering_id } = c.req.param()
   
   try {
+    // One row per menu page, each a small photo URL (legacy rows holding base64 arrays are
+    // not sent — the admin migrates them into page rows; until then the sheet says "coming soon")
     const menus = await DB.prepare(`
-      SELECT menu_id, menu_name, original_image_url as menu_url, menu_type, display_order
+      SELECT menu_id, menu_name, menu_type, page_no, page_url AS url
       FROM restaurant_menus
-      WHERE offering_id = ? AND is_active = 1
-      ORDER BY display_order ASC, created_at ASC
+      WHERE offering_id = ? AND is_active = 1 AND page_url IS NOT NULL
+      ORDER BY page_no ASC, menu_id ASC
     `).bind(offering_id).all()
-    
+
     return c.json({ success: true, menus: menus.results })
   } catch (error) {
     console.error('Get menus error:', error)
@@ -47867,6 +48981,27 @@ Late arrivals may result in reduced time\`;
 })
 
 // Super Admin Login Page
+// The guest-app editor (new admin) is a static app under public/static/admin/; the worker serves
+// its shell here so the address is short and never cached (the app checks localStorage admin_user itself).
+app.get('/admin/app', async (c) => {
+  try {
+    const res = await c.env.ASSETS.fetch(new URL('/static/admin/index.html', c.req.url))
+    if (!res.ok) {
+      return c.text('The guest-app editor is not part of this build yet. Use /admin/dashboard.', 404)
+    }
+    return new Response(res.body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store'
+      }
+    })
+  } catch (error) {
+    console.error('admin app shell error:', error)
+    return c.text('The guest-app editor could not be loaded. Use /admin/dashboard.', 500)
+  }
+})
+
 app.get('/admin/login', (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -47924,8 +49059,10 @@ app.get('/admin/login', (c) => {
                 // CRITICAL: Store user_id and property_id for fetchWithAuth() in staff dashboards
                 localStorage.setItem('user_id', data.user.user_id.toString());
                 localStorage.setItem('property_id', data.user.property_id.toString());
-                // Smart redirect: Use server-suggested redirect or default to dashboard
-                window.location.href = data.redirectTo || '/admin/dashboard';
+                // Go back to the page that sent us here (?next=/admin/app#dining), else the server's suggestion
+                var next = new URLSearchParams(window.location.search).get('next') || '';
+                var safeNext = /^\\/(?!\\/)/.test(next) ? next : '';
+                window.location.href = safeNext || data.redirectTo || '/admin/app';
               } else {
                 alert('Login failed: ' + (data.error || 'Invalid credentials'));
               }
@@ -57161,7 +58298,15 @@ app.get('/admin/dashboard', (c) => {
       @media (min-width: 769px) {
         .mobile-menu-btn { display: none; }
       }
-      
+
+      /* Embed mode (?embed=1): the guest-app editor shows one tab of this page inside its own shell,
+         so the header, sidebar, status bar and helpers stay out of the way */
+      html.embed, body.embed { background: transparent !important; }
+      body.embed #dashHeader, body.embed #dashStatusBar, body.embed #sidebar,
+      body.embed #aiAssistantBtn, body.embed #aiAssistantPanel, body.embed #welcomeModal { display: none !important; }
+      body.embed #sidebar + div { margin-left: 0 !important; padding: 12px !important; }
+      body.embed .flex.min-h-screen { min-height: 0; }
+
       /* Hide scrollbar but keep functionality */
       .overflow-x-auto::-webkit-scrollbar {
         height: 4px;
@@ -57204,7 +58349,7 @@ app.get('/admin/dashboard', (c) => {
 </head>
 <body style="background-color: #f6f2e9;" class="transition-colors duration-300">
     <!-- Professional Header with Logo -->
-    <div class="bg-white border-b border-gray-200 shadow-sm">
+    <div id="dashHeader" class="bg-white border-b border-gray-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <!-- Logo and Brand -->
             <div class="flex items-center gap-4">
@@ -57231,7 +58376,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Notification & Status Bar -->
-    <div class="bg-gray-50 border-b border-gray-200 py-2 px-4">
+    <div id="dashStatusBar" class="bg-gray-50 border-b border-gray-200 py-2 px-4">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
@@ -63967,6 +65112,9 @@ app.get('/admin/dashboard', (c) => {
       if (!user.user_id) { window.location.href = '/admin/login'; }
       // The guest page shares this origin: guest-app visits from staff browsers stay out of Analytics
       try { if (user.user_id) localStorage.setItem('gl_staff', '1'); } catch (e) {}
+      // ?embed=1: one tab of this page is shown inside the guest-app editor (/admin/app)
+      const EMBED = new URLSearchParams(window.location.search).has('embed');
+      if (EMBED) { document.documentElement.classList.add('embed'); document.body.classList.add('embed'); }
 
       // CRITICAL: Get property ID from logged-in user (MULTI-TENANCY)
       // Priority: 1. URL param, 2. User's property_id, 3. localStorage backup
@@ -64381,6 +65529,20 @@ app.get('/admin/dashboard', (c) => {
       
       // Show the default tab on page load
       showTab(currentTab, document.querySelector('.sidebar-btn[data-tab="' + currentTab + '"]'));
+
+      // The guest-app editor switches this page's tab without reloading: postMessage({type:'op-admin-tab', tab})
+      window.addEventListener('message', function(ev) {
+        if (ev.origin !== window.location.origin) return;
+        const m = ev.data;
+        if (!m || m.type !== 'op-admin-tab') return;
+        const tab = String(m.tab || '');
+        if (!/^[a-z]+$/.test(tab) || !document.getElementById(tab + 'Tab')) return;
+        const btn = document.querySelector('.sidebar-btn[data-tab="' + tab + '"]');
+        if (!btn) return;
+        const perm = TAB_PERMISSIONS[tab];
+        if (perm && !hasPermission(perm)) return;
+        showTab(tab, btn);
+      });
       
       window.setFrontDeskView = function(view) {
         currentFrontDeskView = view;
@@ -75079,8 +76241,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         document.body.insertAdjacentHTML('beforeend', assistantHTML);
         
-        // Show welcome modal for first-time users
-        if (!localStorage.getItem('welcomeShown')) {
+        // Show welcome modal for first-time users (never inside the guest-app editor's frame)
+        if (!localStorage.getItem('welcomeShown') && !document.body.classList.contains('embed')) {
           setTimeout(() => {
             document.getElementById('welcomeModal').classList.remove('hidden');
           }, 1000);
@@ -89563,7 +90725,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                const uploadResponse = await fetch('/api/admin/upload-image', {
+                const uploadResponse = await fetchWithAuth('/api/admin/upload-image', {
                   method: 'POST',
                   body: formData
                 });
@@ -98160,7 +99322,7 @@ app.get('/api/room-service-menu/:property_id', async (c) => {
   const { property_id } = c.req.param()
   try {
     const roomService = await DB.prepare(`
-      SELECT offering_id, title_en, short_description_en, full_description_en, location, images
+      SELECT offering_id, title_en, short_description_en, full_description_en, location, images, opening_hours
       FROM hotel_offerings
       WHERE property_id = ? AND offering_type = 'room_service'
       LIMIT 1
@@ -98170,8 +99332,9 @@ app.get('/api/room-service-menu/:property_id', async (c) => {
       return c.json({ success: false, error: 'Room service not available' }, 404)
     }
 
+    const withPhotos = await alacarteHasImageColumn(DB)
     const menuItems = await DB.prepare(`
-      SELECT item_id, category, item_name, description, cost_to_hotel as price, is_premium, allergens
+      SELECT item_id, category, item_name, description, cost_to_hotel as price, is_premium, allergens${withPhotos ? ', image_url' : ''}
       FROM alacarte_menu_items
       WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
       ORDER BY
@@ -98188,10 +99351,18 @@ app.get('/api/room-service-menu/:property_id', async (c) => {
           WHEN 'drink' THEN 10
           ELSE 11
         END,
+        display_order ASC,
         item_name
     `).bind(roomService.offering_id, property_id).all()
 
-    return c.json({ success: true, offering: roomService, items: menuItems.results })
+    // category_label: the stored key in plain words ('hot_and_soft_drinks' → 'Hot and Soft Drinks')
+    const items = (menuItems.results || []).map((it: any) => ({
+      ...it,
+      image_url: withPhotos ? (it.image_url || null) : null,
+      category_label: friendlyCategoryLabel(it.category)
+    }))
+
+    return c.json({ success: true, offering: roomService, items })
   } catch (error) {
     console.error('Room service menu API error:', error)
     return c.json({ success: false, error: 'Failed to load menu' }, 500)
