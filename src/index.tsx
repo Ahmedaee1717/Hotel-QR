@@ -57787,6 +57787,14 @@ label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;le
 input,select{width:100%;background:#fff;border:1px solid #d1d5db;border-radius:9px;padding:10px 12px;color:#111827;font-size:.92rem;font-family:inherit}
 input:focus,select:focus{outline:none;border-color:#25D366;box-shadow:0 0 0 3px rgba(37,211,102,.15)}
 .row{display:flex;gap:12px;flex-wrap:wrap}
+ .seg{display:inline-flex;border:1px solid #d1d5db;border-radius:11px;overflow:hidden;margin:4px 0 14px}
+ .seg button{border:0;background:#fff;padding:10px 16px;font-weight:700;font-size:.85rem;color:#4b5563;cursor:pointer;font-family:inherit}
+ .seg button.on{background:#14110f;color:#fff}
+ .note{display:flex;gap:10px;background:#faf6ea;border:1px solid rgba(212,175,55,.42);color:#5b4a14;border-radius:11px;padding:11px 14px;font-size:.86rem;line-height:1.55;margin-bottom:12px}
+ .note i{margin-top:3px}
+ details.more{margin-top:12px}
+ details.more summary{cursor:pointer;color:#6b7280;font-size:.84rem;font-weight:600}
+ .grp{display:inline-flex;align-items:center;gap:6px;font-weight:600}
 .row>div{flex:1;min-width:150px}
 .btn{border:none;border-radius:9px;padding:11px 20px;font-weight:700;font-size:.85rem;cursor:pointer;margin-top:16px;margin-right:8px}
 .btn-gold{background:#2563eb;color:#fff}
@@ -57841,12 +57849,57 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
 </head>
 <body>
 <header>
-  <h1><i class="fab fa-whatsapp"></i>WhatsApp Escalation</h1>
+  <h1><i class="fab fa-whatsapp"></i>WhatsApp alerts</h1>
   <a href="/admin/app"><i class="fas fa-arrow-left"></i> Admin</a>
 </header>
 <div class="wrap">
 
   <div class="banner" id="planWarn" hidden><i class="fas fa-triangle-exclamation"></i><div>Your WaSender plan allows 1 message per minute and 50 per day — upgrade before using Instant. Until then, guest messages will queue up and reach the team late.</div></div>
+
+  <div class="card" id="whoCard">
+    <h2><i class="fas fa-user-plus"></i>People and groups who get alerts</h2>
+    <p class="muted">Add the managers who should hear when a guest is waiting — one person, or a whole WhatsApp group. They answer the guest straight from WhatsApp; the concierge translates both ways.</p>
+    <div class="seg" role="tablist">
+      <button type="button" id="modePerson" class="on" onclick="setMode('person')"><i class="fas fa-user"></i> A person</button>
+      <button type="button" id="modeGroup" onclick="setMode('group')"><i class="fas fa-users"></i> A WhatsApp group</button>
+    </div>
+    <div class="row" id="personFields">
+      <div><label>Name</label><input id="cname" placeholder="Duty Manager" dir="auto"></div>
+      <div><label>WhatsApp number (with country code)</label><input id="cphone" placeholder="201001234567" inputmode="tel"></div>
+    </div>
+    <div id="groupFields" hidden>
+      <div class="note"><i class="fas fa-circle-info"></i><div>First add the hotel's WhatsApp number (the one that sends the alerts) to the group, then pick the group here. In a group, a message reaches the guest only when someone <b>swipe-replies to the alert</b> or starts with <code>#17</code> — the team's normal chat in the group is never sent to guests.</div></div>
+      <div class="row">
+        <div style="flex:2"><label>Group</label><select id="cgroup"><option value="">Press "Load my groups"</option></select></div>
+        <div style="flex:0 0 auto;align-self:flex-end"><button type="button" class="btn b-soft" style="margin-top:0" onclick="loadGroups()"><i class="fas fa-rotate"></i> Load my groups</button></div>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>When to alert</label><select id="clevel">
+        <option value="1">Level 1 — first response</option>
+        <option value="2">Level 2</option>
+        <option value="3">Level 3</option>
+        <option value="4">Level 4 — last resort</option>
+      </select></div>
+      <div><label>What they receive</label><select id="crelay">
+        <option value="alerts">Alerts only (can reply)</option>
+        <option value="instant">Instant: every guest message</option>
+        <option value="off">Off</option>
+      </select></div>
+      <div><label>Reads in</label><select id="clang">
+        <option value="en">English</option>
+        <option value="ar">Arabic — العربية</option>
+      </select></div>
+    </div>
+    <details class="more"><summary>More options</summary>
+      <div class="row"><div><label>CallMeBot key (optional, free backup channel for a person)</label><input id="ckey" placeholder="free fallback"></div></div>
+    </details>
+    <div class="err" id="cerr" hidden></div>
+    <button class="btn btn-gold" id="addBtn" onclick="addContact()"><i class="fas fa-plus"></i> Add this person</button>
+    <button class="btn btn-wa" onclick="testSend()"><i class="fab fa-whatsapp"></i> Send test now</button>
+    <span class="flash" id="flash"></span>
+    <div class="tw"><table><thead><tr><th>Level</th><th>Name</th><th>WhatsApp</th><th>Receives</th><th>Reads</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  </div>
 
   <div class="card">
     <h2>Escalation ladder</h2>
@@ -57861,36 +57914,6 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
   </div>
 
   <div class="card">
-    <h2>Who gets alerted</h2>
-    <p class="muted">Each person here gets alerts on WhatsApp and can answer the guest by simply replying — the concierge translates both ways. The hotel's own WhatsApp number cannot be on this list.</p>
-    <div class="row">
-      <div><label>Name</label><input id="cname" placeholder="Duty Manager" dir="auto"></div>
-      <div><label>WhatsApp number (with country code)</label><input id="cphone" placeholder="201001234567" inputmode="tel"></div>
-      <div><label>Level</label><select id="clevel">
-        <option value="1">Level 1 — first response</option>
-        <option value="2">Level 2</option>
-        <option value="3">Level 3</option>
-        <option value="4">Level 4 — last resort</option>
-      </select></div>
-      <div><label>Relay</label><select id="crelay">
-        <option value="alerts">Alerts only (can reply)</option>
-        <option value="instant">Instant: every guest message</option>
-        <option value="off">Off</option>
-      </select></div>
-      <div><label>Reads</label><select id="clang">
-        <option value="en">English</option>
-        <option value="ar">Arabic — العربية</option>
-      </select></div>
-      <div><label>CallMeBot key (optional)</label><input id="ckey" placeholder="free fallback"></div>
-    </div>
-    <div class="err" id="cerr" hidden></div>
-    <button class="btn btn-gold" onclick="addContact()">Add number</button>
-    <button class="btn btn-wa" onclick="testSend()"><i class="fab fa-whatsapp"></i> Send test now</button>
-    <span class="flash" id="flash"></span>
-    <div class="tw"><table><thead><tr><th>Level</th><th>Name</th><th>Number</th><th>Relay</th><th>Reads</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
-  </div>
-
-  <div class="card">
     <h2><i class="fas fa-circle-question"></i>How it works</h2>
     <p class="muted">Everyone on the list can answer guests straight from WhatsApp — no app needed. The concierge translates both ways, so staff write in their own language and the guest reads theirs.</p>
     <ol class="how">
@@ -57899,6 +57922,7 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
       <li><b>Or send a voice note</b> telling the concierge what to say — "tell her the pool closes at six and we are sorry". It writes that politely to the guest and sends you a one-line confirmation of what was said.</li>
       <li><b>Several guests waiting?</b> Start with the tag: <code>#17 your answer</code>. Sending just <code>#17</code> shows that chat's last messages.</li>
       <li><b>Finished?</b> Send <code>done</code> (or <code>#17 done</code>, <code>تم</code>) to hand the chat back to the AI.</li>
+      <li><b>In a WhatsApp group</b>, swipe-reply to the alert (or start with <code>#17</code>) — only those messages go to the guest, signed with the name of whoever wrote them. Everything else the team says in the group stays in the group.</li>
     </ol>
     <div class="cmds">
       <span><code>list</code> / <code>القائمة</code> — guests waiting now</span>
@@ -58010,14 +58034,40 @@ function contactRow(c, d){
   return '<tr'+(on?'':' class="paused"')+'>'+
     '<td><span class="pill">L'+(c.level||1)+'</span></td>'+
     '<td dir="auto"><b>'+esc(c.name||'—')+'</b></td>'+
-    '<td>+'+esc(c.phone)+'<div class="sub">'+channel+'</div></td>'+
+    '<td>'+(isGroup(c.phone) ? '<span class="grp"><i class="fas fa-users"></i> WhatsApp group</span>' : '+'+esc(c.phone))+'<div class="sub">'+channel+'</div></td>'+
     '<td><select class="sel" onchange="patch('+id+',{relay_mode:this.value})">'+opts(RELAY, c.relay_mode||'alerts')+'</select></td>'+
     '<td><select class="sel" onchange="patch('+id+',{language:this.value})">'+opts(READS, c.language||'en')+'</select></td>'+
     '<td>'+status+last+'</td>'+
     '<td><div class="acts col"><button class="b-soft" onclick="patch('+id+',{is_active:'+(on?'false':'true')+'})">'+(on?'Pause':'Resume')+'</button>'+
     '<button onclick="del('+id+')">Remove</button></div></td></tr>';
 }
-function who(x){ return x.contact_name || x.contact || x.name || (x.contact_phone ? '+'+x.contact_phone : ''); }
+function isGroup(p){ return String(p||'').slice(-5) === '@g.us'; }
+function who(x){ return x.contact_name || x.contact || x.name || (x.contact_phone ? (isGroup(x.contact_phone) ? 'group' : '+'+x.contact_phone) : ''); }
+var MODE = 'person';
+function setMode(m){
+  MODE = m;
+  document.getElementById('modePerson').classList.toggle('on', m === 'person');
+  document.getElementById('modeGroup').classList.toggle('on', m === 'group');
+  document.getElementById('personFields').hidden = m !== 'person';
+  document.getElementById('groupFields').hidden = m !== 'group';
+  document.getElementById('addBtn').innerHTML = '<i class="fas fa-plus"></i> ' + (m === 'group' ? 'Add this group' : 'Add this person');
+  document.getElementById('cerr').hidden = true;
+  if (m === 'group' && !GROUPS_LOADED) loadGroups();
+}
+var GROUPS_LOADED = false;
+async function loadGroups(){
+  var sel = document.getElementById('cgroup'), err = document.getElementById('cerr');
+  err.hidden = true;
+  sel.innerHTML = '<option value="">Loading the groups…</option>';
+  var admin = {}; try { admin = JSON.parse(localStorage.getItem('admin_user') || '{}'); } catch (e) {}
+  var d = await fetch('/api/staff/escalation/wa-groups', { cache: 'no-store', headers: { 'X-User-ID': String(admin.user_id || localStorage.getItem('user_id') || '') } })
+    .then(function(r){ return r.json(); }).catch(function(){ return { success: false, error: 'No connection — try again' }; });
+  if (!d.success) { sel.innerHTML = '<option value="">Could not load the groups</option>'; err.textContent = d.error || 'Could not load the groups'; err.hidden = false; return; }
+  GROUPS_LOADED = true;
+  var groups = d.groups || [];
+  if (!groups.length) { sel.innerHTML = '<option value="">No groups yet — add the hotel number to a group, then press Load again</option>'; return; }
+  sel.innerHTML = '<option value="">Choose a group…</option>' + groups.map(function(g){ return '<option value="'+esc(g.jid)+'">'+esc(g.name || 'Unnamed group')+'</option>'; }).join('');
+}
 function renderActivity(d){
   var anyInstant = (d.contacts||[]).some(function(c){ return c.relay_mode==='instant' && isOn(c); });
   document.getElementById('planWarn').hidden = !(anyInstant && d.plan_hint==='trial');
@@ -58061,19 +58111,26 @@ async function saveSettings(){
   alert('Ladder saved'); load();
 }
 async function addContact(){
-  var phone=document.getElementById('cphone').value.trim();
   var err=document.getElementById('cerr'); err.hidden=true; err.textContent='';
-  if(!phone){ err.textContent='Enter a WhatsApp number'; err.hidden=false; return; }
+  var phone='', groupJid='', name=document.getElementById('cname').value.trim();
+  if (MODE === 'group') {
+    var gs = document.getElementById('cgroup'); groupJid = gs.value;
+    if(!groupJid){ err.textContent='Choose a group from the list (press "Load my groups" if it is empty)'; err.hidden=false; return; }
+    name = gs.options[gs.selectedIndex].text;
+  } else {
+    phone=document.getElementById('cphone').value.trim();
+    if(!phone){ err.textContent='Enter a WhatsApp number'; err.hidden=false; return; }
+  }
   var d = await fetch('/api/staff/escalation/contacts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    name:document.getElementById('cname').value.trim(), phone:phone,
+    name:name, phone:phone, group_jid:groupJid || undefined,
     level:parseInt(document.getElementById('clevel').value)||1,
     relay_mode:document.getElementById('crelay').value,
     language:document.getElementById('clang').value,
     callmebot_key:document.getElementById('ckey').value.trim()
   })}).then(function(r){return r.json()}).catch(function(){ return {success:false, message:'No connection — try again'}; });
-  if(!d.success){ err.textContent = d.message || d.error || 'Could not add this number'; err.hidden=false; return; }
-  document.getElementById('cname').value=''; document.getElementById('cphone').value=''; document.getElementById('ckey').value='';
-  flash('Number added');
+  if(!d.success){ err.textContent = d.message || d.error || 'Could not add this'; err.hidden=false; return; }
+  document.getElementById('cname').value=''; document.getElementById('cphone').value=''; document.getElementById('ckey').value=''; document.getElementById('cgroup').value='';
+  flash(MODE === 'group' ? 'Group added — alerts will go to the group' : 'Person added');
   load();
 }
 async function patch(id, body){
@@ -79173,7 +79230,7 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
     // No sleeps here: a 429 is reported with WaSender's retry_after and the
     // outbox drain (per-minute cron) sends it later. Long waits inside
     // waitUntil get the worker killed mid-flight.
-    const to = '+' + String(contact.phone).replace(/[^0-9]/g, '')
+    const to = String(contact.phone).endsWith('@g.us') ? String(contact.phone) : '+' + String(contact.phone).replace(/[^0-9]/g, '')
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const r = await fetch('https://www.wasenderapi.com/api/send-message', {
@@ -79416,6 +79473,7 @@ const WA_CHROME: Record<string, Record<string, string>> = {
       '• #17 done (or just "done") → hand the chat back to the AI.\n' +
       '• list → waiting guests.\n' +
       '• mute 2h / on → pause / resume instant forwards.\n' +
+      '• In a group: swipe-reply to the alert (or start with #17) — other group chat never reaches guests.\n' +
       '• help → this card.'
   },
   ar: {
@@ -79447,6 +79505,7 @@ const WA_CHROME: Record<string, Record<string, string>> = {
       '• #17 تم (أو "تم" فقط) ← إعادة المحادثة إلى المساعد الآلي.\n' +
       '• القائمة ← الضيوف المنتظرون.\n' +
       '• كتم 2 ساعة / تشغيل ← إيقاف / استئناف التحويل الفوري.\n' +
+      '• في مجموعة: اسحب للرد على التنبيه (أو ابدأ بـ #17) — باقي كلام المجموعة لا يصل للضيوف أبدًا.\n' +
       '• مساعدة ← هذه البطاقة.'
   }
 }
@@ -79636,7 +79695,7 @@ async function drainWaOutbox(env: any, DB: any, deadline?: number): Promise<{ se
 // WaSender webhook payloads (Baileys-shaped). data.messages is an object for
 // messages.received and an array for messages.upsert; the phone lives in
 // key.cleanedSenderPn/senderPn when the chat is addressed by lid.
-function waParseInbound(body: any): { phone: string; lid?: string; id: string; fromMe: boolean; text: string; quoted: string; audio: any }[] {
+function waParseInbound(body: any): { phone: string; lid?: string; id: string; fromMe: boolean; text: string; quoted: string; audio: any; group?: string; senderPhone?: string; senderName?: string }[] {
   const ev = String((body && body.event) || '')
   if (ev && !/messages\.(upsert|received)|message\.received|messages/i.test(ev)) return []
   const d = (body && body.data) || body
@@ -79646,14 +79705,25 @@ function waParseInbound(body: any): { phone: string; lid?: string; id: string; f
   for (const msg of list) {
     const key = (msg && msg.key) || {}
     const remote = String(key.remoteJid || (msg && (msg.remoteJid || msg.from)) || '')
-    if (!remote || remote.endsWith('@g.us') || remote.includes('broadcast')) continue
-    const pnJid = String(key.cleanedSenderPn || key.senderPn || key.remoteJidAlt || key.participantPn || '')
+    if (!remote || remote.includes('broadcast')) continue
+    const senderName = String((msg && msg.pushName) || '').trim().slice(0, 60)
+    // A group: the chat is the group, the sender is the participant
+    let group = ''
+    let senderPhone = ''
+    if (remote.endsWith('@g.us')) {
+      if (!/^[0-9-]{6,40}@g\.us$/.test(remote)) continue
+      group = remote
+      senderPhone = String(key.cleanedParticipantPn || key.participantPn || '').split('@')[0].split(':')[0]
+      if (senderPhone && !/^\d{8,16}$/.test(senderPhone)) senderPhone = ''
+    }
+    const pnJid = group ? '' : String(key.cleanedSenderPn || key.senderPn || key.remoteJidAlt || key.participantPn || '')
     let phone = ''
     let lid: string | undefined
-    if (pnJid) phone = pnJid.split('@')[0].split(':')[0]
+    if (group) phone = group
+    else if (pnJid) phone = pnJid.split('@')[0].split(':')[0]
     else if (remote.endsWith('@lid')) lid = remote.split('@')[0]
     else phone = remote.split('@')[0].split(':')[0]
-    if (phone && !/^\d{8,16}$/.test(phone)) continue
+    if (phone && !group && !/^\d{8,16}$/.test(phone)) continue
     if (!phone && !lid) continue
     const mm = (msg && (msg.message || (msg.messages && msg.messages.message))) || {}
     const ext = mm.extendedTextMessage || {}
@@ -79663,7 +79733,7 @@ function waParseInbound(body: any): { phone: string; lid?: string; id: string; f
     const qm = ctx.quotedMessage || {}
     const quoted = String(qm.conversation || (qm.extendedTextMessage && qm.extendedTextMessage.text) || '').trim()
     if (!text && !audio) continue
-    out.push({ phone, lid, id: key.id ? String(key.id) : '', fromMe: !!key.fromMe, text, quoted, audio })
+    out.push({ phone, lid, id: key.id ? String(key.id) : '', fromMe: !!key.fromMe, text, quoted, audio, group: group || undefined, senderPhone: senderPhone || undefined, senderName: senderName || undefined })
   }
   return out
 }
@@ -80188,7 +80258,8 @@ async function processWaInbound(env: any, DB: any, id: string, deadline?: number
   if (!claim.meta || !claim.meta.changes) return
   const job: any = await DB.prepare('SELECT * FROM wa_inbound WHERE id = ?').bind(id).first()
   if (!job) return
-  const contact: any = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND phone = ? ORDER BY is_active DESC, contact_id LIMIT 1').bind(job.contact_phone).first()
+  let contact: any = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND phone = ? ORDER BY is_active DESC, contact_id LIMIT 1').bind(job.contact_phone).first()
+  if (contact && job.sender_name && String(contact.phone).endsWith('@g.us')) contact = { ...contact, name: String(job.sender_name) }
   const patch: any = {}
   let status = 'done'
   if (!contact) {
@@ -80459,11 +80530,53 @@ app.post('/api/staff/wasender-webhook', async (c) => {
     const lidWrites = waLidStatements(DB, payload)
     if (lidWrites.length) { try { await DB.batch(lidWrites) } catch (e) {} }
     const msgs = waParseInbound(payload)
-    if (!msgs.length) return c.json({ success: true, ignored: 'no inbound message' })
+    if (!msgs.length) return c.json({ success: true, ignored: 'no inbound message', claimed: 0, claimed_all: false })
 
+    // The WhatsApp line is shared with Signabot: its webhook shows every event to
+    // this route first (x-wa-bridge: 1) and hands Signabot whatever is not claimed.
+    const bridged = c.req.header('x-wa-bridge') === '1'
+    const tagIn = (s: any) => /#\d{1,6}\b/.test(String(s || ''))
+    // A message meant for a guest names the chat: it answers an alert (quotes a #tag) or starts with #17
+    const explicit = (m: any) => tagIn(m.quoted) || /^\s*#\d{1,6}\b/.test(String(m.text || ''))
     let queued = 0
+    let claimed = 0
     let ignored = ''
     for (const m of msgs.slice(0, 5)) {
+      if (m.group) {
+        const g = await DB.prepare(
+          'SELECT contact_id, name, phone, language, relay_mode FROM escalation_contacts WHERE property_id = 1 AND is_active = 1 AND phone = ? LIMIT 1'
+        ).bind(m.group).first()
+        if (!g) { ignored = 'not an alert group'; continue }
+        claimed++ // an alert group belongs to the hotel, whatever is said in it
+        if (m.fromMe) { ignored = 'own message in the group'; continue }
+        const cmd = m.text && !m.audio ? waParseCommand(m.text) : null
+        // Staff talk to each other in the group: only lines aimed at a guest chat (or help / list) count
+        if (!explicit(m) && !(cmd && (cmd.cmd === 'help' || cmd.cmd === 'list'))) { ignored = 'group chat, not for a guest'; continue }
+        if (!m.id) { ignored = 'no message id'; continue }
+        let who = m.senderName || ''
+        if (m.senderPhone) {
+          const pc: any = await DB.prepare("SELECT name FROM escalation_contacts WHERE property_id = 1 AND phone = ? AND name <> '' LIMIT 1").bind(m.senderPhone).first()
+          if (pc && pc.name) who = String(pc.name)
+        }
+        const ga = m.audio || {}
+        const gmedia = m.audio ? JSON.stringify({
+          url: ga.url || null, directPath: ga.directPath || null, mediaKey: ga.mediaKey || null, mimetype: ga.mimetype || null,
+          fileLength: ga.fileLength == null ? null : String(ga.fileLength), fileSha256: ga.fileSha256 || null, fileEncSha256: ga.fileEncSha256 || null,
+          seconds: Number(ga.seconds || 0)
+        }) : null
+        const gstatus = g.relay_mode === 'off' ? 'ignored' : 'pending'
+        const gclaim = await DB.prepare(`
+          INSERT OR IGNORE INTO wa_inbound (id, property_id, contact_phone, kind, text, quoted_text, media_json, status, sender_name)
+          VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)
+        `).bind('mid:' + m.id, g.phone, m.audio ? 'voice' : 'text', m.text || null, m.quoted || null, gmedia, gstatus, who ? who.slice(0, 60) : null).run()
+        if (!gclaim.meta || !gclaim.meta.changes) { ignored = 'duplicate'; continue }
+        if (gstatus === 'ignored') { ignored = 'relay off for this group'; continue }
+        queued++
+        try { c.executionCtx.waitUntil(processWaInbound(c.env, DB, 'mid:' + m.id).catch(() => {})) } catch (e) {}
+        continue
+      }
+      // On the shared line fromMe lines are Signabot's answers or echoes of our alerts — never staff replies
+      if (bridged && m.fromMe) { ignored = 'shared line: own message'; continue }
       let phone = m.phone
       if (!phone && m.lid) {
         const r = await DB.prepare('SELECT phone FROM wa_lids WHERE lid = ?').bind(m.lid).first()
@@ -80474,6 +80587,13 @@ app.post('/api/staff/wasender-webhook', async (c) => {
         'SELECT contact_id, name, phone, language, relay_mode FROM escalation_contacts WHERE property_id = 1 AND is_active = 1 AND phone = ? LIMIT 1'
       ).bind(phone).first()
       if (!contact) { console.log('wasender-webhook: not a contact ' + waMaskPhone(phone) + (m.fromMe ? ' (fromMe)' : '')); ignored = 'not an escalation contact'; continue }
+      if (bridged && !explicit(m)) {
+        // Someone who also talks to Signabot: only a reply to a hotel alert (or #17 …) is theirs for a guest
+        let signabot: any = null
+        try { signabot = await c.env.GXI_DB.prepare("SELECT 1 AS x FROM wa_recipients WHERE phone = ? AND status IN ('active','paused') LIMIT 1").bind(phone).first() } catch (e) {}
+        if (signabot) { ignored = 'Signabot user, not a reply to a hotel alert'; continue }
+      }
+      claimed++
       if (m.fromMe && m.text) {
         // The hotel's own line chatting with itself: our sends echo back as fromMe
         // (coalesced messages contain each queued text), staff-typed lines do not.
@@ -80501,10 +80621,11 @@ app.post('/api/staff/wasender-webhook', async (c) => {
       queued++
       try { c.executionCtx.waitUntil(processWaInbound(c.env, DB, 'mid:' + m.id).catch(() => {})) } catch (e) {}
     }
-    return c.json(queued ? { success: true, queued } : { success: true, queued: 0, ignored })
+    const verdict = { claimed, claimed_all: claimed > 0 && claimed >= Math.min(msgs.length, 5) }
+    return c.json(queued ? { success: true, queued, ...verdict } : { success: true, queued: 0, ignored, ...verdict })
   } catch (e) {
     // Always 200 quickly: a webhook that errors gets disabled by the provider
-    return c.json({ success: true })
+    return c.json({ success: true, claimed: 0, claimed_all: false })
   }
 })
 
@@ -80547,23 +80668,45 @@ app.post('/api/staff/escalation/contacts', async (c) => {
   const { DB } = c.env
   try {
     const b = await c.req.json()
-    const phone = String(b.phone || '').replace(/[^0-9]/g, '')
+    const groupJid = String(b.group_jid || '').trim()
+    if (groupJid && !/^[0-9-]{6,40}@g\.us$/.test(groupJid)) return c.json({ success: false, error: 'bad_group', message: 'That is not a WhatsApp group from the list.' }, 400)
+    const phone = groupJid || String(b.phone || '').replace(/[^0-9]/g, '')
     if (!phone) return c.json({ success: false, error: 'phone required' }, 400)
     const level = Math.min(4, Math.max(1, parseInt(b.level, 10) || 1))
     const relayMode = String(b.relay_mode || 'alerts').toLowerCase()
     if (!WA_RELAY_MODES.includes(relayMode)) return c.json({ success: false, error: 'bad_relay_mode' }, 400)
     const language = normLang(b.language || 'en')
     if (!LANG_NAMES[language]) return c.json({ success: false, error: 'bad_language' }, 400)
-    const own = await waOwnNumber(c.env, DB)
+    const own = groupJid ? '' : await waOwnNumber(c.env, DB)
     if (own && waSamePhone(own, phone)) {
       return c.json({ success: false, error: 'own_number', message: 'This is the hotel\'s own WhatsApp number (the one that sends the alerts). Add the manager\'s personal number instead.' }, 400)
     }
+    const dup = await DB.prepare('SELECT contact_id FROM escalation_contacts WHERE property_id = 1 AND phone = ? LIMIT 1').bind(phone).first()
+    if (dup) return c.json({ success: false, error: 'duplicate', message: groupJid ? 'This group is already on the list.' : 'This number is already on the list.' }, 400)
     await DB.prepare(`
       INSERT INTO escalation_contacts (property_id, name, phone, callmebot_key, is_active, level, relay_mode, language)
       VALUES (1, ?, ?, ?, 1, ?, ?, ?)
     `).bind(b.name || '', phone, b.callmebot_key || null, level, relayMode, language).run()
     return c.json({ success: true })
   } catch (e) { return c.json({ success: false }, 500) }
+})
+
+// The WhatsApp groups the hotel's line is a member of, to pick one as an alert group.
+app.get('/api/staff/escalation/wa-groups', async (c) => {
+  if (!c.req.header('X-User-ID')) return c.json({ success: false, error: 'Sign in to the admin first.' }, 401)
+  if (!c.env.WASENDER_TOKEN) return c.json({ success: false, error: 'WhatsApp is not connected.' }, 400)
+  try {
+    const r = await fetch('https://www.wasenderapi.com/api/groups', { headers: { 'Authorization': 'Bearer ' + c.env.WASENDER_TOKEN }, signal: AbortSignal.timeout(8000) })
+    const d: any = await r.json().catch(() => null)
+    if (!r.ok || !d || d.success === false) return c.json({ success: false, error: (d && (d.message || d.error)) || ('WhatsApp answered ' + r.status) }, 502)
+    const list: any[] = Array.isArray(d.data) ? d.data : (d.data && Array.isArray(d.data.items) ? d.data.items : [])
+    const groups = list.map((g: any) => ({ jid: String(g.jid || g.id || ''), name: String(g.name || g.subject || '').slice(0, 80) }))
+      .filter((g) => /^[0-9-]{6,40}@g\.us$/.test(g.jid))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    return c.json({ success: true, groups })
+  } catch (e: any) {
+    return c.json({ success: false, error: 'Could not reach WhatsApp — try again.' }, 502)
+  }
 })
 
 // Pause, re-activate or retune a contact without deleting it.
