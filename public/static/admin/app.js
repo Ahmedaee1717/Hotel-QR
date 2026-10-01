@@ -87,7 +87,10 @@ function vocab(key) {
 function tilesList() {
   var p = C.property, list = [];
   Object.keys(TYPE_META).forEach(function (typ) {
-    var m = TYPE_META[typ], offs = activeOf(offeringsFor(m.key));
+    var m = TYPE_META[typ];
+    // Events, spa, services and experiences are off on the guest home and have no editor here yet: leave them out entirely
+    if (typ !== 'restaurant' && p[m.show] !== 1) return;
+    var offs = activeOf(offeringsFor(m.key));
     list.push({ key: m.key, kind: 'type', type: typ, label: p[m.label] || m.def, sub: m.sub || '', icon: m.icon, img: firstPhoto(offs), visible: p[m.show] === 1, count: typ === 'activity' ? null : offs.length, hash: m.hash });
   });
   C.customSections.slice().sort(function (a, b) { return ((a.display_order || 0) - (b.display_order || 0)) || (a.section_id - b.section_id); }).forEach(function (cs) {
@@ -334,7 +337,7 @@ function renderHome() {
     + '<button class="btn btn-secondary btn-sm" type="button" onclick="openGuest()">' + t('act.openGuest') + '</button></div></div><div style="height:6px"></div>';
   var w = stageHost('hm-wrap');
   if (!w.firstChild) w.innerHTML = '<div class="hm-grid"><div id="hm-left"></div><div><div id="hm-phone-host"></div><div style="height:16px"></div><div class="hm-qr" id="hm-qr"></div></div></div>';
-  var tiles = tilesList();
+  var tiles = tilesList().filter(function (tl) { return tl.visible; }); // exactly what guests see on the home screen
   var tasks = [
     { ico: '🍽', t: t('task.menu'), s: t('sc.dining'), go: function () { openPage('type:restaurant'); } },
     { ico: '🕒', t: t('task.hours'), s: t('sc.dining'), go: function () { openPage('type:restaurant'); } },
