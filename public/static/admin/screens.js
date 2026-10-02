@@ -311,7 +311,7 @@ function renderInfoList(openKey) {
     + '<button class="pg-add" type="button" data-ip="add">' + t('info.add') + '</button></div><div id="info-phone-host"></div></div>';
   host.querySelectorAll('[data-ip]').forEach(function (b) { b.addEventListener('click', function () { infoAction(b.dataset.ip, b.dataset.id ? +b.dataset.id : null); }); });
   var first = pages.find(function (p) { return p.is_published === 1; }) || pages[0];
-  edPhone('info-phone-host', [['home', t('tab.home')], ['info', t('tab.sheet')]], first ? 'info' : 'home', function (tab) { return tab === 'home' || !first ? pvHome({ highlight: first ? 'info:' + first.page_key : null }) : { type: 'op-preview', view: 'info', page: { title_en: first.title_en, content_en: first.content_en, icon_class: first.icon_class, color_theme: first.color_theme } }; });
+  edPhone('info-phone-host', [['info-menu', t('tab.infoBtn')], ['home', t('tab.home')], ['info', t('tab.sheet')]], 'info-menu', function (tab) { if (tab === 'info-menu') return pvInfoMenu(); return tab === 'home' || !first ? pvHome({ highlight: first ? 'info:' + first.page_key : null }) : { type: 'op-preview', view: 'info', page: { title_en: first.title_en, content_en: first.content_en, icon_class: first.icon_class, color_theme: first.color_theme } }; });
   if (openKey) { var pg = pages.find(function (p) { return p.page_key === openKey; }); if (pg) openInfoEditor(pg.page_id); }
 }
 async function infoAction(act, id) {

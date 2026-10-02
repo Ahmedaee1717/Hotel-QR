@@ -7549,9 +7549,9 @@ app.get('/api/info-pages/:property_id', async (c) => {
     const pages = await DB.prepare(`
       SELECT page_id, page_key, title_en, title_ar, title_de, title_ru,
              title_pl, title_it, title_fr, title_cs, title_uk, title_zh,
-             icon_class, color_theme, display_order, tile_image_url
+             icon_class, color_theme, display_order, tile_image_url, show_in_menu
       FROM info_pages
-      WHERE property_id = ? AND is_published = 1 AND show_in_menu = 1
+      WHERE property_id = ? AND is_published = 1
       ORDER BY display_order ASC, page_id ASC
     `).bind(property_id).all()
 
@@ -25786,7 +25786,10 @@ window.luxTogglePassForm = function() {
 
           @media (max-width: 640px) {
             .lux-hero-actions { top: 16px; right: 12px; gap: 0.4rem; }
-            .lux-clock { top: 16px; left: 12px; padding: 0.5rem 0.85rem; }
+            /* the buttons take the top row on a phone; the clock sits just under them */
+            .lux-clock { top: 64px; left: 12px; padding: 0.5rem 0.85rem; }
+            /* sized by its longest language otherwise (Bahasa Indonesia) */
+            #languageSelector { max-width: 9.8rem; letter-spacing: 0.08em; padding-left: 0.9rem; }
             .lux-hero-frame { inset: 8px; }
             .gradient-hero { height: clamp(400px, 58vh, 520px) !important; }
             #mapFloatingBtn {
@@ -26700,6 +26703,27 @@ window.luxTogglePassForm = function() {
             color: var(--lux-gold-2); font-size: 1.1rem; flex-shrink: 0;
           }
           .lux-info-head h2 { font-family: var(--lux-serif); font-size: 1.75rem; font-weight: 600; color: var(--lux-text); line-height: 1.12; }
+          .lux-info-sec { font-size: 0.66rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--lux-gold-2); font-weight: 700; margin: 1.3rem 0 0.65rem; }
+          .lux-info-row {
+            display: flex; align-items: center; gap: 0.9rem; width: 100%; text-align: start;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            background: linear-gradient(160deg, rgba(52, 29, 39, 0.72) 0%, rgba(26, 14, 19, 0.92) 100%);
+            border-radius: 1.1rem; padding: 0.9rem 1.05rem; margin-bottom: 0.65rem;
+            color: var(--lux-text); text-decoration: none; cursor: pointer;
+          }
+          .lux-info-row:active { transform: scale(0.99); }
+          .lux-info-row .ic {
+            width: 2.6rem; height: 2.6rem; border-radius: 50%; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid rgba(212, 175, 55, 0.5); background: rgba(212, 175, 55, 0.1); color: var(--lux-gold-2);
+          }
+          .lux-info-row .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+          .lux-info-row .tx b { font-family: var(--lux-serif); font-size: 1.22rem; font-weight: 600; line-height: 1.2; }
+          .lux-info-row .tx small { font-size: 0.78rem; color: var(--lux-text-dim); margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .lux-info-row .ch { color: var(--lux-gold-2); font-size: 0.8rem; }
+          [dir="rtl"] .lux-info-row .ch { transform: scaleX(-1); }
+          .lux-info-empty { color: var(--lux-text-dim); font-size: 0.9rem; line-height: 1.6; padding: 0.4rem 0 0.2rem; }
+          .lux-info-back { background: none; border: 0; color: var(--lux-gold-2); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; padding: 0; margin-bottom: 0.9rem; cursor: pointer; }
           .lux-dial-hint { font-size: 0.78rem; color: var(--lux-text-dim); margin-bottom: 0.9rem; letter-spacing: 0.03em; }
           .lux-dial-hint i { color: var(--lux-gold-2); margin-right: 0.4rem; }
           .lux-dial {
@@ -26864,19 +26888,14 @@ window.luxTogglePassForm = function() {
                     </div>
                     <!-- Action cluster -->
                     <div class="lux-hero-actions">
-                        <!-- At Your Service Button -->
-                        <button id="serviceButton" class="lux-chip-btn lux-chip-gold" title="At Your Service">
-                            <i class="fas fa-concierge-bell"></i>
-                            <span class="hidden sm:inline">At Your Service</span>
-                        </button>
                         <!-- Feedback Button (only shows if active form exists) -->
                         <button id="feedbackButton" onclick="openFeedbackForm()" class="hidden lux-chip-btn" title="Share Your Feedback">
                             <i class="fas fa-comment-dots"></i>
                             <span class="hidden sm:inline">Feedback</span>
                         </button>
-                        <button id="infoButton" onclick="openInfoMenu()" class="lux-chip-btn" title="Hotel Information">
+                        <button id="infoButton" onclick="openInfoMenu()" class="lux-chip-btn lux-chip-gold" title="Hotel Information">
                             <i class="fas fa-info-circle"></i>
-                            <span class="hidden sm:inline">Info</span>
+                            <span id="infoChipLabel">Info</span>
                         </button>
                         <select id="languageSelector" onchange="changeLanguage()">
                             <!-- Language options will be populated dynamically -->
@@ -31008,6 +31027,8 @@ window.luxTogglePassForm = function() {
 
         function luxBuildHome() {
             const grid = document.getElementById('luxHome');
+            const infoLbl = document.getElementById('infoChipLabel');
+            if (infoLbl) infoLbl.textContent = luxT('Info');
             if (!grid || !propertyData) return;
             const lang = window.currentLanguage || 'en';
             const tiles = [];
@@ -31048,7 +31069,7 @@ window.luxTogglePassForm = function() {
             if (beachOn) beachEl.dataset.luxEnabled = '1';
             if (PREVIEW && _pvBeach != null) beachOn = _pvBeach;
             if (beachOn) add('beach', 'fas fa-umbrella-beach', luxT('Beach'), luxT('Reserve your spot'), 'luxOpenBeach()');
-            (infoPages || []).forEach(p => {
+            (infoPages || []).filter(p => String(p.show_in_menu) !== '0').forEach(p => {
                 const t = (p['title_' + lang] || p.title_en || '').replace(/</g, '&lt;');
                 add('info:' + p.page_key, p.icon_class || 'fas fa-info-circle', t, '', "openInfoPage('" + p.page_key + "')", false, p.tile_image_url || '');
             });
@@ -31089,7 +31110,8 @@ window.luxTogglePassForm = function() {
                 if (window.luxBuildHomeSafe) window.luxBuildHomeSafe();
             }).catch(function () {});
         }
-        luxTPrefetch(['Beach', 'Reserve your spot', 'Feedback', 'Share your thoughts', 'Resort Map', 'Live · Find your way', 'Restaurants & Bars', 'Served to your room', 'Our Menus', 'Page', 'Menu coming soon']);
+        luxTPrefetch(['Beach', 'Reserve your spot', 'Feedback', 'Share your thoughts', 'Resort Map', 'Live · Find your way', 'Restaurants & Bars', 'Served to your room', 'Our Menus', 'Page', 'Menu coming soon',
+            'Info', 'Hotel Information', 'Contact the hotel', 'Call reception', 'WhatsApp us', 'Email us', 'Good to know', 'Ask our concierge', 'Chat with us in any language', 'More information is coming soon.', 'All information']);
 
         window.luxBuildHomeSafe = function() {
             const content = document.getElementById('content');
@@ -31259,6 +31281,14 @@ window.luxTogglePassForm = function() {
                     if (tile) { pvScrollTo(tile, window.innerHeight / 3); pvFlash(tile); } else pvScrollTo(null, 0);
                 }
                 _pvLastKey = hkey;
+                return;
+            }
+            if (view === 'info-menu') {
+                pvResetToLive();
+                propertyData = Object.assign({}, _pvLive.property, m.property || {});
+                if (Array.isArray(m.infoPages)) infoPages = m.infoPages;
+                openInfoMenu();
+                _pvLastKey = 'info-menu';
                 return;
             }
             if (view === 'category') {
@@ -33509,8 +33539,11 @@ window.luxTogglePassForm = function() {
                 body = '<div class="lux-info-prose">' + content + '</div>';
             }
 
+            var back = window._luxInfoBack ? '<button type="button" class="lux-info-back" onclick="openInfoMenu()">‹ ' + luxEsc(luxT('All information')) + '</button>' : '';
+            window._luxInfoBack = 0;
             luxSheetOpen(
                 '<div class="lux-sheet-content" style="padding-top: 2.7rem;">' +
+                    back +
                     '<div class="lux-info-head">' +
                         '<span class="ic"><i class="' + luxEsc(icon) + '"></i></span>' +
                         '<h2>' + luxEsc(title) + '</h2>' +
@@ -33686,9 +33719,40 @@ window.luxTogglePassForm = function() {
           }
         }
 
+        // Info (hero chip): one dark-and-gold sheet — how to reach the hotel (Hotel › Contact in
+        // the admin) and every published info page (Info pages in the admin). Sample values the
+        // setup left behind are never shown.
         window.openInfoMenu = function() {
-          document.getElementById('infoMenuModal').classList.remove('hidden');
-          displayInfoMenu();
+          if (window.luxTrack) luxTrack('open', 'info-menu');
+          var p = propertyData || {}, lang = window.currentLanguage || 'en';
+          var phone = String(p.contact_phone || '').trim(), wa = String(p.guest_whatsapp || '').trim(), email = String(p.contact_email || '').trim();
+          if (phone.replace(/[^0-9+]/g, '') === '+201234567890') phone = '';
+          if (email.toLowerCase().indexOf('@paradiseresort.com') !== -1) email = '';
+          var row = function (tag, attrs, icon, title, sub) {
+            return '<' + tag + ' class="lux-info-row" ' + attrs + '><span class="ic"><i class="' + icon + '"></i></span><span class="tx"><b>' + luxEsc(title) + '</b>' + (sub ? '<small>' + luxEsc(sub) + '</small>' : '') + '</span><i class="fas fa-chevron-right ch"></i></' + tag + '>';
+          };
+          var contact = '';
+          if (phone) contact += row('a', 'href="tel:' + luxEsc(phone.replace(/[^0-9+]/g, '')) + '"', 'fas fa-phone', luxT('Call reception'), phone);
+          if (wa) contact += row('a', 'href="https://wa.me/' + luxEsc(wa.replace(/[^0-9]/g, '')) + '" target="_blank" rel="noopener"', 'fab fa-whatsapp', luxT('WhatsApp us'), wa);
+          if (email) contact += row('a', 'href="mailto:' + luxEsc(email) + '"', 'fas fa-envelope', luxT('Email us'), email);
+          var cw = document.getElementById('chatbotWidget');
+          if (cw && cw.style.display === 'block') contact += row('button', 'type="button" onclick="luxInfoOpenChat()"', 'fas fa-comments', luxT('Ask our concierge'), luxT('Chat with us in any language'));
+          var pages = (infoPages || []).map(function (pg) {
+            return row('button', 'type="button" onclick="window._luxInfoBack=1;openInfoPage(&quot;' + luxEsc(pg.page_key) + '&quot;)"', pg.icon_class || 'fas fa-circle-info', pg['title_' + lang] || pg.title_en || '', '');
+          }).join('');
+          luxSheetOpen(
+            '<div class="lux-sheet-content" style="padding-top: 2.7rem;">' +
+              '<div class="lux-info-head"><span class="ic"><i class="fas fa-circle-info"></i></span><h2>' + luxEsc(luxT('Hotel Information')) + '</h2></div>' +
+              (contact ? '<div class="lux-info-sec">' + luxEsc(luxT('Contact the hotel')) + '</div>' + contact : '') +
+              (pages ? '<div class="lux-info-sec">' + luxEsc(luxT('Good to know')) + '</div>' + pages : '') +
+              (!contact && !pages ? '<p class="lux-info-empty">' + luxEsc(luxT('More information is coming soon.')) + '</p>' : '') +
+            '</div>'
+          );
+        }
+        window.luxInfoOpenChat = function() {
+          if (window.luxCloseSheet) luxCloseSheet();
+          var chatBtn = document.getElementById('chatbotButton'), win = document.getElementById('chatWindow');
+          if (chatBtn && win && win.classList.contains('hidden')) chatBtn.click();
         }
 
         window.closeInfoMenu = function() {

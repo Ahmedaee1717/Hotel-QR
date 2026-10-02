@@ -135,6 +135,12 @@ function pvCategory(key, draft, highlightId) {
   return { type: 'op-preview', view: 'category', key: key.indexOf('type:') === 0 ? key.slice(5) : key, offerings: offs, highlightOfferingId: highlightId == null ? (draft ? draft.offering_id : null) : highlightId };
 }
 function pvOffering(row) { return { type: 'op-preview', view: 'offering', offering: row }; }
+// The Info button's sheet: hotel contact + every published info page (tile on home or not)
+function pvInfoMenu(contact, pages) {
+  var p = C.property, c = contact || { contact_phone: p.contact_phone || '', guest_whatsapp: p.guest_whatsapp || '', contact_email: p.contact_email || '' };
+  var list = (pages || C.infoPages).filter(function (pg) { return pg.is_published === 1; }).sort(function (a, b) { return ((a.display_order || 0) - (b.display_order || 0)) || (a.page_id - b.page_id); });
+  return { type: 'op-preview', view: 'info-menu', property: c, infoPages: list };
+}
 
 /* ---- shell: sidebar, crumbs, screen header, stage, router ---- */
 var V3 = { screen: null, tab: null, key: null, renderQueued: false };
@@ -434,10 +440,13 @@ function renderHotel(tab) {
     renderTilesBlock();
     edPhone('hotel-phone', [['home', t('tab.home')]], 'home', function () { return pvHome({ highlight: HOTEL.highlight }); });
   } else {
-    host.innerHTML = '<div class="ed-form" style="max-width:640px"><div class="sc-note"><span>ℹ️</span><div>' + t('contact.note') + '</div></div>'
+    host.innerHTML = '<div class="ed-grid"><div class="ed-form"><div class="sc-note"><span>ℹ️</span><div>' + t('contact.note') + '</div></div>'
       + '<div class="ed-group"><div class="ed-group-title">' + t('contact.group') + '</div>'
       + edField('f-phone', t('contact.phone'), p.contact_phone, { type: 'tel', ph: '+20 …' }) + edField('f-wa', t('contact.whatsapp'), p.guest_whatsapp, { type: 'tel', ph: '+20 …' }) + edField('f-email', t('contact.email'), p.contact_email, { type: 'email' }) + '</div>'
-      + '<div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" type="button" id="contact-save">' + t('act.saveChanges') + '</button></div></div>';
+      + '<div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" type="button" id="contact-save">' + t('act.saveChanges') + '</button></div></div><div id="hotel-phone"></div></div>';
+    var cDraft = function () { return { contact_phone: edVal('f-phone').trim(), guest_whatsapp: edVal('f-wa').trim(), contact_email: edVal('f-email').trim() }; };
+    edWatch(['f-phone', 'f-wa', 'f-email'], function () { edSchedule(); });
+    edPhone('hotel-phone', [['info-menu', t('tab.infoBtn')]], 'info-menu', function () { return pvInfoMenu(cDraft()); });
     document.getElementById('contact-save').addEventListener('click', async function () {
       var btn = this; btn.disabled = true;
       var r = await api('PATCH', '/api/admin/property-settings', { contact_phone: edVal('f-phone').trim(), guest_whatsapp: edVal('f-wa').trim(), contact_email: edVal('f-email').trim() }); btn.disabled = false;
