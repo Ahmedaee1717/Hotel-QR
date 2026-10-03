@@ -16151,6 +16151,17 @@ function beachNumKey(v: any): string {
   return String(v == null ? '' : v).trim().toLowerCase()
 }
 
+// The default beach photo, and the same photo with the front row emptied (the app draws that row's umbrellas)
+const BEACH_PHOTO_DEFAULT = '/static/beach-map.jpg'
+const BEACH_PHOTO_CLEAN = '/static/beach/beach-clean-v1.jpg'
+const BEACH_AREA_KINDS = ['pets', 'quiet', 'other']
+function beachSpotNum(v: any): number { const n = parseInt(String(v == null ? '' : v).replace(/[^0-9]/g, ''), 10); return isFinite(n) ? n : 0 }
+// Is this spot (row + number) inside an area of this kind?
+function beachInArea(areas: any[], spot: any, kind: string): any {
+  const n = beachSpotNum(spot.spot_number), r = Number(spot.row_no)
+  return areas.find((a: any) => a.kind === kind && Number(a.row_no) === r && n >= Number(a.from_num) && n <= Number(a.to_num)) || null
+}
+
 function beachAdminPropertyId(c: any, body?: any): string | null {
   const v = getAuthenticatedPropertyId(c) || (body && body.property_id) || c.req.query('property_id')
   return v == null || v === '' ? null : String(v)
@@ -16174,15 +16185,23 @@ app.get('/api/beach/layout/:property_id', async (c) => {
         FROM beach_spots s
         LEFT JOIN beach_zones z ON s.zone_id = z.zone_id
         WHERE s.property_id = ? AND s.is_active = 1
-      `).bind(property_id)
+      `).bind(property_id),
+      DB.prepare('SELECT row_no, live, x_start, x_end, y_top, spot_count, numbering FROM beach_rows WHERE property_id = ? ORDER BY row_no').bind(property_id),
+      DB.prepare('SELECT area_id, row_no, kind, label, note, from_num, to_num FROM beach_areas WHERE property_id = ? ORDER BY row_no, display_order, from_num').bind(property_id)
     ])
     const settings: any = (res[0].results || [])[0] || {}
     const globalMax = beachPosIntOrNull(settings.max_loungers_per_booking) ?? 3
-    const url = settings.beach_map_image_url || null
+    const rows: any[] = res[3].results || []
+    const areas: any[] = res[4].results || []
+    // A row drawn by the app needs the photo with that row emptied (only made for the default photo)
+    const live = rows.some((r: any) => Number(r.live) === 1)
+    const baseUrl = settings.beach_map_image_url || null
+    const url = live && baseUrl === BEACH_PHOTO_DEFAULT ? BEACH_PHOTO_CLEAN : baseUrl
     const image = {
       url,
-      width: url === '/static/beach-map.jpg' ? 1774 : (Number(settings.beach_map_width) || null),
-      height: url === '/static/beach-map.jpg' ? 887 : (Number(settings.beach_map_height) || null)
+      original: baseUrl,
+      width: baseUrl === BEACH_PHOTO_DEFAULT ? 1774 : (Number(settings.beach_map_width) || null),
+      height: baseUrl === BEACH_PHOTO_DEFAULT ? 887 : (Number(settings.beach_map_height) || null)
     }
     const nullsLast = (a: any, b: any) => (a == null ? (b == null ? 0 : 1) : (b == null ? -1 : Number(a) - Number(b)))
     const spots = (res[2].results || []).map((s: any) => {
@@ -16198,6 +16217,8 @@ app.get('/api/beach/layout/:property_id', async (c) => {
       success: true,
       image,
       zones: res[1].results || [],
+      rows: rows.map((r: any) => ({ ...r, live: Number(r.live) === 1 })),
+      areas,
       limits: {
         max_loungers_per_booking: globalMax,
         max_umbrellas_per_booking: beachPosIntOrNull(settings.max_umbrellas_per_booking) ?? 1
@@ -16891,6 +16912,126 @@ app.post('/api/admin/beach/layout/bulk', requirePermission('beach_zones_manage')
   }
 })
 
+// API: Apply a row — N spots spaced evenly from x_start to x_end (percent of the photo, spot centres),
+// numbered left to right (or right to left). Existing spots keep their id (bookings stay attached):
+// they are renumbered 1..n in their current order and moved; extra spots are added after the last one
+// (copying its settings); spots beyond N are retired, unless they have bookings from today on.
+app.put('/api/admin/beach/rows/:row_no', requirePermission('beach_zones_manage'), async (c) => {
+  const { DB } = c.env
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid request body' }, 400)
+    const property_id = beachAdminPropertyId(c, body)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    const rowNo = Number(c.req.param('row_no'))
+    if (!Number.isInteger(rowNo) || rowNo < 1 || rowNo > 100) return c.json({ error: 'Invalid row' }, 400)
+    const count = Number(body.count)
+    if (!Number.isInteger(count) || count < 1 || count > 60) return c.json({ error: 'The number of spots must be between 1 and 60' }, 400)
+    const xs = Number(body.x_start), xe = Number(body.x_end)
+    if (!isFinite(xs) || !isFinite(xe) || xs < 0 || xe > 100 || xe - xs < 5) return c.json({ error: 'The row must start before it ends, inside the photo' }, 400)
+    const numbering = body.numbering === 'rtl' ? 'rtl' : 'ltr'
+    const live = body.live ? 1 : 0
+
+    const res = await DB.batch([
+      DB.prepare(`SELECT * FROM beach_spots WHERE property_id = ? AND row_no = ? AND is_active = 1`).bind(property_id, rowNo),
+      DB.prepare('SELECT * FROM beach_rows WHERE property_id = ? AND row_no = ?').bind(property_id, rowNo)
+    ])
+    const cur: any[] = (res[0].results || []).slice().sort((a: any, b: any) => (beachSpotNum(a.spot_number) - beachSpotNum(b.spot_number)) || (Number(a.map_x) - Number(b.map_x)))
+    const prev: any = (res[1].results || [])[0] || null
+    if (!cur.length) return c.json({ error: 'Row ' + rowNo + ' has no spots yet — add one spot to it first' }, 400)
+    const ys = cur.map((x: any) => Number(x.map_y)).filter((v: number) => isFinite(v)).sort((a: number, b: number) => a - b)
+    const yTop = isFinite(Number(body.y_top)) && Number(body.y_top) > 0 ? Number(body.y_top) : (prev ? Number(prev.y_top) : (ys.length ? ys[ys.length >> 1] : 66.9))
+
+    // Spots past the new count are retired — not while they have bookings ahead
+    const retire = cur.slice(count)
+    if (retire.length) {
+      const ids = retire.map((x: any) => Number(x.spot_id))
+      const busy: any[] = (await DB.prepare(`
+        SELECT b.spot_id, MIN(b.booking_date) AS first_date FROM beach_bookings b
+        WHERE b.spot_id IN (${ids.map(() => '?').join(',')}) AND b.booking_date >= ? AND b.booking_status IN ${BEACH_ACTIVE_STATUSES}
+        GROUP BY b.spot_id
+      `).bind(...ids, cairoToday()).all()).results || []
+      if (busy.length) {
+        const byId = new Map(retire.map((x: any) => [Number(x.spot_id), x]))
+        const list = busy.map((b: any) => 'spot ' + (byId.get(Number(b.spot_id)) || {}).spot_number + ' (' + b.first_date + ')').join(', ')
+        return c.json({ error: 'has_bookings', message: 'These spots still have bookings: ' + list + '. Move or cancel them first, or keep more spots.', spots: busy }, 409)
+      }
+    }
+
+    const keep = cur.slice(0, count)
+    const tpl: any = keep[keep.length - 1]
+    const pos = (k: number) => { // k = spot number 1..count → centre x in percent
+      const slot = numbering === 'ltr' ? k : count - k + 1
+      return count === 1 ? (xs + xe) / 2 : xs + (xe - xs) * (slot - 1) / (count - 1)
+    }
+    const r2 = (n: number) => Math.round(n * 100) / 100
+    const stmts: any[] = []
+    keep.forEach((x: any, i: number) => {
+      stmts.push(DB.prepare('UPDATE beach_spots SET spot_number = ?, map_x = ?, map_y = ?, updated_at = CURRENT_TIMESTAMP WHERE spot_id = ? AND property_id = ?')
+        .bind(String(i + 1), r2(pos(i + 1)), r2(yTop), x.spot_id, property_id))
+    })
+    for (let k = keep.length + 1; k <= count; k++) {
+      stmts.push(DB.prepare(`
+        INSERT INTO beach_spots (property_id, zone_id, spot_number, spot_type, position_x, position_y, max_capacity,
+          price_full_day, price_half_day, price_hourly, currency, tier, row_no, map_x, map_y, map_w, map_h,
+          guest_bookable, max_loungers, is_premium, maintenance_mode, has_umbrella)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+      `).bind(property_id, tpl.zone_id, String(k), tpl.spot_type || 'umbrella', tpl.position_x ?? 0, tpl.position_y ?? 0, tpl.max_capacity ?? 2,
+        tpl.price_full_day ?? 0, tpl.price_half_day ?? 0, tpl.price_hourly ?? 0, tpl.currency || 'USD', tpl.tier || 'first_line', rowNo,
+        r2(pos(k)), r2(yTop), tpl.map_w ?? 2.6, tpl.map_h ?? 5.2, tpl.guest_bookable ?? 1, tpl.max_loungers ?? null, tpl.has_umbrella ?? 1))
+    }
+    for (const x of retire) stmts.push(DB.prepare('UPDATE beach_spots SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE spot_id = ? AND property_id = ?').bind(x.spot_id, property_id))
+    stmts.push(DB.prepare(`
+      INSERT INTO beach_rows (property_id, row_no, live, x_start, x_end, y_top, spot_count, numbering, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(property_id, row_no) DO UPDATE SET live = excluded.live, x_start = excluded.x_start, x_end = excluded.x_end,
+        y_top = excluded.y_top, spot_count = excluded.spot_count, numbering = excluded.numbering, updated_at = excluded.updated_at
+    `).bind(property_id, rowNo, live, r2(xs), r2(xe), r2(yTop), count, numbering))
+    // Areas that now reach past the last spot are trimmed to it
+    stmts.push(DB.prepare('UPDATE beach_areas SET to_num = ?, updated_at = datetime(\'now\') WHERE property_id = ? AND row_no = ? AND to_num > ?').bind(count, property_id, rowNo, count))
+    stmts.push(DB.prepare('DELETE FROM beach_areas WHERE property_id = ? AND row_no = ? AND from_num > ?').bind(property_id, rowNo, count))
+    await DB.batch(stmts)
+    return c.json({ success: true, row_no: rowNo, count, kept: keep.length, added: Math.max(0, count - keep.length), retired: retire.length })
+  } catch (error) {
+    console.error('Apply beach row error:', error)
+    return c.json({ error: 'Failed to save the row' }, 500)
+  }
+})
+
+// API: Replace the areas of a row (pets / quiet / other, as spot-number ranges with a note for guests)
+app.put('/api/admin/beach/rows/:row_no/areas', requirePermission('beach_zones_manage'), async (c) => {
+  const { DB } = c.env
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || !Array.isArray(body.areas)) return c.json({ error: 'areas must be a list' }, 400)
+    const property_id = beachAdminPropertyId(c, body)
+    if (!property_id) return c.json({ error: 'property_id is required' }, 400)
+    const rowNo = Number(c.req.param('row_no'))
+    if (!Number.isInteger(rowNo) || rowNo < 1 || rowNo > 100) return c.json({ error: 'Invalid row' }, 400)
+    if (body.areas.length > 12) return c.json({ error: 'At most 12 areas per row' }, 400)
+    const clean: any[] = []
+    for (const a of body.areas) {
+      const kind = BEACH_AREA_KINDS.includes(a && a.kind) ? a.kind : 'other'
+      const from = Number(a && a.from_num), to = Number(a && a.to_num)
+      if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from || to > 60) return c.json({ error: 'Each area needs a range like 1 – 6' }, 400)
+      const label = String((a && a.label) || '').trim().slice(0, 40) || (kind === 'pets' ? 'Pets welcome' : kind === 'quiet' ? 'Quiet area' : 'Area')
+      if (/[<>]/.test(label)) return c.json({ error: 'Names cannot contain < or >' }, 400)
+      const note = String((a && a.note) || '').trim().slice(0, 240)
+      clean.push({ kind, label, note, from, to })
+    }
+    const stmts: any[] = [DB.prepare('DELETE FROM beach_areas WHERE property_id = ? AND row_no = ?').bind(property_id, rowNo)]
+    clean.forEach((a, i) => stmts.push(DB.prepare(`
+      INSERT INTO beach_areas (property_id, row_no, kind, label, note, from_num, to_num, display_order, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(property_id, rowNo, a.kind, a.label, a.note || null, a.from, a.to, i)))
+    await DB.batch(stmts)
+    return c.json({ success: true, areas: clean.length })
+  } catch (error) {
+    console.error('Save beach areas error:', error)
+    return c.json({ error: 'Failed to save the areas' }, 500)
+  }
+})
+
 // API: Delete Beach Spot (soft). Refuses while future active bookings exist unless ?force=1.
 app.delete('/api/admin/beach/spots/:spot_id', requirePermission('beach_zones_manage'), async (c) => {
   const { DB } = c.env
@@ -17334,6 +17475,14 @@ app.post('/api/beach/bookings', async (c) => {
       if (Number(spot.guest_bookable) !== 1) {
         const msg = 'This spot can only be booked with the beach team.'
         return c.json({ error: msg, code: 'not_guest_bookable', message: msg }, 403)
+      }
+      if (body.with_pet === true || body.with_pet === 1 || body.with_pet === '1') {
+        const areas: any[] = (await DB.prepare("SELECT row_no, kind, label, from_num, to_num FROM beach_areas WHERE property_id = ? AND kind = 'pets'").bind(property_id).all()).results || []
+        if (!beachInArea(areas, spot, 'pets')) {
+          const where = areas.map((a: any) => a.from_num + '–' + a.to_num).join(', ')
+          const msg = where ? 'Pets are welcome on spots ' + where + ' only.' : 'Pets are not allowed on the beach.'
+          return c.json({ error: msg, code: 'pets_not_here', message: msg }, 409)
+        }
       }
       if (slot === 'full_day' && Number(settings.full_day_enabled) !== 1) {
         return c.json({ error: 'Full-day booking is not available. Please choose Morning or Afternoon.', code: 'invalid_slot' }, 400)
@@ -26174,6 +26323,18 @@ window.luxTogglePassForm = function() {
           .lux-slot-chip.on .sn, .lux-slot-chip.on .st { color: #231307; }
           .lux-slot-chip.past { opacity: 0.4; cursor: not-allowed; }
           .lux-beach-stats { display: flex; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.6rem; font-size: 0.72rem; color: var(--lux-text-dim); }
+          .lux-pet-toggle { display: flex; align-items: center; gap: 0.75rem; width: 100%; text-align: start; margin: 0.2rem 0 0.8rem; padding: 0.7rem 0.95rem; border-radius: 1rem; border: 1px solid rgba(230, 170, 60, 0.45); background: rgba(230, 170, 60, 0.08); color: var(--lux-text); cursor: pointer; }
+          .lux-pet-toggle .pt-ic { font-size: 1.25rem; }
+          .lux-pet-toggle .pt-tx { flex: 1; display: flex; flex-direction: column; }
+          .lux-pet-toggle .pt-tx b { font-size: 0.86rem; font-weight: 700; }
+          .lux-pet-toggle .pt-tx small { font-size: 0.72rem; color: var(--lux-text-dim); }
+          .lux-pet-toggle .pt-sw { width: 2.4rem; height: 1.35rem; border-radius: 999px; background: rgba(255, 255, 255, 0.18); position: relative; flex-shrink: 0; transition: background 0.2s; }
+          .lux-pet-toggle .pt-sw span { position: absolute; top: 0.15rem; left: 0.15rem; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: #fff; transition: left 0.2s; }
+          .lux-pet-toggle.on { border-color: #e6aa3c; background: rgba(230, 170, 60, 0.16); }
+          .lux-pet-toggle.on .pt-sw { background: #e6aa3c; }
+          .lux-pet-toggle.on .pt-sw span { left: 1.2rem; }
+          .lux-seat.nopet { opacity: 0.35; filter: grayscale(1); cursor: not-allowed; }
+          .lux-area-note b { color: var(--lux-gold-2); }
           .lux-stat { display: inline-flex; align-items: center; gap: 0.4rem; }
           .lux-stat strong { color: var(--lux-text); font-size: 0.9rem; }
           .lux-stat .dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -31111,6 +31272,7 @@ window.luxTogglePassForm = function() {
             }).catch(function () {});
         }
         luxTPrefetch(['Beach', 'Reserve your spot', 'Feedback', 'Share your thoughts', 'Resort Map', 'Live · Find your way', 'Restaurants & Bars', 'Served to your room', 'Our Menus', 'Page', 'Menu coming soon',
+            'Coming with a pet?', 'Pets are welcome on spots', 'Pets welcome', 'Quiet area',
             'Info', 'Hotel Information', 'Contact the hotel', 'Call reception', 'WhatsApp us', 'Email us', 'Good to know', 'Ask our concierge', 'Chat with us in any language', 'More information is coming soon.', 'All information']);
 
         window.luxBuildHomeSafe = function() {
@@ -32361,7 +32523,18 @@ window.luxTogglePassForm = function() {
         }
 
         // ── Beach booking: seamless in-app aerial experience ──
-        const luxBeach = { settings: {}, spots: [], zones: [], limits: {}, image: '', slots: [], bookings: [], date: null, slot: null, spot: null, loungers: 2, posting: false };
+        const luxBeach = { settings: {}, spots: [], zones: [], limits: {}, image: '', slots: [], bookings: [], date: null, slot: null, spot: null, loungers: 2, posting: false, rows: [], areas: [], withPet: false };
+        // The shared drawing for rows the app draws itself (umbrellas + area bands): /static/beach/live-row.js
+        function luxBeachLiveLib() {
+            if (window.BeachLive) return Promise.resolve(true);
+            return new Promise(function (resolve) {
+                var sc = document.createElement('script'); sc.src = '/static/beach/live-row.js';
+                sc.onload = function () { resolve(true); }; sc.onerror = function () { resolve(false); };
+                document.head.appendChild(sc);
+            });
+        }
+        function luxBeachPetAreas() { return (luxBeach.areas || []).filter(function (a) { return a.kind === 'pets'; }); }
+        function luxBeachPetOk(s) { return !window.BeachLive || window.BeachLive.areasOf(luxBeachPetAreas(), s).length > 0; }
         const LUX_BEACH_SCALE = 1.35;
 
         function luxBeachDateStr(d) {
@@ -32438,6 +32611,10 @@ window.luxTogglePassForm = function() {
                 luxBeach.limits = (layout && layout.limits) || {};
                 luxBeach.image = (layout && layout.image && layout.image.url) || luxBeach.settings.beach_map_image_url || '';
                 luxBeach.zones = (results[2] && results[2].overlays) || [];
+                luxBeach.rows = (layout && layout.rows) || [];
+                luxBeach.areas = (layout && layout.areas) || [];
+                luxBeach.withPet = false;
+                if (luxBeach.rows.length || luxBeach.areas.length) await luxBeachLiveLib();
                 luxBeach.date = luxBeachDays()[0];
                 luxBeach.slot = null;
                 luxBeach.spot = null;
@@ -32554,6 +32731,7 @@ window.luxTogglePassForm = function() {
                 '<div class="lux-day-strip" id="luxDayStrip"></div>' +
                 '<div class="lux-slot-row" id="luxSlotRow"></div>' +
                 '<div class="lux-beach-stats" id="luxBeachStats"></div>' +
+                '<div id="luxBeachPets"></div>' +
                 '<div class="lux-beach-map-wrap" id="luxBeachMapWrap">' +
                     '<div class="lux-beach-canvas" id="luxBeachCanvas"></div>' +
                 '</div>' +
@@ -32566,9 +32744,29 @@ window.luxTogglePassForm = function() {
             luxBeachRenderSlots();
             luxBeachRenderMap();
             luxBeachRenderStats(); // after the map so the bookable (front-row) pool is set
+            luxBeachRenderPets();
             luxBeachRenderSelection();
             luxBeachRenderForm();
         }
+        // "Coming with a pet?" — only when a pets area exists; the map then greys out the other spots
+        function luxBeachRenderPets() {
+            var host = document.getElementById('luxBeachPets');
+            if (!host) return;
+            var pets = luxBeachPetAreas();
+            if (!pets.length) { host.innerHTML = ''; return; }
+            var where = pets.map(function (a) { return a.from_num + '–' + a.to_num; }).join(', ');
+            host.innerHTML = '<button type="button" class="lux-pet-toggle' + (luxBeach.withPet ? ' on' : '') + '" onclick="luxBeachTogglePet()">' +
+                '<span class="pt-ic">🐾</span><span class="pt-tx"><b>' + luxEsc(luxT('Coming with a pet?')) + '</b><small>' + luxEsc(luxT('Pets are welcome on spots')) + ' ' + luxEsc(where) + '</small></span>' +
+                '<span class="pt-sw"><span></span></span></button>';
+        }
+        window.luxBeachTogglePet = function () {
+            luxBeach.withPet = !luxBeach.withPet;
+            if (luxBeach.withPet && luxBeach.spot && !luxBeachPetOk(luxBeach.spot)) luxBeach.spot = null;
+            luxBeachRenderPets();
+            luxBeachRenderMap();
+            luxBeachRenderSelection();
+            luxBeachRenderForm();
+        };
 
         function luxBeachRenderDays() {
             var host = document.getElementById('luxDayStrip');
@@ -32720,6 +32918,10 @@ window.luxTogglePassForm = function() {
 
                 var hero = '<div class="lux-hero-box" style="height:' + DISP_H + 'px;">' +
                     '<img class="lux-hero-img" src="' + luxEsc(luxBeach.image) + '" alt="Beach" style="height:' + DISP_H + 'px;">';
+                if (window.BeachLive) {
+                    hero += window.BeachLive.setsHtml(luxBeach.spots, luxBeach.rows, { dim: function (sp) { return luxBeach.withPet && !luxBeachPetOk(sp); } }) +
+                        window.BeachLive.areasHtml(luxBeach.areas, luxBeach.spots);
+                }
                 placed.forEach(function(f) {
                     var s = f.s;
                     var mx = Number(s.map_x);
@@ -32729,7 +32931,8 @@ window.luxTogglePassForm = function() {
                     var tier = luxBeachTier(s);
                     var freeS = luxBeachSpotOpen(s);
                     var selS = luxBeach.spot && luxBeach.spot.spot_id === s.spot_id;
-                    hero += '<button class="lux-seat' + (tier === 'vip' ? ' t-vip' : '') + (tier === 'cabana' ? ' t-cabana' : '') + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + '" data-idx="' + f.idx + '"' +
+                    var noPet = luxBeach.withPet && !luxBeachPetOk(s);
+                    hero += '<button class="lux-seat' + (tier === 'vip' ? ' t-vip' : '') + (tier === 'cabana' ? ' t-cabana' : '') + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + (noPet ? ' nopet' : '') + '" data-idx="' + f.idx + '"' +
                         ' style="left:' + (mx - mw / 2).toFixed(2) + '%; width:' + mw.toFixed(2) + '%; top:' + my.toFixed(2) + '%; height:' + mh.toFixed(2) + '%;">' +
                         '<span class="n">' + luxEsc(s.spot_number) + '</span>' + ((tier === 'vip' || s.is_premium) ? '<span class="st">★</span>' : '') +
                     '</button>';
@@ -32828,7 +33031,7 @@ window.luxTogglePassForm = function() {
 
             canvas.onclick = function(e) {
                 var el = e.target.closest('.lux-spot3d, .lux-flatspot, .lux-plate, .lux-seat');
-                if (!el || el.classList.contains('booked') || luxBeach.posting) return;
+                if (!el || el.classList.contains('booked') || el.classList.contains('nopet') || luxBeach.posting) return;
                 var picked = luxBeach.spots[parseInt(el.dataset.idx, 10)];
                 if (!luxBeachSpotOpen(picked)) return;
                 luxBeach.loungers = Math.min(parseInt(luxBeach.loungers, 10) || 2, luxBeachMaxLoungers(picked));
@@ -32869,6 +33072,9 @@ window.luxTogglePassForm = function() {
                     '<span><i class="fas fa-tag"></i>' + (price > 0 ? luxEsc(s.currency || 'USD') + ' ' + price : 'Free for hotel guests') + '</span>' +
                 '</div>' +
                 (s.spot_description ? '<p class="dd">' + luxEsc(s.spot_description) + '</p>' : '') +
+                (window.BeachLive ? window.BeachLive.areasOf(luxBeach.areas, s).map(function (a) {
+                    return '<p class="dd lux-area-note"><span>' + (window.BeachLive.ICON[a.kind] || '') + '</span> <b>' + luxEsc(luxT(a.label)) + '</b>' + (a.note ? ' — ' + luxEsc(a.note) : '') + '</p>';
+                }).join('') : '') +
             '</div>';
         }
 
@@ -32975,7 +33181,8 @@ window.luxTogglePassForm = function() {
                         num_guests: parseInt(document.getElementById('luxBchGuests').value, 10) || 1,
                         num_loungers: loungers,
                         booking_source: 'guest',
-                        special_requests: document.getElementById('luxBchNotes').value
+                        with_pet: !!luxBeach.withPet,
+                        special_requests: (luxBeach.withPet ? '🐾 Coming with a pet. ' : '') + document.getElementById('luxBchNotes').value
                     })
                 });
                 status = resp.status;
@@ -45616,6 +45823,21 @@ input:disabled{background:#f3f4f6;color:#6b7280}
 #stage.adding{cursor:crosshair}
 #photo{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;-webkit-user-drag:none}
 #cells{position:absolute;inset:0}
+.cell.pvrow{pointer-events:none}
+.cell.pvrow.new{border-style:dashed;background:#fff7e0}
+.rw-step{display:flex;align-items:center;gap:8px}
+.rw-step input{width:70px;text-align:center;font-weight:700;font-size:1.05rem}
+.rw-step .btn{width:38px;justify-content:center}
+.rw-range{width:100%}
+.rw-note{font-size:.82rem;line-height:1.45;border-radius:10px;padding:8px 11px;margin-top:10px}
+.rw-note.add{background:#ecfdf5;color:#065f46}
+.rw-note.rem{background:#fef2f2;color:#991b1b}
+.ar-row{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-bottom:8px}
+.ar-row .ar-top{display:flex;gap:6px;align-items:center}
+.ar-row .ar-top select{flex:1}
+.ar-row .ar-nums{display:flex;gap:6px;align-items:center;margin-top:6px}
+.ar-row .ar-nums input{width:64px;text-align:center}
+.ar-row input.ar-note,.ar-row input.ar-label{width:100%;margin-top:6px;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font:inherit;font-size:.86rem}
 .mapmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:#fff;background:rgba(15,23,42,.62);font-weight:600;padding:20px;text-align:center;z-index:5}
 .cell{position:absolute;border-radius:50%;cursor:grab;touch-action:none;display:flex;align-items:center;justify-content:center;background:#fff;border:2.5px solid #0ea5e9;box-shadow:0 2px 7px rgba(0,0,0,.45),0 0 0 2px rgba(255,255,255,.55);transition:box-shadow .15s,transform .15s}
 .cell::before{content:"";position:absolute;inset:-7px;border-radius:50%}
@@ -45688,6 +45910,7 @@ input:disabled{background:#f3f4f6;color:#6b7280}
   .grid2{grid-template-columns:1fr}
 }
 </style>
+<script src="/static/beach/live-row.js"></script>
 </head>
 <body>
 <header class="top">
@@ -45708,6 +45931,7 @@ input:disabled{background:#f3f4f6;color:#6b7280}
         <button class="btn" id="mSelect" onclick="setMode('select')"><i class="fas fa-arrow-pointer"></i>Select &amp; move</button>
         <button class="btn" id="mAdd" onclick="setMode('add')"><i class="fas fa-plus"></i>Add spot</button>
         <button class="btn" id="mNumber" onclick="setMode('number')"><i class="fas fa-arrow-down-1-9"></i>Number a row</button>
+        <button class="btn" id="mRow" onclick="setMode('row')"><i class="fas fa-umbrella-beach"></i>Row &amp; areas</button>
       </div>
       <button class="btn" onclick="addCabanas()"><i class="fas fa-campground"></i>Add cabanas VC-1–VC-3</button>
       <span class="sp"></span>
@@ -45725,6 +45949,7 @@ input:disabled{background:#f3f4f6;color:#6b7280}
         <div class="mapwrap" id="mapwrap">
           <div id="stage">
             <img id="photo" alt="Beach photo" draggable="false">
+            <div id="live" style="position:absolute;inset:0;pointer-events:none"></div>
             <div id="cells"></div>
           </div>
           <div id="mapMsg" class="mapmsg"><i class="fas fa-spinner fa-spin"></i> Loading the beach layout…</div>
@@ -45840,8 +46065,11 @@ var S = {
   spots: [], byId: {}, dirty: {}, sel: [],
   mode: 'select', placeId: null, pending: null, addTier: 'first_line',
   num: { src: '', start: '1', prefix: '', dir: 'ltr', incl: false }, numPlan: null,
-  zoomIx: 0, loaded: false, busy: false
+  zoomIx: 0, loaded: false, busy: false,
+  rows: [], areas: [], rowEd: null, imageOriginal: '/static/beach-map.jpg'
 };
+var PHOTO_DEFAULT = '/static/beach-map.jpg', PHOTO_CLEAN = '/static/beach/beach-clean-v1.jpg';
+var AREA_KINDS = { pets: '🐾 Pets welcome', quiet: '🌿 Quiet area', other: '◆ Other' };
 var SL = { loaded: false, saved: null, days: [], dirty: false, sunrise: '', sunset: '' };
 var curTab = 'layout';
 
@@ -45969,6 +46197,9 @@ async function loadLayout() {
   }
   var d = r.data;
   if (d.image) S.image = { url: d.image.url || '', width: Number(d.image.width) || 1774, height: Number(d.image.height) || 887 };
+  S.imageOriginal = (d.image && d.image.original) || S.image.url;
+  S.rows = d.rows || [];
+  S.areas = d.areas || [];
   S.zones = (d.zones || []).map(function (z) {
     return { zone_id: Number(z.zone_id), zone_name: z.zone_name || ('Zone ' + z.zone_id), zone_type: z.zone_type || 'standard',
       max_loungers: numOrNull(z.max_loungers), max_umbrellas: numOrNull(z.max_umbrellas), is_active: z.is_active == null ? 1 : (Number(z.is_active) ? 1 : 0) };
@@ -46021,9 +46252,37 @@ function pendingGeo() {
   var P = S.pending, sz = defSize(P.tier);
   return { x: clamp(P.x, sz.w / 2, 100 - sz.w / 2), y: clamp(P.y - sz.h / 2, 0, 100 - sz.h), w: sz.w, h: sz.h };
 }
+function rowDraftSpots() {
+  var R = S.rowEd; if (!R) return [];
+  var cur = rowSpotsSorted(R.row);
+  return BeachLive.rowPositions(R.count, R.x_start, R.x_end, R.numbering).map(function (p, i) {
+    var old = cur[i];
+    return { spot_number: String(p.n), row_no: R.row, map_x: p.x, map_y: R.y_top, map_h: old && old.map_h != null ? old.map_h : 5.2, map_w: old && old.map_w != null ? old.map_w : 2.6, maintenance_mode: old ? old.maintenance_mode : 0, isNew: !old };
+  });
+}
+function renderLive() {
+  var host = el('live'); if (!host || !window.BeachLive) return;
+  if (S.mode === 'row' && S.rowEd) {
+    var R = S.rowEd, draft = rowDraftSpots();
+    var photo = R.live && S.imageOriginal === PHOTO_DEFAULT ? PHOTO_CLEAN : S.imageOriginal;
+    if (el('photo').getAttribute('src') !== photo) el('photo').setAttribute('src', photo);
+    var others = S.spots.filter(function (x) { return Number(x.row_no) !== R.row; }).map(function (x) { var g = geo(x); return Object.assign({}, x, { map_x: g.x, map_y: g.y }); });
+    var rowsDraft = S.rows.filter(function (r) { return Number(r.row_no) !== R.row; }).concat([{ row_no: R.row, live: R.live }]);
+    host.innerHTML = BeachLive.setsHtml(others.concat(draft), rowsDraft) + BeachLive.areasHtml(R.areas.map(function (a) { return Object.assign({ row_no: R.row }, a); }), draft);
+    return;
+  }
+  if (S.image.url && el('photo').getAttribute('src') !== S.image.url) el('photo').setAttribute('src', S.image.url);
+  var cur = S.spots.map(function (x) { var g = geo(x); return Object.assign({}, x, { map_x: g.x, map_y: g.y }); });
+  host.innerHTML = BeachLive.setsHtml(cur, S.rows) + BeachLive.areasHtml(S.areas, cur);
+}
 function renderMap() {
   var h = '';
-  S.spots.forEach(function (s) { h += cellHtml(s); });
+  var inRow = S.mode === 'row' && S.rowEd;
+  S.spots.forEach(function (s) { if (inRow && Number(s.row_no) === S.rowEd.row) return; h += cellHtml(s); });
+  if (inRow) rowDraftSpots().forEach(function (d) {
+    h += '<div class="cell t-first_line pvrow' + (d.isNew ? ' new' : '') + '" style="left:' + r2(d.map_x - d.map_w / 2) + '%;top:' + r2(d.map_y) + '%;width:' + d.map_w + '%;height:' + d.map_h + '%"><span class="n">' + esc(d.spot_number) + '</span></div>';
+  });
+  renderLive();
   if (S.mode === 'add' && S.pending) {
     var g = pendingGeo();
     h += '<div class="cell ghost" style="left:' + r2(g.x - g.w / 2) + '%;top:' + r2(g.y) + '%;width:' + g.w + '%;height:' + g.h + '%"><span class="n">' + esc(S.pending.num || 'new') + '</span></div>';
@@ -46071,14 +46330,15 @@ var MODE_HINTS = {
   select: 'Click a spot to edit it. Drag to move. Shift/Ctrl-click selects several. Arrow keys nudge the selection (hold Shift for bigger steps).',
   add: 'Click the photo where the new spot goes. Esc to stop adding.',
   place: 'Click the photo where this spot goes. Esc to cancel.',
-  number: 'Pick a row, or click spots on the photo to choose them. Then set the first number and the direction.'
+  number: 'Pick a row, or click spots on the photo to choose them. Then set the first number and the direction.',
+  row: 'Set how many spots the row has, where it starts and ends, and its areas. The photo shows the result before you save.'
 };
 function renderLayout() {
   renderMap();
   renderLegend();
   renderTray();
   renderSide();
-  ['Select', 'Add', 'Number'].forEach(function (m) { el('m' + m).classList.toggle('on', S.mode === m.toLowerCase()); });
+  ['Select', 'Add', 'Number', 'Row'].forEach(function (m) { el('m' + m).classList.toggle('on', S.mode === m.toLowerCase()); });
   el('modeHint').textContent = MODE_HINTS[S.mode] || '';
 }
 function fld(label, input) { return '<div class="field"><label class="lb">' + label + '</label>' + input + '</div>'; }
@@ -46090,7 +46350,8 @@ function zoneOptions(cur, withBlank) {
 }
 function renderSide() {
   var h;
-  if (S.mode === 'add') h = addPanel();
+  if (S.mode === 'row') h = rowPanel();
+  else if (S.mode === 'add') h = addPanel();
   else if (S.mode === 'number') h = numberPanel();
   else if (S.sel.length === 1 && S.byId[S.sel[0]]) {
     h = (S.mode === 'place' ? '<div class="banner"><i class="fas fa-location-crosshairs"></i> Click the photo where spot <b>' + esc(S.byId[S.sel[0]].spot_number) + '</b> goes. <button class="lnk" onclick="cancelMode()">Cancel</button></div>' : '') + editorPanel(S.byId[S.sel[0]]);
@@ -46190,11 +46451,126 @@ function setMode(m) {
     else if (S.sel.length === 1 && S.byId[S.sel[0]] && S.byId[S.sel[0]].row_no != null) S.num.src = 'row:' + S.byId[S.sel[0]].row_no;
     else if (!valid) S.num.src = rl.length ? 'row:' + rl[0].row : (S.sel.length ? 'sel' : '');
   }
+  if (m === 'row' && !S.rowEd) { var rl0 = rowList(); openRowEditor(rl0.length ? rl0[0].row : 1, true); }
+  if (m !== 'row') S.rowEd = null;
   S.mode = m;
   S.placeId = null;
   S.pending = null;
   S.numPlan = null;
   renderLayout();
+}
+
+// ---------- rows & areas ----------
+function rowSpotsSorted(row) {
+  return S.spots.filter(function (x) { return Number(x.row_no) === Number(row); }).sort(function (a, b) {
+    return (BeachLive.num(a.spot_number) - BeachLive.num(b.spot_number)) || (geo(a).x - geo(b).x);
+  });
+}
+function openRowEditor(row, quiet) {
+  var cur = rowSpotsSorted(row), saved = null;
+  S.rows.forEach(function (r) { if (Number(r.row_no) === Number(row)) saved = r; });
+  var xs = cur.map(function (x) { return geo(x).x; });
+  var ys = cur.map(function (x) { return geo(x).y; }).sort(function (a, b) { return a - b; });
+  S.rowEd = {
+    row: Number(row),
+    count: saved ? Number(saved.spot_count) : (cur.length || 1),
+    x_start: saved ? Number(saved.x_start) : (xs.length ? r2(Math.min.apply(null, xs)) : 3),
+    x_end: saved ? Number(saved.x_end) : (xs.length ? r2(Math.max.apply(null, xs)) : 97),
+    y_top: saved ? Number(saved.y_top) : (ys.length ? ys[ys.length >> 1] : BeachLive.DEFAULT_Y_TOP),
+    numbering: saved ? (saved.numbering === 'rtl' ? 'rtl' : 'ltr') : 'ltr',
+    live: saved ? !!(saved.live === true || Number(saved.live) === 1) : false,
+    wasLive: saved ? !!(saved.live === true || Number(saved.live) === 1) : false,
+    areas: S.areas.filter(function (a) { return Number(a.row_no) === Number(row); }).map(function (a) { return { kind: a.kind, label: a.label, note: a.note || '', from_num: Number(a.from_num), to_num: Number(a.to_num) }; }),
+    existing: cur.length
+  };
+  if (!quiet) { S.mode = 'row'; renderLayout(); }
+}
+function rowPanel() {
+  var R = S.rowEd; if (!R) return idlePanel();
+  var canLive = S.imageOriginal === PHOTO_DEFAULT;
+  var rows = rowList();
+  var change = R.count > R.existing ? '<div class="rw-note add"><i class="fas fa-plus"></i> Spots ' + (R.existing + 1) + (R.count > R.existing + 1 ? '–' + R.count : '') + ' will be added (same settings as spot ' + R.existing + ').</div>'
+    : R.count < R.existing ? '<div class="rw-note rem"><i class="fas fa-minus"></i> Spots ' + (R.count + 1) + (R.existing > R.count + 1 ? '–' + R.existing : '') + ' will be removed. If one of them has a booking from today on, nothing is changed and you are told which.</div>' : '';
+  var crowded = R.count > 1 && (R.x_end - R.x_start) / (R.count - 1) < 3.3 ? '<div class="rw-note rem"><i class="fas fa-triangle-exclamation"></i> The umbrellas are getting very close — spread the row wider or use fewer spots.</div>' : '';
+  return '<div class="card"><h3>Row ' + R.row + '</h3>' +
+    (rows.length > 1 ? '<div class="chips">' + rows.map(function (r) { return '<button class="chip' + (r.row === R.row ? ' on' : '') + '" onclick="openRowEditor(' + r.row + ')">Row ' + r.row + '</button>'; }).join('') + '</div>' : '') +
+    (canLive ? '<label style="display:flex;gap:10px;align-items:flex-start;margin:10px 0 14px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;cursor:pointer;line-height:1.4"><input type="checkbox" id="rwLive" style="width:auto;flex:0 0 auto"' + (R.live ? ' checked' : '') + ' onchange="rowSet(&quot;live&quot;, this.checked)"><span style="flex:1;min-width:0"><b>The app draws the umbrellas</b><br><span class="muted sm">The photo shows an empty row and an umbrella is drawn at every spot — add or remove spots and the picture follows.</span></span></label>' : '') +
+    fld('Number of spots', '<div class="rw-step"><button class="btn" onclick="rowStep(-1)" aria-label="Fewer">−</button><input type="number" id="rwCount" min="1" max="60" value="' + R.count + '" oninput="rowSet(&quot;count&quot;, this.value)"><button class="btn" onclick="rowStep(1)" aria-label="More">+</button></div>') +
+    fld('Row starts at (left)', '<input type="range" class="rw-range" min="0" max="60" step="0.1" value="' + R.x_start + '" oninput="rowSet(&quot;x_start&quot;, this.value)">') +
+    fld('Row ends at (right)', '<input type="range" class="rw-range" min="40" max="100" step="0.1" value="' + R.x_end + '" oninput="rowSet(&quot;x_end&quot;, this.value)">') +
+    fld('Numbering', '<select onchange="rowSet(&quot;numbering&quot;, this.value)"><option value="ltr"' + (R.numbering === 'ltr' ? ' selected' : '') + '>1 on the left → right</option><option value="rtl"' + (R.numbering === 'rtl' ? ' selected' : '') + '>1 on the right → left</option></select>') +
+    '<div id="rwChange">' + change + crowded + '</div>' +
+    '</div>' +
+    '<div class="card"><h3>Areas</h3><p class="muted sm">Parts of the row with their own rule, shown on the guest map as a coloured band. Guests coming with a pet only see the pets area.</p>' +
+    '<div id="rwAreas">' + areasEditorHtml() + '</div>' +
+    '<button class="btn" onclick="areaAdd()"><i class="fas fa-plus"></i>Add an area</button>' +
+    '</div>' +
+    '<div class="card"><button class="btn pri" style="width:100%;justify-content:center" onclick="rowSave()" id="rwSave"><i class="fas fa-floppy-disk"></i>Save row &amp; areas</button>' +
+    '<button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="setMode(&quot;select&quot;)">Cancel</button></div>';
+}
+function areasEditorHtml() {
+  var R = S.rowEd;
+  if (!R.areas.length) return '<p class="muted sm">No areas yet.</p>';
+  return R.areas.map(function (a, i) {
+    return '<div class="ar-row"><div class="ar-top"><select onchange="areaSet(' + i + ', &quot;kind&quot;, this.value)">' +
+      Object.keys(AREA_KINDS).map(function (k) { return '<option value="' + k + '"' + (k === a.kind ? ' selected' : '') + '>' + AREA_KINDS[k] + '</option>'; }).join('') +
+      '</select><button class="btn icon" title="Remove this area" aria-label="Remove this area" onclick="areaDel(' + i + ')"><i class="fas fa-trash"></i></button></div>' +
+      '<div class="ar-nums"><span class="muted sm">Spots</span><input type="number" min="1" max="60" value="' + a.from_num + '" oninput="areaSet(' + i + ', &quot;from_num&quot;, this.value)"><span>–</span><input type="number" min="1" max="60" value="' + a.to_num + '" oninput="areaSet(' + i + ', &quot;to_num&quot;, this.value)"></div>' +
+      '<input class="ar-label" maxlength="40" placeholder="Name guests see" value="' + esc(a.label) + '" oninput="areaSet(' + i + ', &quot;label&quot;, this.value)">' +
+      '<input class="ar-note" maxlength="240" placeholder="Note for guests (optional), e.g. Dogs on a lead, please" value="' + esc(a.note) + '" oninput="areaSet(' + i + ', &quot;note&quot;, this.value)">' +
+      '</div>';
+  }).join('');
+}
+function rowRefresh(sideToo) {
+  renderMap();
+  if (sideToo) { renderSide(); return; }
+  var R = S.rowEd, ch = el('rwChange'); if (!ch) return;
+  var tmp = document.createElement('div'); tmp.innerHTML = rowPanel();
+  var nc = tmp.querySelector('#rwChange'); if (nc) ch.innerHTML = nc.innerHTML;
+  var cnt = el('rwCount'); if (cnt && document.activeElement !== cnt) cnt.value = R.count;
+}
+function rowSet(k, v) {
+  var R = S.rowEd; if (!R) return;
+  if (k === 'count') { var n = parseInt(v, 10); if (!isFinite(n)) return; R.count = clamp(n, 1, 60); }
+  else if (k === 'x_start') R.x_start = clamp(Number(v), 0, R.x_end - 5);
+  else if (k === 'x_end') R.x_end = clamp(Number(v), R.x_start + 5, 100);
+  else if (k === 'numbering') R.numbering = v === 'rtl' ? 'rtl' : 'ltr';
+  else if (k === 'live') {
+    R.live = !!v;
+    // first time the app draws this row: line it up with the emptied row of the photo
+    if (R.live && !R.wasLive && S.imageOriginal === PHOTO_DEFAULT) { R.y_top = BeachLive.DEFAULT_Y_TOP; R.x_start = 2.6; R.x_end = 98.1; rowRefresh(true); return; }
+  }
+  rowRefresh(false);
+}
+function rowStep(d) { var R = S.rowEd; if (!R) return; R.count = clamp(R.count + d, 1, 60); rowRefresh(false); }
+function areaAdd() {
+  var R = S.rowEd; var hasPets = R.areas.some(function (a) { return a.kind === 'pets'; });
+  R.areas.push(hasPets ? { kind: 'quiet', label: 'Quiet area', note: '', from_num: Math.max(1, R.count - 6), to_num: R.count } : { kind: 'pets', label: 'Pets welcome', note: '', from_num: 1, to_num: Math.min(6, R.count) });
+  rowRefresh(true);
+}
+function areaDel(i) { S.rowEd.areas.splice(i, 1); rowRefresh(true); }
+function areaSet(i, k, v) {
+  var a = S.rowEd.areas[i]; if (!a) return;
+  if (k === 'kind') { var old = a.kind; a.kind = v; if (!a.label || a.label === { pets: 'Pets welcome', quiet: 'Quiet area', other: 'Area' }[old]) a.label = { pets: 'Pets welcome', quiet: 'Quiet area', other: 'Area' }[v]; rowRefresh(true); return; }
+  if (k === 'from_num' || k === 'to_num') { var n = parseInt(v, 10); if (!isFinite(n)) return; a[k] = clamp(n, 1, 60); }
+  else a[k] = v;
+  renderMap();
+}
+async function rowSave() {
+  var R = S.rowEd; if (!R || S.busy) return;
+  if (dirtyCount()) { toast('Save or discard the moved spots first.', 'err'); return; }
+  for (var i = 0; i < R.areas.length; i++) {
+    var a = R.areas[i];
+    if (a.from_num > a.to_num || a.to_num > R.count) { toast('Area ' + (i + 1) + ': spots must be between 1 and ' + R.count + ', first number before the last.', 'err'); return; }
+  }
+  S.busy = true; var btn = el('rwSave'); if (btn) btn.disabled = true;
+  var r = await api('PUT', '/api/admin/beach/rows/' + R.row, { property_id: PID, count: R.count, x_start: R.x_start, x_end: R.x_end, y_top: R.y_top, numbering: R.numbering, live: R.live });
+  if (r.ok) r = await api('PUT', '/api/admin/beach/rows/' + R.row + '/areas', { property_id: PID, areas: R.areas });
+  S.busy = false; if (btn) btn.disabled = false;
+  if (!r.ok) { toast((r.data && r.data.message) || errText(r, 'Could not save the row'), 'err'); return; }
+  toast('Row ' + R.row + ' saved — guests see it now', 'ok');
+  S.rowEd = null; S.mode = 'select';
+  await loadLayout();
 }
 function cancelMode() { setMode('select'); }
 function clearSel() { S.sel = []; renderLayout(); }
